@@ -1,0 +1,86 @@
+<comment>
+problem   = Jet internal shock model 2: Corrugated internal shocks
+reference = 
+configure = --enable-mpi --enable-special-relativity --with-problem=IntSh2-mini --with-gas=mhd --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-flux=hlld --with-integrator=vl --enable-smr #--enable-ghost
+
+<job>
+problem_id      = IntSh2    # problem ID: basename of output filenames
+maxout          = 3         # Output blocks number from 1 -> maxout
+num_domains     = 2         # number of Domains in Mesh
+
+<output1>
+out_fmt    = hst      # History data dump
+dt         = 0.05     # time increment between outputs
+
+<output2>
+out_fmt    = vtk      # Binary data dump
+out        = prim     # variables to be output
+id         = prim     # file id string
+dt         = 0.05     # time increment between outputs
+
+<time>
+cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = -1         # cycle limit
+tlim       = 10.0       # time limit
+
+<domain1>
+level = 0
+
+Nx1        = 512        # Number of zones in X1-direction (x)
+x1min      = 0.         # minimum value of X1
+x1max      = 15.        # maximum value of X1
+bc_ix1     = 2          # (outflow) inner-X1 boundary flag
+# bc_ox1     = user     # (user) outer-X1 boundary flag
+# NGrid_x1   = 16         # MPI blocks in x1
+
+Nx2        = 128        # Number of zones in X2-direction (y)
+x2min      = -3.        # minimum value of X2
+x2max      = 3.         # maximum value of X2
+bc_ix2     = 4          # (periodic) inner-X2 boundary flag
+bc_ox2     = 4          # (periodic) outer-X2 boundary flag
+# NGrid_x2   = 4          # MPI blocks in x2
+
+Nx3        = 1          # Number of zones in X3-direction (z)
+x3min      = -0.01      # minimum value of X3
+x3max      = 0.01       # maximum value of X3
+bc_ix3     = 1          # (reflecting) inner-X3 boundary flag
+bc_ox3     = 1          # (reflecting) outer-X3 boundary flag
+# NGrid_x3   = 1          # MPI blocks in x3
+
+AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
+
+<domain2>
+level           = 1         # refinement level this Domain (root=0)
+Nx1             = 128       # Number of zones in X1-direction
+Nx2             = 256       # Number of zones in X2-direction
+Nx3             = 1         # Number of zones in X3-direction
+iDisp           = 640       # i-displacement measured in cells of this level
+jDisp           = 0         # j-displacement measured in cells of this level
+kDisp           = 0         # k-displacement measured in cells of this level
+AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
+
+<problem>
+
+gamma   = 1.33333333333  # gamma = C_p/C_v
+
+# BASIC SETUP
+
+z_shock = 10.
+
+# pre-shock conditions
+rho1 = 20.
+press1 = 1.0
+gamma1 = 10.
+# magnetic fields; constant Bz
+bfield1 = 14.1 # amplitude
+
+# post-shock conditions
+rho2 = 471.446
+press2 = 1016.92
+gamma2 = 1.08543
+bfield2 = 36.0765
+
+# shock corrugation: cos
+corr_cos1_A = 0.1  # amplitude
+corr_cos1_L = 1.5  # modulation wavelength perpendicular to the flow
+corr_cos1_Lz = 4.5 # modulation wavelength parallel to the flow
