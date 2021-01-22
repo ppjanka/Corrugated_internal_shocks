@@ -1,0 +1,12 @@
+*.o
+.*
+Makedepend
+Makefile
+Makeoptions
+join_vtk
+config.log
+config.status
+config.h
+defs.h
+configure
+autom4te.cache
