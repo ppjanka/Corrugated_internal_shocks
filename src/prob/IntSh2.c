@@ -1,12 +1,9 @@
 #include "copyright.h"
 /*============================================================================*/
-/*! \file current_sheet.c
- *  \brief Problem generator for current sheet test. 
- *
- * PURPOSE: Problem generator for current sheet test.  This version only allows
- *   current sheet in X-Y plane, with Bz=0.  
- *
- * REFERENCE: */
+/*! \file IntSh2.c
+ *  \brief Problem generator for the corrugated internal shock collision simulations
+ *  in context of relativistic jets in microquasars.
+ *  Author: Patryk Pjanka, Nordita, 2021 */
 /*============================================================================*/
 
 //#define DEBUG
@@ -19,7 +16,7 @@
 #include "globals.h"
 #include "prototypes.h"
 
-#include <gsl/gsl_poly.h> // -lgsl -lgslcblas -lm needed at linking stage
+#include <gsl/gsl_poly.h> // NOTE: -lgsl -lgslcblas -lm needed at linking stage
 
 // Special Relativity handling functions
 inline Real v2gamma (Real vel)
@@ -30,8 +27,8 @@ inline Real gamma2v (Real _gamma)
 // declarations
 void inflow_boundary (GridS *pGrid);
 
-// Solver for the post-shock conditions from relativistic Rankine-Hugoniot conditions -- Lorentz factor space, with Bfield included
-//  -- quartic solve based on: https://math.stackexchange.com/questions/785/is-there-a-general-formula-for-solving-4th-degree-equations-quartic/1135224
+// Solver for the post-shock conditions from relativistic Rankine-Hugoniot conditions
+// -- post-shock Lorentz factor space, with Bfield included
 void postshock_gamma_bfield (Real adiab_idx,
 		Real rho1, Real press1, Real vel1, Real gamma1, Real B1,
 		Real* rho2, Real* press2, Real* vel2, Real* gamma2, Real* B2) {
@@ -157,7 +154,6 @@ void postshock_gamma_bfield (Real adiab_idx,
 
 }
 
-
 /*----------------------------------------------------------------------------*/
 /* problem:  */
 
@@ -186,54 +182,13 @@ void problem(DomainS *pDomain)
   Real vel_shock2 = par_getd("problem", "vel_shock2");
   Real gamma_shock2 = v2gamma(vel_shock2);
   Real z_shock2 = par_getd("problem", "z_shock2");
-	// shock corrugation parameters: general
-	int corr_type = par_geti("problem", "corr_type");
-	// shock corrugation parameters: sin terms
-	Real corr_sin1_A = par_getd("problem", "corr_sin1_A");
-	Real corr_sin1_L = par_getd("problem", "corr_sin1_L");
-	Real corr_sin1_f = 2.*M_PI / corr_sin1_L;
-	Real corr_sin1_Lz = par_getd("problem", "corr_sin1_Lz");
-	if (corr_sin1_Lz == 0) corr_sin1_Lz = HUGE_NUMBER;
-	Real corr_sin1_fz = 2.*M_PI / corr_sin1_Lz;
-	Real corr_sin2_A = par_getd("problem", "corr_sin2_A");
-	Real corr_sin2_L = par_getd("problem", "corr_sin2_L");
-	Real corr_sin2_f = 2.*M_PI / corr_sin2_L;
-	Real corr_sin2_Lz = par_getd("problem", "corr_sin2_Lz");
-  if (corr_sin2_Lz == 0) corr_sin2_Lz = HUGE_NUMBER;
-	Real corr_sin2_fz = 2.*M_PI / corr_sin2_Lz;
-	Real corr_sin3_A = par_getd("problem", "corr_sin3_A");
-	Real corr_sin3_L = par_getd("problem", "corr_sin3_L");
-	Real corr_sin3_f = 2.*M_PI / corr_sin3_L;
-	Real corr_sin3_Lz = par_getd("problem", "corr_sin3_Lz");
-  if (corr_sin3_Lz == 0) corr_sin3_Lz = HUGE_NUMBER;
-	Real corr_sin3_fz = 2.*M_PI / corr_sin3_Lz;
-	// shock corrugation parameters: cos terms
-	Real corr_cos1_A = par_getd("problem", "corr_cos1_A");
-	Real corr_cos1_L = par_getd("problem", "corr_cos1_L");
-	Real corr_cos1_f = 2.*M_PI / corr_cos1_L;
-	Real corr_cos1_Lz = par_getd("problem", "corr_cos1_Lz");
-  if (corr_cos1_Lz == 0) corr_cos1_Lz = HUGE_NUMBER;
-	Real corr_cos1_fz = 2.*M_PI / corr_cos1_Lz;
-	Real corr_cos2_A = par_getd("problem", "corr_cos2_A");
-	Real corr_cos2_L = par_getd("problem", "corr_cos2_L");
-	Real corr_cos2_f = 2.*M_PI / corr_cos2_L;
-	Real corr_cos2_Lz = par_getd("problem", "corr_cos2_Lz");
-  if (corr_cos2_Lz == 0) corr_cos2_Lz = HUGE_NUMBER;
-	Real corr_cos2_fz = 2.*M_PI / corr_cos2_Lz;
-	Real corr_cos3_A = par_getd("problem", "corr_cos3_A");
-	Real corr_cos3_L = par_getd("problem", "corr_cos3_L");
-	Real corr_cos3_f = 2.*M_PI / corr_cos3_L;
-	Real corr_cos3_Lz = par_getd("problem", "corr_cos3_Lz");
-  if (corr_cos3_Lz == 0) corr_cos3_Lz = HUGE_NUMBER;
-	Real corr_cos3_fz = 2.*M_PI / corr_cos3_Lz;
 	// magnetic field parameters for constant By
 	Real bfield_A = par_getd("problem", "bfield_A");
 
-  Real eta, vel_corr, gamma_corr;
-  Real rho, press, vel, B, _gamma, sqr_gamma, enthalpy;
+  Real eta, enthalpy;
+  Real rho, press, vel, B, _gamma;
   Real rho1, press1, vel1, B1, gamma1;
-  Real rho_mock, press_mock, vel_mock, B_mock, gamma_mock;
-  Real sqr_b;
+  Real sqr_b, sqr_gamma;
 
 	for (k = ks; k <= ke; k++) {
     for (j = js; j <= je+1; j++) {
@@ -241,55 +196,28 @@ void problem(DomainS *pDomain)
 
         // read the current location
         cc_pos(pGrid,i,j,k,&z,&r,&x3);
-        vel_corr = 0.;
 
         // radial profile
         eta = 0.5 + 0.5*cos(3.*r/rmax);
 
-        // 0: AMBIENT MEDIUM
+        // Calculate fluid properties from large-x1 to small-x1 ("right-to-left")
+        // -- i.e., in the direction of the flow
+
+        // 0: Pre-shock--------------------------------------------------------
         rho = eta * (rho_jet - rho_amb) + rho_amb;
         press = eta * (press_jet - press_amb) + press_amb;
         _gamma = gamma_shock1;
         vel = - gamma2v(_gamma);
         B = bfield_A;
 
-        // shock corrugation
-        if (corr_type == 2 && z > z_shock1) { // vel1 perturbation in the preshock medium
-          vel_corr = corr_sin1_A * sin(corr_sin1_f * r) + corr_cos1_A * cos(corr_cos1_f * r)
-                   + corr_sin2_A * sin(corr_sin2_f * r) + corr_cos2_A * cos(corr_cos2_f * r)
-                   + corr_sin3_A * sin(corr_sin3_f * r) + corr_cos3_A * cos(corr_cos3_f * r);
-          vel += vel_corr;
-          _gamma = v2gamma(vel);
-        } else if (corr_type == 3) { // rho perturbation in the preshock medium
-          vel_corr = corr_sin1_A * sin(corr_sin1_f * r + corr_sin1_fz * (z-z_shock1)) // * sin(corr_sin1_f*(z-z_shock1))
-                   + corr_cos1_A * cos(corr_cos1_f * r + corr_cos1_fz * (z-z_shock1)) // * sin(corr_cos1_f*(z-z_shock1))
-                   + corr_sin2_A * sin(corr_sin2_f * r + corr_sin2_fz * (z-z_shock1)) // * sin(corr_sin2_f*(z-z_shock1))
-                   + corr_cos2_A * cos(corr_cos2_f * r + corr_cos2_fz * (z-z_shock1)) // * sin(corr_cos2_f*(z-z_shock1))
-                   + corr_sin3_A * sin(corr_sin3_f * r + corr_sin3_fz * (z-z_shock1)) // * sin(corr_sin3_f*(z-z_shock1))
-                   + corr_cos3_A * cos(corr_cos3_f * r + corr_cos3_fz * (z-z_shock1));// * sin(corr_cos3_f*(z-z_shock1));
-        }
-
-        // 0: Pre-shock--------------------------------------------------------
-        if (z > z_shock1) {
-          rho *= (1.0 + vel_corr);
         // 1: Post-shock1------------------------------------------------------
-        } else {
+        if (z < z_shock1) {
           rho1 = rho; press1 = press; vel1 = vel; gamma1 = _gamma; B1 = B;
-          if (corr_type == 4) {
-            postshock_gamma_bfield(adiab_idx, rho1, press1, vel1, gamma1, B1,
+          postshock_gamma_bfield(adiab_idx, rho1, press1, vel1, gamma1, B1,
                 &rho, &press, &vel, &_gamma, &B);
-          } else {
-            // calculate magnetic field post-shock conditions with no perturbations (to keep divB=0)
-            postshock_gamma_bfield(adiab_idx, rho1, press1, vel1, gamma1, B1,
-                &rho_mock, &press_mock, &vel_mock, &gamma_mock, &B);
-            // calculate hydro post-shock conditions taking density perturbations into account
-            rho1 *= (1.0 + vel_corr);
-            postshock_gamma_bfield(adiab_idx, rho1, press1, vel1, gamma1, B1,
-                &rho, &press, &vel, &_gamma, &B_mock);
-          }
         }
         // 1: Post-shock2-----------------------------------------------------
-        if (z < z_shock2) {
+        if (z < z_shock2 && fabs(vel_shock2) > 1.0e-6) {
           rho1 = rho; press1 = press; vel1 = vel; gamma1 = _gamma; B1 = B;
           // transform pre-shock velocity to the new shock's frame
           #ifdef DEBUG
@@ -306,23 +234,6 @@ void problem(DomainS *pDomain)
           #endif
         }
 
-        // shock corrugation through vertical motions at the initial shock position
-        if (corr_type == 0) {
-          vel_corr = (fabs(z-z_shock1) < 0.25*corr_sin1_L ? corr_sin1_A * cos(corr_sin1_f*(z-z_shock1)) * sin(corr_sin1_f * r) : 0.0)
-                   + (fabs(z-z_shock1) < 0.25*corr_cos1_L ? corr_cos1_A * cos(corr_cos1_f*(z-z_shock1)) * cos(corr_cos1_f * r) : 0.0)
-                   + (fabs(z-z_shock1) < 0.25*corr_sin2_L ? corr_sin2_A * cos(corr_sin2_f*(z-z_shock1)) * sin(corr_sin2_f * r) : 0.0)
-                   + (fabs(z-z_shock1) < 0.25*corr_cos2_L ? corr_cos2_A * cos(corr_cos2_f*(z-z_shock1)) * cos(corr_cos2_f * r) : 0.0)
-                   + (fabs(z-z_shock1) < 0.25*corr_sin3_L ? corr_sin3_A * cos(corr_sin3_f*(z-z_shock1)) * sin(corr_sin3_f * r) : 0.0)
-                   + (fabs(z-z_shock1) < 0.25*corr_cos3_L ? corr_cos3_A * cos(corr_cos3_f*(z-z_shock1)) * cos(corr_cos3_f * r) : 0.0);
-          if (fabs(vel_corr) >= 1.0) {
-            printf("[intsh2b.cpp] ERROR: Shock corrugation speed cannot exceed c = 1.0. Pleas adjust corrugation parameters. Aborting.");
-            exit(0);
-          }
-          // adjust the Lorentz factor for shock corrugation
-          gamma_corr = v2gamma(vel_corr);
-          _gamma *= gamma_corr;
-        }
-
         // Set the hydro parameters
         // NOTE: rho and Pg are in the fluid frame, Beckwith & Stone 2011
         enthalpy = 1. + adiab_idx * press / ((adiab_idx-1.)*rho);
@@ -330,9 +241,6 @@ void problem(DomainS *pDomain)
         pGrid->U[k][j][i].M1 = _gamma*_gamma*rho*enthalpy*vel;
         pGrid->U[k][j][i].M2 = 0.;
         pGrid->U[k][j][i].M3 = 0.;
-        if (corr_type == 0) {
-          pGrid->U[k][j][i].M2 = _gamma*_gamma*rho*enthalpy*vel_corr;
-        }
         pGrid->U[k][j][i].E = _gamma*_gamma*rho*enthalpy - press;
 
         // set bfield in the y-direction
@@ -355,9 +263,10 @@ void problem(DomainS *pDomain)
     }
   }
 
-	// set the rest of bfield
+	// set the rest of face-centered bfield
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
+      #pragma omp simd
       for (i=is; i<=ie+1; i++) {
         pGrid->B1i[k][j][i] = 0.0;
       }
@@ -366,13 +275,14 @@ void problem(DomainS *pDomain)
 
   for (k=ks; k<=(ke > 1 ? ke+1 : ke); k++) {
     for (j=js; j<=je; j++) {
+      #pragma omp simd
       for (i=is; i<=ie; i++) {
         pGrid->B3i[k][j][i] = 0.0;
       }
     }
   }
 
-  // enroll the bvals function
+  // enroll the bvals inflow function
   if (pDomain->Level == 0) {
     bvals_mhd_fun(pDomain, right_x1, inflow_boundary);
   }
@@ -398,7 +308,9 @@ void problem_write_restart(MeshS *pM, FILE *fp)
 void problem_read_restart(MeshS *pM, FILE *fp)
 {
   // enroll the bvals function
-  bvals_mhd_fun(*(pM->Domain), right_x1, inflow_boundary);
+  if ((*pM->Domain)->Level == 0) {
+    bvals_mhd_fun(*(pM->Domain), right_x1, inflow_boundary);
+  }
 
   return;
 }
@@ -443,8 +355,6 @@ void inflow_boundary (GridS *pGrid) {
   // shock injection parameters
   Real gamma_shock1 = par_getd("problem", "gamma_shock1");
   Real z_shock1 = par_getd("problem", "z_shock1");
-  // shock corrugation parameters: general
-  int corr_type = par_geti("problem", "corr_type");
   // shock corrugation parameters: sin terms
   Real corr_sin1_A = par_getd("problem", "corr_sin1_A");
   Real corr_sin1_L = par_getd("problem", "corr_sin1_L");
@@ -487,7 +397,7 @@ void inflow_boundary (GridS *pGrid) {
   Real bfield_A = par_getd("problem", "bfield_A");
 
   // initialize the grid conditions
-  Real eta, vel_corr;
+  Real eta, rho_pert;
   Real rho, press, vel;
   Real enthalpy;
 
@@ -508,70 +418,42 @@ void inflow_boundary (GridS *pGrid) {
       rho = eta * (rho_jet - rho_amb) + rho_amb;
       press = eta * (press_jet - press_amb) + press_amb;
 
-      // shock corrugation profile
-      if (corr_type == 1 || corr_type == 2) {
-        vel_corr = corr_sin1_A * sin(corr_sin1_f * r) + corr_cos1_A * cos(corr_cos1_f * r)
-                 + corr_sin2_A * sin(corr_sin2_f * r) + corr_cos2_A * cos(corr_cos2_f * r)
-                 + corr_sin3_A * sin(corr_sin3_f * r) + corr_cos3_A * cos(corr_cos3_f * r);
-        if (fabs(vel_corr) >= 1.0) {
-          printf("[intsh2b.cpp] ERROR: Shock corrugation speed cannot exceed c = 1.0. Pleas adjust corrugation parameters. Aborting.");
-          exit(0);
-        }
-      }
-
-      //#pragma omp simd
       for (i = iu; i <= iu+nghost; i++) {
 
         // read the current location
         cc_pos(pGrid,i,j,k,&z,&r,&x3);
 
-        if (corr_type == 3 || corr_type == 4) {
+        // calculate density corrugation
+        rho_pert = corr_sin1_A * sin(corr_sin1_f * r + corr_sin1_fz * (z-z_shock1-vel*time))
+                 + corr_cos1_A * cos(corr_cos1_f * r + corr_cos1_fz * (z-z_shock1-vel*time))
+                 + corr_sin2_A * sin(corr_sin2_f * r + corr_sin2_fz * (z-z_shock1-vel*time))
+                 + corr_cos2_A * cos(corr_cos2_f * r + corr_cos2_fz * (z-z_shock1-vel*time))
+                 + corr_sin3_A * sin(corr_sin3_f * r + corr_sin3_fz * (z-z_shock1-vel*time))
+                 + corr_cos3_A * cos(corr_cos3_f * r + corr_cos3_fz * (z-z_shock1-vel*time));
+        rho = (eta * (rho_jet - rho_amb) + rho_amb) * (1.0 + rho_pert);
 
-          // calculate density corrugation
-          vel_corr = corr_sin1_A * sin(corr_sin1_f * r + corr_sin1_fz * (z-z_shock1-vel*time)) // * sin(corr_sin1_f*(z-z_shock1))
-                   + corr_cos1_A * cos(corr_cos1_f * r + corr_cos1_fz * (z-z_shock1-vel*time)) // * sin(corr_cos1_f*(z-z_shock1))
-                   + corr_sin2_A * sin(corr_sin2_f * r + corr_sin2_fz * (z-z_shock1-vel*time)) // * sin(corr_sin2_f*(z-z_shock1))
-                   + corr_cos2_A * cos(corr_cos2_f * r + corr_cos2_fz * (z-z_shock1-vel*time)) // * sin(corr_cos2_f*(z-z_shock1))
-                   + corr_sin3_A * sin(corr_sin3_f * r + corr_sin3_fz * (z-z_shock1-vel*time)) // * sin(corr_sin3_f*(z-z_shock1))
-                   + corr_cos3_A * cos(corr_cos3_f * r + corr_cos3_fz * (z-z_shock1-vel*time));// * sin(corr_cos3_f*(z-z_shock1));
-          rho = (eta * (rho_jet - rho_amb) + rho_amb) * (1.0 + vel_corr);
+        // Set the hydro parameters
+        // NOTE: rho and Pg are in the fluid frame, Beckwith & Stone 2011
+        enthalpy = 1. + adiab_idx * press / ((adiab_idx-1.)*rho);
+        pGrid->U[k][j][i].d = _gamma*rho;
+        pGrid->U[k][j][i].M1 = _gamma*_gamma*rho*enthalpy*vel;
+        pGrid->U[k][j][i].M2 = 0.;
+        pGrid->U[k][j][i].M3 = 0.;
+        pGrid->U[k][j][i].E = _gamma*_gamma*rho*enthalpy - press;
 
-          // Set the hydro parameters
-          // NOTE: rho and Pg are in the fluid frame, Beckwith & Stone 2011
-          enthalpy = 1. + adiab_idx * press / ((adiab_idx-1.)*rho);
-          pGrid->U[k][j][i].d = _gamma*rho;
-          pGrid->U[k][j][i].M1 = _gamma*_gamma*rho*enthalpy*vel;
-          pGrid->U[k][j][i].M2 = 0.;
-          pGrid->U[k][j][i].M3 = 0.;
-          if (corr_type == 0) {
-            pGrid->U[k][j][i].M2 = _gamma*_gamma*rho*enthalpy*vel_corr;
-          }
-          pGrid->U[k][j][i].E = _gamma*_gamma*rho*enthalpy - press;
+        // set bfield in the y-direction
+        pGrid->U[k][j][i].B1c = 0.;
+        pGrid->U[k][j][i].B2c = bfield_A;
+        pGrid->U[k][j][i].B3c = 0.;
 
-          // set bfield in the y-direction
-          pGrid->U[k][j][i].B1c = 0.;
-          pGrid->U[k][j][i].B2c = bfield_A;
-          pGrid->U[k][j][i].B3c = 0.;
+        // make adjustments due to bfield
+        sqr_gamma = SQR(_gamma);
+        sqr_b = SQR(pGrid->U[k][j][i].B1c) +
+                 SQR(pGrid->U[k][j][i].B2c) +
+                 SQR(pGrid->U[k][j][i].B3c);
+        pGrid->U[k][j][i].M1 += sqr_b * vel /*from w_tot*/;
+        pGrid->U[k][j][i].E += sqr_b /*from w_tot*/ - 0.5 * sqr_b / sqr_gamma /*from P_tot*/;
 
-          // make adjustments due to bfield
-          sqr_gamma = SQR(_gamma);
-          sqr_b = SQR(pGrid->U[k][j][i].B1c) +
-                   SQR(pGrid->U[k][j][i].B2c) +
-                   SQR(pGrid->U[k][j][i].B3c);
-          pGrid->U[k][j][i].M1 += sqr_b * vel /*from w_tot*/;
-          pGrid->U[k][j][i].E += sqr_b /*from w_tot*/ - 0.5 * sqr_b / sqr_gamma /*from P_tot*/;
-
-        }/* else if (corr_type == 1 || corr_type == 2) {
-          // set the boundary conditions
-          prim(IDN, k,j,i) = rho;
-          if (corr_type == 1) { // WARNING: not corrected for 4-velocity (see above)
-            prim(IVX, k,j,i) = vel;
-            prim(IVY, k,j,i) = vel_corr;
-          } else if (corr_type == 2) {
-            prim(IVX, k,j,i) = vel + vel_corr;
-          }
-          prim(IPR, k,j,i) = press;
-        }*/
       }
     }
   }

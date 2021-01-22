@@ -90,12 +90,6 @@ z_shock1 = 10.     # initial shock position
 vel_shock2 = 0.1   # velocity of the consecutive shock in the LAB frame
 z_shock2 = 8.      # position of the consecutive shock
 
-# shock corrugation: general
-corr_type = 4 # 0: at the shock, initial conditions
-              # 1: as an inflow perturbation
-              # 2: vel1 perturbation in the pre-shock medium
-              # 3: rho perturbation in the pre-shock medium
-              # 4: rho perturbation in the inflow bvals
 # shock corrugation: sin
 corr_sin1_A = 0.  # amplitude
 corr_sin1_L = 6.0 # modulation wavelength perpendicular to the flow
