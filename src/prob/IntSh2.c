@@ -73,7 +73,7 @@ void postshock_gamma_bfield (Real adiab_idx,
   gsl_poly_complex_solve (a, 7, w, z);
   gsl_poly_complex_workspace_free (w);
 
-  Real gamma2_here;
+  Real gamma2_here, vel2_here, rho2_here, press2_here, B2_here;
 
   #ifdef DEBUG
   printf("All solutions for gamma (real,complex) pairs:\n");
@@ -115,16 +115,16 @@ void postshock_gamma_bfield (Real adiab_idx,
     if (gamma2_here > gamma1) continue; // unphysical
 
     // calculate the remaining postshock conditions
-    (*vel2) = - gamma2v(gamma2_here);
-    (*rho2) = A / ((*vel2)*gamma2_here);
-    (*B2) = vel1*B1 / (*vel2);
-    (*press2) = B - C*(*vel2) - 0.5*SQR((*B2)/gamma2_here);
+    vel2_here = - gamma2v(gamma2_here);
+    rho2_here = A / (vel2_here*gamma2_here);
+    B2_here = vel1*B1 / vel2_here;
+    press2_here = B - C*vel2_here - 0.5*SQR(B2_here/gamma2_here);
 
     // check the solution
-    Real D2 = (*B2) * (*vel2); // magnetic flux
-    Real A2 = gamma2_here * (*rho2) * (*vel2); // effective mass flux
-    Real B2x = ((*rho2) + adiab_idx * (*press2) / (adiab_idx - 1.0)) * SQR(gamma2_here*(*vel2)) + (*press2) + SQR(D2) * (1.0 + 0.5 / SQR((*vel2)*gamma2_here) ); // momentum flux
-    Real C2 = ((*rho2) + adiab_idx * (*press2) / (adiab_idx - 1.0)) * SQR(gamma2_here) * (*vel2) + SQR(D2) / (*vel2); // energy flux
+    Real D2 = B2_here * vel2_here; // magnetic flux
+    Real A2 = gamma2_here * rho2_here * vel2_here; // effective mass flux
+    Real B2x = (rho2_here + adiab_idx * press2_here / (adiab_idx - 1.0)) * SQR(gamma2_here*vel2_here) + press2_here + SQR(D2) * (1.0 + 0.5 / SQR(vel2_here*gamma2_here) ); // momentum flux
+    Real C2 = (rho2_here + adiab_idx * press2_here / (adiab_idx - 1.0)) * SQR(gamma2_here) * vel2_here + SQR(D2) / vel2_here; // energy flux
 
     if (fabs(A-A2) > 1.0e-5 || fabs(B-B2x) > 1.0e-5 || fabs(C-C2) > 1.0e-5 || fabs(D-D2) > 1.0e-5) {
       continue; // shock in the opposite direction (v > 0)
@@ -148,7 +148,7 @@ void postshock_gamma_bfield (Real adiab_idx,
   }
 
   #ifdef DEBUG
-  printf("gamma2 = %.2e, rho2 = %.2e, press2 = %.2e, B2 = %.2e\n", *gamma2, *rho2, *press2, *B2);
+  printf("gamma2 = %.2e, vel2 = %.2e, rho2 = %.2e, press2 = %.2e, B2 = %.2e\n", *gamma2, *vel2, *rho2, *press2, *B2);
   //exit(0);
   #endif
 
@@ -179,9 +179,9 @@ void problem(DomainS *pDomain)
 	// shock injection parameters
 	Real gamma_shock1 = par_getd("problem", "gamma_shock1");
 	Real z_shock1 = par_getd("problem", "z_shock1");
-  Real vel_shock2 = par_getd("problem", "vel_shock2");
-  Real gamma_shock2 = v2gamma(vel_shock2);
+  Real gamma_shock2 = par_getd("problem", "gamma_shock2");
   Real z_shock2 = par_getd("problem", "z_shock2");
+  Real gamma_shock2_LAB, vel_shock2_LAB;
 	// magnetic field parameters for constant By
 	Real bfield_A = par_getd("problem", "bfield_A");
 
@@ -217,18 +217,28 @@ void problem(DomainS *pDomain)
                 &rho, &press, &vel, &_gamma, &B);
         }
         // 1: Post-shock2-----------------------------------------------------
-        if (z < z_shock2 && fabs(vel_shock2) > 1.0e-6) {
+        if (z < z_shock2 && fabs(gamma_shock2) > 1.0e-6) {
           rho1 = rho; press1 = press; vel1 = vel; gamma1 = _gamma; B1 = B;
+          // calculate the 2nd shock velocity in the LAB frame
+          gamma_shock2_LAB = ((gamma_shock2/gamma1) - fabs(vel)*sqrt(SQR((gamma_shock2/gamma1)) + SQR(vel1) - 1.0)) / (1.0 - SQR(vel1));
+          vel_shock2_LAB = gamma2v(gamma_shock2_LAB);
+          // transform pre-shock Bfield to the new shock's frame
+          B1 = B1 * gamma_shock2 / gamma1;
           // transform pre-shock velocity to the new shock's frame
+          gamma1 = gamma_shock2_LAB * gamma1 * (1.0 - vel_shock2_LAB*vel1); // should equal gamma_shock2
+          vel1 = - gamma2v(gamma1);
           #ifdef DEBUG
-          printf("gsh2 = %.2e, g1 = %.2e, vsh2 = %.2e, v1 = %.2e\n", gamma_shock2, gamma1, vel_shock2, vel1);
+          printf("gsh2 = %.2e, g1 = %.2e, vsh2 = %.2e, v1 = %.2e\n", gamma_shock2_LAB, gamma1, vel_shock2_LAB, vel1);
+          printf("gamma1 = %.2e = %.2e = gamma_shock2\n", gamma1, gamma_shock2);
           #endif
-          gamma1 = gamma_shock2 * gamma1 * (1.0 - vel_shock2*vel1);
           // apply RH conditions
           postshock_gamma_bfield(adiab_idx, rho1, press1, vel1, gamma1, B1,
               &rho, &press, &vel, &_gamma, &B);
+          // TODO: transform post-shock Bfield back to the LAB frame
+          B *= gamma_shock2_LAB * (1.0 + vel_shock2_LAB*vel); // = gamma_LAB / gamma
           // transform post-shock velocity back to the LAB frame
-          _gamma = gamma_shock2 * _gamma * (1.0 + vel_shock2*vel);
+          _gamma *= gamma_shock2_LAB * (1.0 + vel_shock2_LAB*vel); // = gamma_LAB / gamma
+          vel = - gamma2v(_gamma);
           #ifdef DEBUG
           exit(0);
           #endif
@@ -282,8 +292,9 @@ void problem(DomainS *pDomain)
     }
   }
 
-  // enroll the bvals inflow function
-  if (pDomain->Level == 0) {
+  // enroll the bvals inflow function if we touch the inflow boundary
+  fc_pos(pGrid,ie+1,0,0,&z,&r,&x3);
+  if ((z - par_getd("domain1", "x1max")) < 1.0e-6) {
     bvals_mhd_fun(pDomain, right_x1, inflow_boundary);
   }
 

@@ -7,7 +7,7 @@ flags = export LIBS="-lgsl -lgslcblas -lm"
 <job>
 problem_id      = IntSh2    # problem ID: basename of output filenames
 maxout          = 2         # Output blocks number from 1 -> maxout
-num_domains     = 3         # number of Domains in Mesh
+num_domains     = 1         # number of Domains in Mesh
 
 <output1>
 out_fmt    = hst      # History data dump
@@ -27,19 +27,19 @@ dt         = 0.05     # time increment between outputs
 <time>
 cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
 nlim       = -1         # cycle limit
-tlim       = 50.0       # time limit
+tlim       = 10.0       # time limit
 
 <domain1>
 level = 0
 
-Nx1        = 256        # Number of zones in X1-direction (x)
-x1min      = -20.       # minimum value of X1
-x1max      = 5.         # maximum value of X1
+Nx1        = 512        # Number of zones in X1-direction (x)
+x1min      = 0.         # minimum value of X1
+x1max      = 15.        # maximum value of X1
 bc_ix1     = 2          # (outflow) inner-X1 boundary flag
 # bc_ox1     = user     # (user) outer-X1 boundary flag
 # NGrid_x1   = 16         # MPI blocks in x1
 
-Nx2        = 64         # Number of zones in X2-direction (y)
+Nx2        = 128        # Number of zones in X2-direction (y)
 x2min      = -3.        # minimum value of X2
 x2max      = 3.         # maximum value of X2
 bc_ix2     = 4          # (periodic) inner-X2 boundary flag
@@ -55,25 +55,15 @@ bc_ox3     = 1          # (reflecting) outer-X3 boundary flag
 
 AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
 
-<domain2>
-level           = 1         # refinement level this Domain (root=0)
-Nx1             = 232       # Number of zones in X1-direction
-Nx2             = 128       # Number of zones in X2-direction
-Nx3             = 1         # Number of zones in X3-direction
-iDisp           = 280       # i-displacement measured in cells of this level
-jDisp           = 0         # j-displacement measured in cells of this level
-kDisp           = 0         # k-displacement measured in cells of this level
-AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
-
-<domain3>
-level           = 2         # refinement level this Domain (root=0)
-Nx1             = 456       # Number of zones in X1-direction
-Nx2             = 256       # Number of zones in X2-direction
-Nx3             = 1         # Number of zones in X3-direction
-iDisp           = 568       # i-displacement measured in cells of this level
-jDisp           = 0         # j-displacement measured in cells of this level
-kDisp           = 0         # k-displacement measured in cells of this level
-AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
+#<domain2>
+#level           = 1         # refinement level this Domain (root=0)
+#Nx1             = 128       # Number of zones in X1-direction
+#Nx2             = 256       # Number of zones in X2-direction
+#Nx3             = 1         # Number of zones in X3-direction
+#iDisp           = 640       # i-displacement measured in cells of this level
+#jDisp           = 0         # j-displacement measured in cells of this level
+#kDisp           = 0         # k-displacement measured in cells of this level
+#AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
 
 <problem>
 
@@ -84,22 +74,21 @@ gamma   = 1.33333333333  # gamma = C_p/C_v
 r_jet = 1.0
 
 # ambient medium
-rho_amb = 20.
-press_amb = 1.0
+rho_amb = 1.
+press_amb = 0.001
 
 # jet
-rho_jet = 20.
-press_jet = 1.0
+rho_jet = 1.
+press_jet = 0.001
 
 # magnetic fields; constant Bz
-bfield_A = 14.1 # amplitude
+bfield_A = 9.901091354 # 7.001128838 # amplitude
 
 # shock setup
-gamma_shock1 = 3.  # shock (frame) velocity in LAB frame
-z_shock1 = 0.      # initial shock position
-gamma_shock2 = 3.  # velocity of the consecutive shock
-                   #   in the previous shock's post-shock frame (if 0, no shock)
-z_shock2 = -17.5   # position of the consecutive shock
+gamma_shock1 = 31.31 # shock (frame) velocity in LAB frame
+z_shock1 = 10.       # initial shock position
+vel_shock2 = 0.    # velocity of the consecutive shock in the LAB frame (0: no shock)
+z_shock2 = 8.      # position of the consecutive shock
 
 # shock corrugation: sin
 corr_sin1_A = 0.  # amplitude
