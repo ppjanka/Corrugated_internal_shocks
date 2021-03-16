@@ -1,0 +1,12 @@
+*.o
+.*
+Makefile
+Makeoptions
+autom4te.cache
+config.log
+config.status
+configure
+*Makedepend
+*Makefile
+src/config.h
+src/defs.h

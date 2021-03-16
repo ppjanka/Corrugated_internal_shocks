@@ -108,8 +108,6 @@ ifeq ($(MACHINE),macosx)
   OPT = -O3 
   FFTWLIB = -L/opt/local/lib -lfftw3
   FFTWINC = -I/opt/local/include
-else
-  abort Unsupported MACHINE=$(MACHINE)
 endif
 endif
 endif
