@@ -77,10 +77,11 @@ void problem(DomainS *pDomain)
 	}
 
 	// Prepare the particles
+	tstop0[0] = par_getd_def("particle","tstop",1.0e20); // particle stopping time, sim.u.
 	pGrid->nparticle = 0; pgrid = 0;
 	for (p = 0; p < npart; p++) {
 	  // set particle location
-	  pos.x1 = x1min + L1 * (0.5 + 1.0*p/(npart+1));
+	  pos.x1 = x1min + L1 * ((0.5 + p)/(npart+1));
 	  pos.x2 = 0.; pos.x3 = 0.;
 	  if (part_in_rank(pos)) { // if in this MPI rank
 	    (pGrid->nparticle)++;
