@@ -237,6 +237,7 @@ typedef struct Grain_Property_s{
 #endif
   Real rad;		/*!< radius of this type of particle (cm) */
   Real rho;		/*!< solid density of this type of particle (g/cm^3) */
+  Real alpha; /*!< charge-to-mass ratio, q/mc, see Mignone et al. (2018), eq. 18 */
   long num;		/*!< number of particles with this property */
   short integrator;	/*!< integrator type: exp (1), semi (2) or full (3) */
 }Grain_Property;

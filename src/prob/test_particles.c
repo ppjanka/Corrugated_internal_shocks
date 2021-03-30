@@ -86,6 +86,7 @@ void problem(DomainS *pDomain)
 	  }
 	}
 
+  #ifdef MHD
   // set the rest of face-centered bfield
   for (k=ks; k<=ke; k++) {
     for (j=js; j<=je; j++) {
@@ -111,9 +112,11 @@ void problem(DomainS *pDomain)
       }
     }
   }
+  #endif //MHD
 
 	// Prepare the particles
 	tstop0[0] = par_getd_def("particle","tstop",1.0e20); // particle stopping time, sim.u.
+  grproperty[0].alpha = par_getd("particle", "alpha"); /*!< charge-to-mass ratio, q/mc, see Mignone et al. (2018), eq. 18 */
 	pGrid->nparticle = 0; pgrid = 0;
 	for (p = 0; p < npart; p++) {
 	  // set particle location
