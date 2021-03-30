@@ -55,10 +55,14 @@ void problem(DomainS *pDomain)
   Real vel1 = par_getd("problem", "vel1");
   int npart = par_geti("particle", "parnumgrid");
   Real part_vel2 = par_getd("problem", "part_vel2");
+  #ifdef MHD
+  Real bfield3 = par_getd("problem", "bfield3");
+  #endif
 
-  // Prepare the hydro grid
+  // Prepare the mhd grid
 	for (k=ks; k<=ke; k++) {
 	  for (j=js; j<=je; j++) {
+      #pragma omp simd
 	    for (i=is; i<=ie; i++) {
 	      // resolve the physical location
         cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
@@ -67,6 +71,12 @@ void problem(DomainS *pDomain)
         pGrid->U[k][j][i].M1 = rho * vel1;
         pGrid->U[k][j][i].M2 = 0.0;
         pGrid->U[k][j][i].M3 = 0.0;
+        // set magnetic fields
+        #ifdef MHD
+        pGrid->U[k][j][i].B1c = 0.0;
+        pGrid->U[k][j][i].B2c = 0.0;
+        pGrid->U[k][j][i].B3c = bfield3;
+        #endif
         /*#ifndef BAROTROPIC
         pGrid->U[k][j][i].E = 2.5/Gamma_1
          + 0.5*(SQR(pGrid->U[k][j][i].M1) + SQR(pGrid->U[k][j][i].M2)
@@ -75,6 +85,32 @@ void problem(DomainS *pDomain)
 	    }
 	  }
 	}
+
+  // set the rest of face-centered bfield
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je; j++) {
+      #pragma omp simd
+      for (i=is; i<=ie+1; i++) {
+        pGrid->B1i[k][j][i] = 0.0;
+      }
+    }
+  }
+  for (k=ks; k<=ke; k++) {
+    for (j=js; j<=je+1; j++) {
+      #pragma omp simd
+      for (i=is; i<=ie; i++) {
+        pGrid->B2i[k][j][i] = 0.0;
+      }
+    }
+  }
+  for (k=ks; k<=(ke > 1 ? ke+1 : ke); k++) {
+    for (j=js; j<=je; j++) {
+      #pragma omp simd
+      for (i=is; i<=ie; i++) {
+        pGrid->B3i[k][j][i] = bfield3;
+      }
+    }
+  }
 
 	// Prepare the particles
 	tstop0[0] = par_getd_def("particle","tstop",1.0e20); // particle stopping time, sim.u.
