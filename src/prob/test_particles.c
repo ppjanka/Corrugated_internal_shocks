@@ -48,13 +48,16 @@ void problem(DomainS *pDomain)
   long int p, pgrid;
 
   // Initialize boxsize
-  Real x1min, x1max, L1, x2min, x2max, L2;
+  Real x1min, x1max, L1, x2min, x2max, L2, x3min, x3max, L3;
   x1min = pDomain->RootMinX[0];
   x1max = pDomain->RootMaxX[0];
   L1 = x1max - x1min;
   x2min = pDomain->RootMinX[1];
   x2max = pDomain->RootMaxX[1];
   L2 = x2max - x2min;
+  x3min = pDomain->RootMinX[2];
+  x3max = pDomain->RootMaxX[2];
+  L3 = x3max - x3min;
 
   // Read problem parameters
   #ifndef BAROTROPIC
@@ -64,10 +67,19 @@ void problem(DomainS *pDomain)
   #endif //BAROTROPIC
   Real rho = par_getd("problem", "rho");
   Real vel1 = par_getd("problem", "vel1");
+  Real vel2 = par_getd("problem", "vel2");
+  Real vel3 = par_getd("problem", "vel3");
   int npart = par_geti("particle", "parnumgrid");
+  Real part_vel1 = par_getd("problem", "part_vel1");
   Real part_vel2 = par_getd("problem", "part_vel2");
+  Real part_vel3 = par_getd("problem", "part_vel3");
   #ifdef MHD
+  Real bfield1 = par_getd("problem", "bfield1");
+  int bfield1_type = par_geti("problem", "bfield1_type");
+  Real bfield2 = par_getd("problem", "bfield2");
+  int bfield2_type = par_geti("problem", "bfield2_type");
   Real bfield3 = par_getd("problem", "bfield3");
+  int bfield3_type = par_geti("problem", "bfield3_type");
   #endif
   #ifdef SPECIAL_RELATIVITY
   Real enthalpy, gamma, sqr_b, sqr_gamma;
@@ -84,8 +96,8 @@ void problem(DomainS *pDomain)
         // set hydro variables
         pGrid->U[k][j][i].d = rho;
         pGrid->U[k][j][i].M1 = rho * vel1;// * cos(M_PI*(x1 - x1min)/(L1));
-        pGrid->U[k][j][i].M2 = 0.0;
-        pGrid->U[k][j][i].M3 = 0.0;
+        pGrid->U[k][j][i].M2 = rho * vel2;
+        pGrid->U[k][j][i].M3 = rho * vel3;
         // set magnetic fields
         #ifdef MHD
         pGrid->U[k][j][i].B1c = 0.0;
@@ -106,23 +118,39 @@ void problem(DomainS *pDomain)
         #else // SR case
         press = SQR(csound) * rho / adiab_idx;
         enthalpy = 1. + adiab_idx * press / ((adiab_idx-1.)*rho);
-        gamma = v2gamma(vel1);
+        gamma = v2gamma(sqrt(SQR(vel1) + SQR(vel2) + SQR(vel3)));
         // set hydro variables
         pGrid->U[k][j][i].d = gamma*rho;
         pGrid->U[k][j][i].M1 = gamma*gamma*rho*enthalpy*vel1;
-        pGrid->U[k][j][i].M2 = 0.0;
-        pGrid->U[k][j][i].M3 = 0.0;
+        pGrid->U[k][j][i].M2 = gamma*gamma*rho*enthalpy*vel2;
+        pGrid->U[k][j][i].M3 = gamma*gamma*rho*enthalpy*vel3;
         // set magnetic fields
         #ifdef MHD
         pGrid->U[k][j][i].B1c = 0.0;
         pGrid->U[k][j][i].B2c = 0.0;
-        pGrid->U[k][j][i].B3c = bfield3;// * sin(M_PI*(x1 - x1min)/(L1));
+        if (bfield1_type == 1) { // constant
+          pGrid->U[k][j][i].B1c = bfield1;
+        } else if (bfield1_type == 2) { // linear with x2
+          pGrid->U[k][j][i].B1c = bfield1 * (0.5 + 0.5*(x2 - x2min)/L2);
+        }
+        if (bfield2_type == 1) { // constant
+          pGrid->U[k][j][i].B2c = bfield2;
+        } else if (bfield2_type == 2) { // linear with x3
+          pGrid->U[k][j][i].B2c = bfield2 * (0.5 + 0.5*(x3 - x3min)/L3);
+        }
+        if (bfield3_type == 1) { // constant
+          pGrid->U[k][j][i].B3c = bfield3;
+        } else if (bfield3_type == 2) { // linear with x1
+          pGrid->U[k][j][i].B3c = bfield3 * (0.5 + 0.5*(x1 - x1min)/L1);
+        }
         // make momentum adjustments due to bfield
         sqr_gamma = SQR(gamma);
         sqr_b = SQR(pGrid->U[k][j][i].B1c) +
                  SQR(pGrid->U[k][j][i].B2c) +
                  SQR(pGrid->U[k][j][i].B3c);
         pGrid->U[k][j][i].M1 += sqr_b * vel1 /*from w_tot*/;
+        pGrid->U[k][j][i].M2 += sqr_b * vel2 /*from w_tot*/;
+        pGrid->U[k][j][i].M3 += sqr_b * vel3 /*from w_tot*/;
         #endif
 
         #ifndef BAROTROPIC
@@ -143,7 +171,13 @@ void problem(DomainS *pDomain)
     for (j=js; j<=je; j++) {
       #pragma omp simd
       for (i=is; i<=ie+1; i++) {
-        pGrid->B1i[k][j][i] = 0.0;
+        // resolve the physical location
+        fc_pos(pGrid,i,j,k,&x1,&x2,&x3);
+        if (bfield1_type == 1) { // constant
+          pGrid->B1i[k][j][i] = bfield1;
+        } else if (bfield1_type == 2) { // linear with x2
+          pGrid->B1i[k][j][i] = bfield1 * (0.5 + 0.5*(x2 - x2min)/L2);
+        }
       }
     }
   }
@@ -151,7 +185,13 @@ void problem(DomainS *pDomain)
     for (j=js; j<=je+1; j++) {
       #pragma omp simd
       for (i=is; i<=ie; i++) {
-        pGrid->B2i[k][j][i] = 0.0;
+        // resolve the physical location
+        fc_pos(pGrid,i,j,k,&x1,&x2,&x3);
+        if (bfield2_type == 1) { // constant
+          pGrid->B2i[k][j][i] = bfield2;
+        } else if (bfield2_type == 2) { // linear with x3
+          pGrid->B2i[k][j][i] = bfield2 * (0.5 + 0.5*(x3 - x3min)/L3);
+        }
       }
     }
   }
@@ -159,7 +199,13 @@ void problem(DomainS *pDomain)
     for (j=js; j<=je; j++) {
       #pragma omp simd
       for (i=is; i<=ie; i++) {
-        pGrid->B3i[k][j][i] = bfield3;
+        // resolve the physical location
+        fc_pos(pGrid,i,j,k,&x1,&x2,&x3);
+        if (bfield3_type == 1) { // constant
+          pGrid->B3i[k][j][i] = bfield3;
+        } else if (bfield3_type == 2) { // linear with x3
+          pGrid->B3i[k][j][i] = bfield3 * (0.5 + 0.5*(x1 - x1min)/L1);
+        }
       }
     }
   }
@@ -182,9 +228,9 @@ void problem(DomainS *pDomain)
       pGrid->particle[pgrid].x1 = pos.x1;
       pGrid->particle[pgrid].x2 = pos.x2;
       pGrid->particle[pgrid].x3 = pos.x3;
-      pGrid->particle[pgrid].v1 = 0.;
+      pGrid->particle[pgrid].v1 = part_vel1;
       pGrid->particle[pgrid].v2 = part_vel2;
-      pGrid->particle[pgrid].v3 = 0.;
+      pGrid->particle[pgrid].v3 = part_vel3;
       pGrid->particle[pgrid].pos = 1; /* grid particle */
       pGrid->particle[pgrid].my_id = p;
       #ifdef MPI_PARALLEL
