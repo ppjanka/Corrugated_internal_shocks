@@ -225,17 +225,12 @@ FILE *atherr_fp(void)
  */
 void ath_flush_out(void)
 {
-  printf("0\n");
   FILE *fp;
-  printf("A\n");
   /* If the output log file needs to be opened then there's no data on
      the stream to flush.  Return with a successful completion. */
   if(open_out_flag) return;
-  printf("B\n");
   fp = (ath_fp_out == NULL ? stdout : ath_fp_out);
-  printf("C\n");
   fflush(fp);
-  printf("D\n");
 }
 
 /*----------------------------------------------------------------------------*/

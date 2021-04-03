@@ -147,11 +147,9 @@ void integrate_2d_vl(DomainS *pD)
   int jl=js-(nghost-1), ju=je+(nghost-1);
   #endif //PARTICLES
   #ifdef PARTICLES
-  printf("Here?\n");
   // give particles access to half-step quantities
   pG->Uhalf = &Uhalf;
   pG->Whalf = &Whalf;
-  printf("Here?\n");
   #endif //PARTICLES
 
 /* Set etah=0 so first calls to flux functions do not use H-correction */
@@ -172,8 +170,6 @@ void integrate_2d_vl(DomainS *pD)
 #endif
     }
   }
-
-  printf("2DVL setup done\n");
 
 /*=== STEP 1: Compute first-order fluxes at t^{n} in x1-direction ============*/
 /* No source terms are needed since there is no temporal evolution */
@@ -225,8 +221,6 @@ void integrate_2d_vl(DomainS *pD)
 #endif
     }
   }
-
-  printf("2DVL Step 1 done\n");
 
 /*=== STEP 2: Compute first-order fluxes at t^{n} in x2-direction ============*/
 /* No source terms are needed since there is no temporal evolution */
@@ -280,8 +274,6 @@ void integrate_2d_vl(DomainS *pD)
     }
   }
 
-  printf("2DVL Step 2 done\n");
-
 /*=== STEP 3: Not needed in 2D ===*/
 
 /*=== STEP 4:  Update face-centered B for 0.5*dt =============================*/
@@ -303,8 +295,6 @@ void integrate_2d_vl(DomainS *pD)
  * Update the interface magnetic fields using CT for a half time step.
  */
 
-  printf("here\n");
-
   for (j=jl; j<=ju; j++) {
     for (i=il; i<=iu+1; i++) {
       B1_x1Face[j][i] -= hdtodx2*(emf3[j+1][i  ] - emf3[j][i]);
@@ -315,8 +305,6 @@ void integrate_2d_vl(DomainS *pD)
       B2_x2Face[j][i] += hdtodx1*(emf3[j  ][i+1] - emf3[j][i]);
     }
   }
-
-  printf("here\n");
 
   /*for (j=jl; j<=ju; j++) {
     for (i=il; i<=iu; i++) {
@@ -341,8 +329,6 @@ void integrate_2d_vl(DomainS *pD)
     }
   }
 #endif /* MHD */
-
-  printf("2DVL Step 4 done\n");
 
 /*=== STEP 5: Update cell-centered variables to half-timestep ================*/
 
@@ -397,8 +383,6 @@ void integrate_2d_vl(DomainS *pD)
 #endif
     }
   }
-
-  printf("2DVL Step 5 done\n");
 
 #ifdef FIRST_ORDER_FLUX_CORRECTION
 /*--- Step 5d ------------------------------------------------------------------
@@ -485,8 +469,6 @@ void integrate_2d_vl(DomainS *pD)
     }
   }
 
-  printf("2DVL Step 6 done\n");
-
 
 /*=== STEP 7: Conserved->Primitive variable inversion at t^{n+1/2} ===========*/
         
@@ -558,15 +540,11 @@ void integrate_2d_vl(DomainS *pD)
   }
 #endif 
 
-
-  printf("2DVL Step 7 done\n");
 /*=== STEP 7.5: Integrate the particles ======================================*/
 
   #ifdef PARTICLES
     Integrate_Particles(pD);
   #endif
-
-    printf("2DVL Step 7.5 done\n");
 
 /*=== STEP 8: Compute second-order L/R x1-interface states ===================*/
 
@@ -622,9 +600,6 @@ void integrate_2d_vl(DomainS *pD)
   }
 
 
-  printf("2DVL Step 8 done\n");
-
-
 /*=== STEP 9: Compute second-order L/R x2-interface states ===================*/
 
 /*--- Step 9a ------------------------------------------------------------------
@@ -677,8 +652,6 @@ void integrate_2d_vl(DomainS *pD)
       Wr_x2Face[j][i] = Wr[j];
     }
   }
-
-  printf("2DVL Step 9 done\n");
 
 /*=== STEP 10: Not needed in 2D ===*/
 
@@ -819,8 +792,6 @@ void integrate_2d_vl(DomainS *pD)
 #endif
   
 
-
-  printf("2DVL Step 11 done\n");
 /*=== STEP 12: Update face-centered B for a full timestep ====================*/
         
 /*--- Step 12a -----------------------------------------------------------------
@@ -869,7 +840,6 @@ void integrate_2d_vl(DomainS *pD)
 #endif /* MHD */
 
 
-  printf("2DVL Step 12 done\n");
 /*=== STEP 13: Add source terms for a full timestep using n+1/2 states =======*/
        
 /*--- Step 13a -----------------------------------------------------------------
@@ -903,8 +873,6 @@ void integrate_2d_vl(DomainS *pD)
       }
     }
   }
-
-  printf("2DVL Step 13 done\n");
 
 /*=== STEP 14: Update cell-centered values for a full timestep ===============*/
 
@@ -960,9 +928,7 @@ void integrate_2d_vl(DomainS *pD)
       S[j][i] -= dtodx2*(x2FluxS[j+1][i]  - x2FluxS[j][i]);
 #endif
     }
-  }  
-
-  printf("2DVL Step 14 done\n");
+  }
 
 #ifdef FIRST_ORDER_FLUX_CORRECTION
 /*=== STEP 15: First-order flux correction ===================================*/
@@ -1251,8 +1217,6 @@ void integrate_2d_vl(DomainS *pD)
   }
 
 #endif /* STATIC_MESH_REFINEMENT */
-
-  printf("2DVL finished\n");
 
   return;
 }

@@ -35,6 +35,8 @@
 
 #ifdef PARTICLES         /* endif at the end of the file */
 
+//#define DEBUG
+
 /*==============================================================================
  * PRIVATE FUNCTION PROTOTYPES:
  *   Delete_Ghost()   - delete ghost particles
@@ -94,8 +96,10 @@ void Integrate_Particles(DomainS *pD)
   {/* loop over all particles */
     curG = &(pG->particle[p]);
 
-    printf("INITIAL STATE: x = v = %.2e %.2e %.2e, v = %.2e %.2e %.2e\n", curG->x1, curG->x2, curG->x3, curG->v1, curG->v2, curG->v3);
+    #ifdef DEBUG
+    printf("INITIAL STATE: x = %.2e %.2e %.2e, v = %.2e %.2e %.2e\n", curG->x1, curG->x2, curG->x3, curG->v1, curG->v2, curG->v3);
     //exit(0);
+    #endif
 
 /* Step 1: Calculate velocity update */
     switch(grproperty[curG->property].integrator)
@@ -170,8 +174,9 @@ void Integrate_Particles(DomainS *pD)
     curG->v3 = curP->v3;
     p++;
 
-    printf("FINAL STATE: x = v = %.2e %.2e %.2e, v = %.2e %.2e %.2e\n", curG->x1, curG->x2, curG->x3, curG->v1, curG->v2, curG->v3);
-
+    #ifdef DEBUG
+    printf("FINAL STATE: x = %.2e %.2e %.2e, v = %.2e %.2e %.2e\n", curG->x1, curG->x2, curG->x3, curG->v1, curG->v2, curG->v3);
+    #endif
   } /* end of the for loop */
 
   /* output the status */
@@ -238,9 +243,8 @@ void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
   } else {
     k = 1;
   }*/
-  printf("Getting weights\n");
+
   getweight(pG, x,y,z, cell1, weights, &i,&j,&k);
-  printf("done\n");
 
   // interpolate bfields and vels from cell-centered values
   // (which should have been evolved by dt/2 at this point)
@@ -255,13 +259,13 @@ void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
     for (jj = 0; jj < ( pG->Nx[1] > 1 ? 3 : 1 ); jj++) {
       #pragma omp simd
       for (ii = 0; ii < ( pG->Nx[0] > 1 ? 3 : 1 ); ii++) {
+        #ifdef DEBUG
         printf(" -- velocity interp loop: %i %i %i\n", ii,jj,kk);
+        #endif
         idxk = k+kk;
         idxj = j+jj;
         idxi = i+ii;
         cc_pos(pG,idxi,idxj,idxk,&x,&y,&z);
-        printf("1\n");
-        // Triangular Shaped Cloud (TSC) weighing:
         weight = weights[kk][jj][ii];
         /*1.0;
         // x1 weight
@@ -285,20 +289,18 @@ void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
         } else {
           weight *= 0.5 * SQR(0.5 - dist);
         }*/
-        printf("2\n");
-        // maybe better to use conserved vars at half-step, [TODO:] move to SR (with VL-SR integrator it may be pre-computed)
-        //printf("%i %i %i\n", idxk, idxj, idxi);
         v[0] += weight * pG->Whalf[idxk][idxj][idxi].V1;
         v[1] += weight * pG->Whalf[idxk][idxj][idxi].V2;
         v[2] += weight * pG->Whalf[idxk][idxj][idxi].V3;
         B[0] += weight * pG->Whalf[idxk][idxj][idxi].B1c;
         B[1] += weight * pG->Whalf[idxk][idxj][idxi].B2c;
         B[2] += weight * pG->Whalf[idxk][idxj][idxi].B3c;
+        sum_weights += weight;
+        #ifdef DEBUG
         printf("weight: %.2e\n", weight);
         printf("v: %.2e %.2e %.2e\n", v[0], v[1], v[2]);
         printf("B: %.2e %.2e %.2e\n", B[0], B[1], B[2]);
-        sum_weights += weight;
-        //printf("3\n");
+        #endif
       }
     }
   }
@@ -308,15 +310,13 @@ void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
     v[nn] /= sum_weights;
     B[nn] /= sum_weights;
   }
+  #ifdef DEBUG
   printf("Final v: %.2e %.2e %.2e\n", v[0], v[1], v[2]);
   printf("Final B: %.2e %.2e %.2e\n", B[0], B[1], B[2]);
-
-  //printf("Velocity interpolated.\n");
+  #endif
 
   // CALCULATE E = - V x B
   cross_product(B, v, E);
-
-  //printf("EM interpolated.\n");
 }
 
 /* ------------ Boris pusher -- implicit Verlet particle integrator -----------------*/
@@ -336,7 +336,9 @@ void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
 void int_par_boris(GridS *pG, GrainS *curG, Real3Vect cell1,
                               Real *dv1, Real *dv2, Real *dv3, Real *ts)
 {
+  #ifdef DEBUG
   printf("Inside Boris integrator.\n");
+  #endif
 
   int n;
 
@@ -346,15 +348,19 @@ void int_par_boris(GridS *pG, GrainS *curG, Real3Vect cell1,
   Real v[3], vn[3]; // particle and half-step fluid 3-velocities
   v[0] = curG->v1; v[1] = curG->v2; v[2] = curG->v3;
   velocity_3to4(v, u, &gamma);
+  #ifdef DEBUG
   printf("SR quantities calculated.\n");
   printf("v: %.2e %.2e %.2e\n", v[0], v[1], v[2]);
   printf("u: %.2e %.2e %.2e\n", u[0], u[1], u[2]);
+  #endif
 
   // integration step from the particle's charge-to-mass ratio, see Mignone et al. (2018), eq. 18
   Real h2 = 0.5 * grproperty[curG->property].alpha* pG->dt;
 
   // Step 1 [DRIFT]: predict the particle position after half time step
+  #ifdef DEBUG
   printf("Step 1: ");
+  #endif
   Real x1n, x2n, x3n;
   if (pG->Nx[0] > 1)  x1n = curG->x1 + 0.5*curG->v1*pG->dt;
   else x1n = curG->x1;
@@ -362,10 +368,14 @@ void int_par_boris(GridS *pG, GrainS *curG, Real3Vect cell1,
   else x2n = curG->x2;
   if (pG->Nx[2] > 1)  x3n = curG->x3 + 0.5*curG->v3*pG->dt;
   else x3n = curG->x3;
+  #ifdef DEBUG
   printf("done.\n");
+  #endif
 
   // Interpolate and extract electromagnetic components
+  #ifdef DEBUG
   printf("EM components: \n");
+  #endif
   Real Bn[3], En[3]; // EM fields interpolated at the half-step particle position
   interpolate_EM(pG, x1n, x2n, x3n, Bn, En, vn, cell1);
   gamma_n = 1.0 / sqrt(1.0 - SQR(vn[0]) - SQR(vn[1]) - SQR(vn[2]));
@@ -373,58 +383,86 @@ void int_par_boris(GridS *pG, GrainS *curG, Real3Vect cell1,
     Bn[n] *= h2/gamma_n;
   }
   Real sqr_Bn = SQR(Bn[0]) + SQR(Bn[1]) + SQR(Bn[2]);
+  #ifdef DEBUG
   printf("Bn: %.2e %.2e %.2e\n", Bn[0], Bn[1], Bn[2]);
   printf("En: %.2e %.2e %.2e\n", En[0], En[1], En[2]);
   printf("done.\n");
+  #endif
 
   // Step 2 [KICK]
+  #ifdef DEBUG
   printf("Step 2: ");
   printf("u: %.2e %.2e %.2e\n", u[0], u[1], u[2]);
+  #endif
   Real u_minus [3];
   for (n = 0; n < 3; n++) {
     u_minus[n] = u[n] + h2 /*c*/ * En[n];
   }
+  #ifdef DEBUG
   printf("u_minus: %.2e %.2e %.2e\n", u_minus[0], u_minus[1], u_minus[2]);
   printf("done.\n");
+  #endif
 
   // Step 3 [ROTATE]
+  #ifdef DEBUG
   printf("Step 3: ");
+  #endif
   Real u_plus [3], buffer [3];
   cross_product(u_minus, Bn, buffer);
+  #ifdef DEBUG
   printf("buffer: %.2e %.2e %.2e\n", buffer[0], buffer[1], buffer[2]);
+  #endif
   for (n = 0; n < 3; n++) {
     buffer[n] += u_minus[n];
     buffer[n] /= 0.5 * (1.0 + sqr_Bn);
   }
+  #ifdef DEBUG
   printf("buffer: %.2e %.2e %.2e\n", buffer[0], buffer[1], buffer[2]);
+  #endif
   cross_product(buffer, Bn, u_plus);
+  #ifdef DEBUG
   printf("u_plus: %.2e %.2e %.2e\n", u_plus[0], u_plus[1], u_plus[2]);
+  #endif
   for (n = 0; n < 3; n++) {
     u_plus[n] += u_minus[n];
   }
+  #ifdef DEBUG
   printf("u_plus: %.2e %.2e %.2e\n", u_plus[0], u_plus[1], u_plus[2]);
   printf("done.\n");
+  #endif
 
   // Step 4 [KICK]
+  #ifdef DEBUG
   printf("Step 4: ");
+  #endif
   for (n = 0; n < 3; n++) {
     u[n] = u_plus[n] + h2 /* c */ * En[n];
   }
+  #ifdef DEBUG
   printf("New 4velocity: %.2e %.2e %.2e\n", u[0], u[1], u[2]);
+  #endif
   velocity_4to3(u, v, &gamma);
+  #ifdef DEBUG
   printf("done.\n");
+  #endif
 
   // Report velocity change to the main integrator
+  #ifdef DEBUG
   printf("Reporting velocity change: \n");
   printf("New velocity: %.2e %.2e %.2e\n", v[0], v[1], v[2]);
+  #endif
   (*dv1) = v[0] - curG->v1;
   (*dv2) = v[1] - curG->v2;
   (*dv3) = v[2] - curG->v3;
+  #ifdef DEBUG
   printf(" -- velocity change: %.2e %.2e %.2e\n", (*dv1), (*dv2), (*dv3));
   printf("done.\n");
+  #endif
 
   // Step 5 [DRIFT] -- performed in Integrate_Particles (see above)
+  #ifdef DEBUG
   printf("Boris integrator done.\n");
+  #endif
 
 }
 

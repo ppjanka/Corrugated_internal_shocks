@@ -116,7 +116,7 @@ void problem(DomainS *pDomain)
         #ifdef MHD
         pGrid->U[k][j][i].B1c = 0.0;
         pGrid->U[k][j][i].B2c = 0.0;
-        pGrid->U[k][j][i].B3c = bfield3 * sin(M_PI*(x1 - x1min)/(L1));
+        pGrid->U[k][j][i].B3c = bfield3;// * sin(M_PI*(x1 - x1min)/(L1));
         // make momentum adjustments due to bfield
         sqr_gamma = SQR(gamma);
         sqr_b = SQR(pGrid->U[k][j][i].B1c) +
