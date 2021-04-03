@@ -333,6 +333,8 @@ typedef struct Grid_s{
   GrainS *particle;          /*!< array of all particles */
   GrainAux *parsub;          /*!< supplemental particle information */
   GPCouple ***Coup;          /*!< array of gas-particle coupling */
+  ConsS*** Uhalf; // conserved variables at 1/2 step
+  PrimS*** Whalf; // primitive variables at 1/2 step
 #endif /* PARTICLES */
 
 #ifdef STATIC_MESH_REFINEMENT

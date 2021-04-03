@@ -36,9 +36,6 @@
 #include "../globals.h"
 #include "prototypes.h"
 #include "../prototypes.h"
-#ifdef PARTICLES
-#include "../particles/particle.h"
-#endif
 
 #ifdef SPECIAL_RELATIVITY
 
@@ -145,22 +142,9 @@ void integrate_3d_vl(DomainS *pD)
   PrimS Wcheck;
   Int3Vect BadCell;
 #endif
-
-  /* With particles, one more ghost cell must be updated in predict step */
-  #ifdef PARTICLES
-  int il=is-nghost, iu=ie+nghost;
-  int jl=js-nghost, ju=je+nghost;
-  int kl=ks-nghost, ku=ke+nghost;
-  #else
   int il=is-(nghost-1), iu=ie+(nghost-1);
   int jl=js-(nghost-1), ju=je+(nghost-1);
   int kl=ks-(nghost-1), ku=ke+(nghost-1);
-  #endif // PARTICLES
-  #ifdef PARTICLES
-  // give particles access to half-step quantities
-  pG->Uhalf = Uhalf;
-  pG->Whalf = Whalf;
-  #endif //PARTICLES
 
 /* Set etah=0 so first calls to flux functions do not use H-correction */
   etah = 0.0;
@@ -170,16 +154,16 @@ void integrate_3d_vl(DomainS *pD)
       for (i=is-nghost; i<=ie+nghost; i++) {
         Uhalf[k][j][i] = pG->U[k][j][i];
         W[k][j][i] = Cons_to_Prim(&(pG->U[k][j][i]));
-        #ifdef USE_ENTROPY_FIX
-        S[k][j][i] = W[k][j][i].P * pow(W[k][j][i].d,1.0-Gamma);
-        S[k][j][i]*= pG->U[k][j][i].d / W[k][j][i].d;
-        Shalf[k][j][i] = S[k][j][i];
-        #endif
-        #ifdef MHD
+#ifdef USE_ENTROPY_FIX
+	S[k][j][i] = W[k][j][i].P * pow(W[k][j][i].d,1.0-Gamma);
+	S[k][j][i]*= pG->U[k][j][i].d / W[k][j][i].d;
+	Shalf[k][j][i] = S[k][j][i];
+#endif
+#ifdef MHD
         B1_x1Face[k][j][i] = pG->B1i[k][j][i];
         B2_x2Face[k][j][i] = pG->B2i[k][j][i];
         B3_x3Face[k][j][i] = pG->B3i[k][j][i];
-        #endif /* MHD */
+#endif /* MHD */
       }
     }
   }
@@ -702,13 +686,6 @@ void integrate_3d_vl(DomainS *pD)
 #endif /* USE_ENTROPY_FIX */
   }
 #endif 
-
-
-/*=== STEP 7.5: Integrate the particles ======================================*/
-
-  #ifdef PARTICLES
-    Integrate_Particles(pD);
-  #endif
 
 /*=== STEP 8: Compute second-order L/R x1-interface states ===================*/
 
@@ -1794,9 +1771,9 @@ void integrate_init_3d(MeshS *pM)
     }
   }
 
-  size1 = size1 + 2*nghost + 1; // +1 for face-centered quantities
-  size2 = size2 + 2*nghost + 1;
-  size3 = size3 + 2*nghost + 1;
+  size1 = size1 + 2*nghost;
+  size2 = size2 + 2*nghost;
+  size3 = size3 + 2*nghost;
   nmax = MAX((MAX(size1,size2)),size3);
 
 #ifdef MHD

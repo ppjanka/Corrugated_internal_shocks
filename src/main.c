@@ -495,12 +495,14 @@ int main(int argc, char *argv[])
 /*--- Step 9a. ---------------------------------------------------------------*/
 /* Only write output's with t_out>t (last argument of data_output = 0) */
 
+    printf("9a\n");
     data_output(&Mesh, 0);
 
 /*--- Step 9b. ---------------------------------------------------------------*/
 /* operator-split explicit diffusion: thermal conduction, viscosity, resistivity
  * Done first since CFL constraint is applied which may change dt  */
 
+    printf("9b\n");
 #ifdef OPERATOR_SPLIT_COOLING
     integrate_cooling(&Mesh);
     for (nl=0; nl<(Mesh.NLevels); nl++){ 
@@ -542,6 +544,7 @@ int main(int argc, char *argv[])
 /*--- Step 9c. ---------------------------------------------------------------*/
 /* Loop over all Domains and call Integrator */
 
+    printf("9c\n");
     for (nl=0; nl<(Mesh.NLevels); nl++){ 
       for (nd=0; nd<(Mesh.DomainsPerLevel[nl]); nd++){  
         if (Mesh.Domain[nl][nd].Grid != NULL){
@@ -559,6 +562,7 @@ int main(int argc, char *argv[])
 /*--- Step 9d. ---------------------------------------------------------------*/
 /* With SMR, restrict solution from Child --> Parent grids  */
 
+    printf("9d\n");
 #ifdef STATIC_MESH_REFINEMENT
     RestrictCorrect(&Mesh);
 #endif
@@ -566,12 +570,14 @@ int main(int argc, char *argv[])
 /*--- Step 9e. ---------------------------------------------------------------*/
 /* User work (defined in problem()) */
 
+    printf("9e\n");
     Userwork_in_loop(&Mesh);
 
 /*--- Step 9f. ---------------------------------------------------------------*/
 /* Compute gravitational potential using new density, and add second-order
  * correction to fluxes for accelerations due to self-gravity. */
 
+    printf("9f\n");
 #ifdef SELF_GRAVITY
     for (nl=0; nl<(Mesh.NLevels); nl++){ 
       for (nd=0; nd<(Mesh.DomainsPerLevel[nl]); nd++){  
@@ -587,6 +593,7 @@ int main(int argc, char *argv[])
 /*--- Step 9g. ---------------------------------------------------------------*/
 /* Update Mesh time, and time in all Grid's. */
 
+    printf("9g\n");
     Mesh.nstep++;
     Mesh.time += Mesh.dt;
     for (nl=0; nl<(Mesh.NLevels); nl++){
@@ -603,6 +610,7 @@ int main(int argc, char *argv[])
 /* Boundary values must be set after time is updated for t-dependent BCs.
  * With SMR, ghost zones at internal fine/coarse boundaries set by Prolongate */
 
+    printf("9h\n");
     for (nl=0; nl<(Mesh.NLevels); nl++){ 
       for (nd=0; nd<(Mesh.DomainsPerLevel[nl]); nd++){  
         if (Mesh.Domain[nl][nd].Grid != NULL){
@@ -622,11 +630,13 @@ int main(int argc, char *argv[])
 /* Compute new dt. With resistivity, the diffusion coeffieicnts are evaluated
  * within new_dt(), which requires that boundary values are already updated.  */
 
+    printf("9i\n");
     new_dt(&Mesh);
 
 /*--- Step 9j. ---------------------------------------------------------------*/
 /* Force quit if wall time limit reached.  Check signals from system */
 
+    printf("9j\n");
 #ifdef MPI_PARALLEL
     if(use_wtlim && (MPI_Wtime() > wtend))
       iquit = 103; /* an arbitrary, unused signal number */
@@ -635,16 +645,23 @@ int main(int argc, char *argv[])
 
 /* Print diagnostic message, flush message buffers, and continue... */
 
+    printf("9k\n");
     ath_pout(0,"cycle=%i time=%e next dt=%e last dt=%e\n",
 	     Mesh.nstep,Mesh.time,Mesh.dt,dt_done);
 
     if(nflush == Mesh.nstep){
+      printf("Here.\n");
       ath_flush_out();
+      printf("out.\n");
       ath_flush_err();
+      printf("err.\n");
       nflush += iflush;
+      printf("nflush.\n");
     }
+    printf("Integration loop finished\n");
   } /* END OF MAIN INTEGRATION LOOP ==========================================*/
 
+  printf("Integration finished\n");
 /*--- Step 10. ---------------------------------------------------------------*/
 /* Finish up by computing zc/sec, dumping data, and deallocate memory */
 

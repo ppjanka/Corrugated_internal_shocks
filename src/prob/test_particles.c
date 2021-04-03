@@ -16,6 +16,12 @@
 #include "prototypes.h"
 #include "particles/particle.h"
 
+// Special Relativity handling functions
+inline Real v2gamma (Real vel)
+{return 1./sqrt(1.-vel*vel);}
+inline Real gamma2v (Real _gamma)
+{return sqrt(1.-1./(_gamma*_gamma));}
+
 /*==============================================================================
  * PRIVATE FUNCTION PROTOTYPES:
  *============================================================================*/
@@ -51,12 +57,20 @@ void problem(DomainS *pDomain)
   L2 = x2max - x2min;
 
   // Read problem parameters
+  #ifndef BAROTROPIC
+  Real adiab_idx = par_getd("problem", "gamma");
+  Real csound = par_getd("problem", "iso_csound");
+  Real press;
+  #endif //BAROTROPIC
   Real rho = par_getd("problem", "rho");
   Real vel1 = par_getd("problem", "vel1");
   int npart = par_geti("particle", "parnumgrid");
   Real part_vel2 = par_getd("problem", "part_vel2");
   #ifdef MHD
   Real bfield3 = par_getd("problem", "bfield3");
+  #endif
+  #ifdef SPECIAL_RELATIVITY
+  Real enthalpy, gamma, sqr_b, sqr_gamma;
   #endif
 
   // Prepare the mhd grid
@@ -66,22 +80,59 @@ void problem(DomainS *pDomain)
 	    for (i=is; i<=ie; i++) {
 	      // resolve the physical location
         cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
+        #ifndef SPECIAL_RELATIVITY
         // set hydro variables
         pGrid->U[k][j][i].d = rho;
-        pGrid->U[k][j][i].M1 = rho * vel1;
+        pGrid->U[k][j][i].M1 = rho * vel1;// * cos(M_PI*(x1 - x1min)/(L1));
         pGrid->U[k][j][i].M2 = 0.0;
         pGrid->U[k][j][i].M3 = 0.0;
         // set magnetic fields
         #ifdef MHD
         pGrid->U[k][j][i].B1c = 0.0;
         pGrid->U[k][j][i].B2c = 0.0;
-        pGrid->U[k][j][i].B3c = bfield3;
+        pGrid->U[k][j][i].B3c = bfield3;// * sin(M_PI*(x1 - x1min)/(L1));
         #endif
-        /*#ifndef BAROTROPIC
-        pGrid->U[k][j][i].E = 2.5/Gamma_1
+
+        #ifndef BAROTROPIC
+        press = SQR(csound) * rho / adiab_idx;
+        pGrid->U[k][j][i].E = press / (adiab_idx - 1.0)
          + 0.5*(SQR(pGrid->U[k][j][i].M1) + SQR(pGrid->U[k][j][i].M2)
          + SQR(pGrid->U[k][j][i].M3))/pGrid->U[k][j][i].d;
-        #endif // BAROTROPIC*/
+        #ifdef MHD
+        pGrid->U[k][j][i].E += 0.5 * (SQR(pGrid->U[k][j][i].B1c) + SQR(pGrid->U[k][j][i].B2c) + SQR(pGrid->U[k][j][i].B3c));
+        #endif //MHD
+        #endif // BAROTROPIC
+        //---------------------------------------------------
+        #else // SR case
+        press = SQR(csound) * rho / adiab_idx;
+        enthalpy = 1. + adiab_idx * press / ((adiab_idx-1.)*rho);
+        gamma = v2gamma(vel1);
+        // set hydro variables
+        pGrid->U[k][j][i].d = gamma*rho;
+        pGrid->U[k][j][i].M1 = gamma*gamma*rho*enthalpy*vel1;
+        pGrid->U[k][j][i].M2 = 0.0;
+        pGrid->U[k][j][i].M3 = 0.0;
+        // set magnetic fields
+        #ifdef MHD
+        pGrid->U[k][j][i].B1c = 0.0;
+        pGrid->U[k][j][i].B2c = 0.0;
+        pGrid->U[k][j][i].B3c = bfield3 * sin(M_PI*(x1 - x1min)/(L1));
+        // make momentum adjustments due to bfield
+        sqr_gamma = SQR(gamma);
+        sqr_b = SQR(pGrid->U[k][j][i].B1c) +
+                 SQR(pGrid->U[k][j][i].B2c) +
+                 SQR(pGrid->U[k][j][i].B3c);
+        pGrid->U[k][j][i].M1 += sqr_b * vel1 /*from w_tot*/;
+        #endif
+
+        #ifndef BAROTROPIC
+        pGrid->U[k][j][i].E = gamma*gamma*rho*enthalpy - press;
+        #ifdef MHD
+        // ignoring the following terms gets us near the pressure equillibrium
+        //pGrid->U[k][j][i].E += sqr_b /*from w_tot*/;// - 0.5 * sqr_b / sqr_gamma /*from P_tot*/;
+        #endif //MHD
+        #endif // BAROTROPIC
+        #endif // SPECIAL_RELATIVITY
 	    }
 	  }
 	}

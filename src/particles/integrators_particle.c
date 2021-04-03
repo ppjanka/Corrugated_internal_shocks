@@ -113,7 +113,11 @@ void Integrate_Particles(DomainS *pD)
         break;
 
       case 4: /* Boris pusher, see Mignone et al. (2018) */
+        #if defined(SPECIAL_RELATIVITY) && defined(VL_INTEGRATOR) && defined(CARTESIAN)
         int_par_boris(pG, curG, cell1, &dv1, &dv2, &dv3, &ts);
+        #else
+        ath_error("[integrate_particle]: the Boris integrator has only been tested for the VL-SR integrator in Cartesian coords!");
+        #endif
         break;
 
       default:
@@ -210,74 +214,16 @@ inline void velocity_4to3 (Real* u, Real* v, Real* gamma)
  *   -- B and E are assumed to be 3-element arrays
  */
 void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
-    Real* B, Real* E, Real* v)
+    Real* B, Real* E, Real* v, Real3Vect cell1)
 {
   // TODO: find a way to get rid of all those if statements...
 
-  //printf("Interpolating EM\n");
-  // INTERPOLATE BFIELDS -----------------------------------
-
-  // find the indices of the nearest cell corner
+  // find the indices of the nearest cell center (i+1,j+1,k+1)
+  // calculate interpolation weights for that location
   int i,j,k;
   Real x,y,z; int ii,jj,kk,nn, idxk, idxj, idxi;
-  if (pG->Nx[0] > 1) {
-    i = (int) round((x1-pG->MinX[0])/(pG->dx1)) + pG->is;
-  } else {
-    i = 1;
-  }
-  if (pG->Nx[1] > 1) {
-    j = (int) round((x2-pG->MinX[1])/(pG->dx2)) + pG->js;
-  } else {
-    j = 1;
-  }
-  if (pG->Nx[2] > 1) {
-    k = (int) round((x3-pG->MinX[2])/(pG->dx3)) + pG->ks;
-  } else {
-    k = 1;
-  }
-
-  //printf("Indices found: %i %i %i.\n", i, j, k);
-
-  // TODO: parallelize with OpenMP?
-  // interpolate bfields from face-centered Bfields (which should have been evolved by dt/2 at this point)
-  Real dist, weight, sum_weights = 0.0;
-  for(nn = 0; nn < 3; nn++)
-    B[nn] = 0.0;
-  //printf("Bfield cleared.\n");
-  for (kk = 0; kk < ( pG->Nx[2] > 1 ? 3 : 1 ); kk++) {
-    for (jj = 0; jj < ( pG->Nx[1] > 1 ? 3 : 1 ); jj++) {
-      for (ii = 0; ii < ( pG->Nx[0] > 1 ? 3 : 1 ); ii++) {
-        idxk = k+kk-1;
-        idxj = j+jj-1;
-        idxi = i+ii-1;
-        //printf(" -- Bfield interp loop: %i %i %i\n", ii,jj,kk);
-        fc_pos(pG,idxi,idxj,idxk,&x,&y,&z);
-        //printf("1\n");
-        dist = sqrt(SQR(x1-x) + SQR(x2-y) + SQR(x3-z));
-        if (ii*jj*kk == 1) { // center point
-          weight = 0.75 - SQR(dist);
-        } else {
-          weight = 0.5 * SQR(0.5 - dist);
-        }
-        //printf("2\n");
-        B[0] += weight * pG->B1i[idxk][idxj][idxi];
-        B[1] += weight * pG->B2i[idxk][idxj][idxi];
-        B[2] += weight * pG->B3i[idxk][idxj][idxi];
-        //printf("3\n");
-        sum_weights += weight;
-      }
-    }
-  }
-  // finalize
-  for(nn = 0; nn < 3; nn++)
-      B[nn] /= sum_weights;
-
-  //printf("Bfield interpolated.\n");
-
-  // INTERPOLATE VELOCITIES ----------------------------------
-
-  // find the indices of the nearest cell center
-  if (pG->Nx[0] > 1) {
+  Real weights[3][3][3];
+  /*if (pG->Nx[0] > 1) {
     i = (int) round((x1-pG->MinX[0])/(pG->dx1) - 0.5) + pG->is;
   } else {
     i = 1;
@@ -291,42 +237,79 @@ void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
     k = (int) round((x3-pG->MinX[2])/(pG->dx3) - 0.5) + pG->ks;
   } else {
     k = 1;
-  }
-  // TODO: parallelize with OpenMP?
-  // interpolate bfields from face-centered Bfields (which should have been evolved by dt/2 at this point)
-  sum_weights = 0.0;
-  for(nn = 0; nn < 3; nn++)
+  }*/
+  printf("Getting weights\n");
+  getweight(pG, x,y,z, cell1, weights, &i,&j,&k);
+  printf("done\n");
+
+  // interpolate bfields and vels from cell-centered values
+  // (which should have been evolved by dt/2 at this point)
+  Real dist, weight, sum_weights = 0.0;
+  #pragma omp simd
+  for(nn = 0; nn < 3; nn++) {
     v[nn] = 0.0;
+    B[nn] = 0.0;
+  }
   //printf("velocity cleared.\n");
   for (kk = 0; kk < ( pG->Nx[2] > 1 ? 3 : 1 ); kk++) {
     for (jj = 0; jj < ( pG->Nx[1] > 1 ? 3 : 1 ); jj++) {
+      #pragma omp simd
       for (ii = 0; ii < ( pG->Nx[0] > 1 ? 3 : 1 ); ii++) {
-        //printf(" -- velocity interp loop: %i %i %i\n", ii,jj,kk);
-        idxk = k+kk-1;
-        idxj = j+jj-1;
-        idxi = i+ii-1;
+        printf(" -- velocity interp loop: %i %i %i\n", ii,jj,kk);
+        idxk = k+kk;
+        idxj = j+jj;
+        idxi = i+ii;
         cc_pos(pG,idxi,idxj,idxk,&x,&y,&z);
-        //printf("1\n");
-        dist = sqrt(SQR(x1-x) + SQR(x2-y) + SQR(x3-z));
-        if (ii*jj*kk == 1) { // center point
-          weight = 0.75 - SQR(dist);
+        printf("1\n");
+        // Triangular Shaped Cloud (TSC) weighing:
+        weight = weights[kk][jj][ii];
+        /*1.0;
+        // x1 weight
+        dist = fabs(x1-x)/pG->dx1;
+        if (ii == 1) { // center point
+          weight *= 0.75 - SQR(dist);
         } else {
-          weight = 0.5 * SQR(0.5 - dist);
+          weight *= 0.5 * SQR(0.5 - dist);
         }
-        //printf("2\n");
+        // x2 weight
+        dist = fabs(x2-y)/pG->dx2;
+        if (jj == 1) { // center point
+          weight *= 0.75 - SQR(dist);
+        } else {
+          weight *= 0.5 * SQR(0.5 - dist);
+        }
+        // x3 weight
+        dist = fabs(x3-z)/pG->dx3;
+        if (kk == 1) { // center point
+          weight *= 0.75 - SQR(dist);
+        } else {
+          weight *= 0.5 * SQR(0.5 - dist);
+        }*/
+        printf("2\n");
         // maybe better to use conserved vars at half-step, [TODO:] move to SR (with VL-SR integrator it may be pre-computed)
         //printf("%i %i %i\n", idxk, idxj, idxi);
-        v[0] += weight * pG->U[idxk][idxj][idxi].M1 / pG->U[idxk][idxj][idxi].d;
-        v[1] += weight * pG->U[idxk][idxj][idxi].M2 / pG->U[idxk][idxj][idxi].d;
-        v[2] += weight * pG->U[idxk][idxj][idxi].M3 / pG->U[idxk][idxj][idxi].d;
+        v[0] += weight * pG->Whalf[idxk][idxj][idxi].V1;
+        v[1] += weight * pG->Whalf[idxk][idxj][idxi].V2;
+        v[2] += weight * pG->Whalf[idxk][idxj][idxi].V3;
+        B[0] += weight * pG->Whalf[idxk][idxj][idxi].B1c;
+        B[1] += weight * pG->Whalf[idxk][idxj][idxi].B2c;
+        B[2] += weight * pG->Whalf[idxk][idxj][idxi].B3c;
+        printf("weight: %.2e\n", weight);
+        printf("v: %.2e %.2e %.2e\n", v[0], v[1], v[2]);
+        printf("B: %.2e %.2e %.2e\n", B[0], B[1], B[2]);
         sum_weights += weight;
         //printf("3\n");
       }
     }
   }
   // finalize
-  for(nn = 0; nn < 3; nn++)
+  #pragma omp simd
+  for(nn = 0; nn < 3; nn++) {
     v[nn] /= sum_weights;
+    B[nn] /= sum_weights;
+  }
+  printf("Final v: %.2e %.2e %.2e\n", v[0], v[1], v[2]);
+  printf("Final B: %.2e %.2e %.2e\n", B[0], B[1], B[2]);
 
   //printf("Velocity interpolated.\n");
 
@@ -341,6 +324,7 @@ void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
  *                            Real *dv1, Real *dv2, Real *dv3, Real *ts)
  *  \brief Boris pusher -- implicit Verlet particle integrator (see Mignone et al. (2018)
  *  NOTE: only includes Lorentz force
+ *  NOTE: Designed and tested only for the VL-SR integrator
  *
  *  TODO: Add a time-step constraint (possibly through particle multi-timestepping?)
  *
@@ -383,7 +367,7 @@ void int_par_boris(GridS *pG, GrainS *curG, Real3Vect cell1,
   // Interpolate and extract electromagnetic components
   printf("EM components: \n");
   Real Bn[3], En[3]; // EM fields interpolated at the half-step particle position
-  interpolate_EM(pG, x1n, x2n, x3n, Bn, En, vn);
+  interpolate_EM(pG, x1n, x2n, x3n, Bn, En, vn, cell1);
   gamma_n = 1.0 / sqrt(1.0 - SQR(vn[0]) - SQR(vn[1]) - SQR(vn[2]));
   for (n = 0; n < 3; n++) {
     Bn[n] *= h2/gamma_n;
