@@ -215,7 +215,6 @@ inline void velocity_4to3 (Real* u, Real* v, Real* gamma)
 /*! \fn void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
     Real* B, Real* E, Real* v)
  *  \brief interpolate B and E fields at the current particle position
- *   -- uses Triangular Shape Cloud (TSC) for interpolation, see Mignone et al. (2018), eq. 44
  *   -- B and E are assumed to be 3-element arrays
  */
 void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
@@ -244,7 +243,10 @@ void interpolate_EM (GridS *pG, Real x1, Real x2, Real x3,
     k = 1;
   }*/
 
-  getweight(pG, x,y,z, cell1, weights, &i,&j,&k);
+  getweight(pG, x1,x2,x3, cell1, weights, &i,&j,&k);
+  #ifdef DEBUG
+  printf("Particle in cell no: %i %i %i\n", i,j,k);
+  #endif
 
   // interpolate bfields and vels from cell-centered values
   // (which should have been evolved by dt/2 at this point)
