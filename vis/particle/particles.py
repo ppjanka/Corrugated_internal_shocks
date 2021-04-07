@@ -38,8 +38,8 @@ class Particles:
         x1l, x1u, x2l, x2u, x3l, x3u, \
         x1dl, x1du, x2dl, x2du, x3dl, x3du = struct.unpack('f'*12, self.file.read(4*12))
         coords = {'x1min': x1l, 'x1max': x1u, \
-                  'x2min': x2l, 'x1max': x3u, \
-                  'x2min': x2l, 'x1max': x3u}
+                  'x2min': x2l, 'x2max': x2u, \
+                  'x3min': x3l, 'x3max': x3u}
         # Read particle property info
         nparttypes, = struct.unpack('i', self.file.read(4))
         grproperty = []
@@ -128,8 +128,45 @@ class Particles:
             c = cm.get_cmap(cmap, 128)
             for p in range(self.npart):
                 ax.scatter(self.pos[:,p,axis_x], self.pos[:,p,axis_y], s=0.1, color=c(p/self.npart))
+
+        ax.set_aspect(1.0)
+
+        if axis_x == 0:
+            ax.set_xlim(self.coords['x1min'],self.coords['x1max'])
+            ax.set_xlabel('x')
+        elif axis_x == 1:
+            ax.set_xlim(self.coords['x2min'],self.coords['x2max'])
+            ax.set_xlabel('y')
+        elif axis_x == 2:
+            ax.set_xlim(self.coords['x3min'],self.coords['x3max'])
+            ax.set_xlabel('z')
+
+        if axis_y == 0:
+            ax.set_ylim(self.coords['x1min'],self.coords['x1max'])
+            ax.set_ylabel('x')
+        elif axis_y == 1:
+            ax.set_ylim(self.coords['x2min'],self.coords['x2max'])
+            ax.set_ylabel('y')
+        elif axis_y == 2:
+            ax.set_ylim(self.coords['x3min'],self.coords['x3max'])
+            ax.set_ylabel('z')
+
+        ax.set_title('Particle position')
                 
-    def plot_Ekin_vs_time (self, ax, cmap='rainbow'):
+    def plot_Ekin_vs_time (self, ax, cmap='rainbow', average=False, residuals=False):
         c = cm.get_cmap(cmap, 128)
-        for p in range(self.npart):
-            ax.scatter(self.times, self.Ekin[:,p], s=0.1, color=c(p/self.npart))
+        data_to_plot = 1.*self.Ekin[:,:]
+        if residuals: # subtract time-average
+            data_to_plot -= np.mean(data_to_plot, axis=0)
+            ax.set_title('Particle energy: Residuals')
+        else:
+            ax.set_title('Particle energy')
+        if average: # average over particles
+            data_to_plot = np.mean(data_to_plot, axis=1)
+            ax.scatter(self.times, data_to_plot, s=0.1, color=c(p/self.npart))
+        else: # plot each particle separately
+            for p in range(self.npart):
+                ax.scatter(self.times, data_to_plot[:,p], s=0.1, color=c(p/self.npart))
+        if residuals:
+            ax.set_ylim(1.1*np.min(data_to_plot), 1.1*np.max(data_to_plot))
+        ax.set_xlabel('Time')
