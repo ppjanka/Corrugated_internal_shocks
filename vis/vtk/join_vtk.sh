@@ -3,10 +3,17 @@
 # This script uses join_vtk to join all vtk outputs in the directory indicated as argument, regardless of the number of id* folders inside it
 # File: join_vtk.sh
 # Author: Patryk Pjanka, 2021
-# Usage: 0) compile join_vtk.c within athena/vis/vtk
+# Usage:
 #        1) copy or link join_vtk.sh to athena/bin
 #        2) run by "./join_vtk.sh < folder with id* inside, given as -d to athena run >"
 
+# compile join_vtk.c on first use
+if [ ! -f ../vis/vtk/join_vtk ]; then
+    echo Compiling join_vtk on first use.
+    gcc -Wall -W -o ../vis/vtk/join_vtk ../vis/vtk/join_vtk.c -lm
+fi
+
+# join the vtk files
 rm -r $1/joined
 mkdir $1/joined
 nlevels=$(ls -d $1/id0/lev* | wc -l)
