@@ -232,24 +232,40 @@ class Particles:
     def plot_Ekin_distribution_movie (self, nproc=1, bins=None, log=True, cmap='rainbow', navg=1, tempdir='./temp_EkinDistr/', outdir='./', force=False, verbose=True, xmin=None, xmax=None, ymin=None, ymax=None):
         # create the temp folder if needed
         if not os.path.exists(tempdir):
+            if verbose:
+                print("Preparing tempdir..", end='', flush=True)
             os.makedirs(tempdir)
+            if verbose:
+                print(" done", flush=True)
         # generate Ekin if needed
         if len(self.Ekin) == 0:
+            if verbose:
+                print("Calculating Ekin..", end='', flush=True)
             self.update_aux_data()
+            if verbose:
+                print(" done", flush=True)
         # boxcar-average before plotting for more efficient code
         data_to_plot = {'times': 1.*np.array(self.times), 'data': np.transpose(self.Ekin)}
         if navg > 1:
+            if verbose:
+                print("Boxcar-averaging..", end='', flush=True)
             boxcar = np.ones(navg) * 1. / navg
             data_to_plot['times'] = sp_convolve(data_to_plot['times'], boxcar, mode='valid')
             boxcar.shape = (1,navg)
             data_to_plot['data'] = sp_convolve(data_to_plot['data'], boxcar, mode='valid')
+            if verbose:
+                print(" done", flush=True)
         # plot the frames (ideally in parallel)
+        if verbose:
+            print("Generating frames..", flush=True)
         if nproc == 1:
             for i in range(len(self.times)-navg):
                 self.plot_Ekin_distribution_frame(data_to_plot, bins=bins, log=log, cmap=cmap, i=i, navg=navg, tempdir=tempdir, force=force, verbose=verbose, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
         else:
             with ProcessPool(nproc) as pool:
                 _ = pool.map(lambda i : self._plot_Ekin_distribution_frame(data_to_plot, bins=bins, log=log, cmap=cmap, i=i, navg=navg, tempdir=tempdir, force=force, verbose=verbose, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax), range(len(self.times)-navg))
+        if verbose:
+            print(" All frames generated.", flush=True)
         # render the movie
         try:
             print("Rendering the movie..", flush=True)
