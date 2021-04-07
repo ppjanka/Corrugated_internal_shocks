@@ -126,8 +126,6 @@ void problem(DomainS *pDomain)
         pGrid->U[k][j][i].M3 = gamma*gamma*rho*enthalpy*vel3;
         // set magnetic fields
         #ifdef MHD
-        pGrid->U[k][j][i].B1c = 0.0;
-        pGrid->U[k][j][i].B2c = 0.0;
         if (bfield1_type == 1) { // constant
           pGrid->U[k][j][i].B1c = bfield1;
         } else if (bfield1_type == 2) { // linear with x2
