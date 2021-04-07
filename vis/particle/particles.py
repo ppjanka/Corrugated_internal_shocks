@@ -1,14 +1,14 @@
 # This is a script with instructions to read, process, and plot the .lis outputs from the Athena 4.2 particle module.
 # The structure is adapted (by P. Pjanka, 2021) from the *.m files within this folder.
 
+from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
+
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import cm
-import matplotlib.gridspec as gridspec
-import statistics as stat
+from scipy.signal import convolve as sp_convolve
 
 import struct # for reading binary data
 import sys
+import os
 import glob
 from tqdm import tqdm # progress bar
 
@@ -125,7 +125,8 @@ class Particles:
             for p in range(self.npart):
                 ax.scatter(self.pos[:,p,axis_x], self.pos[:,p,axis_y], s=0.1, c=self.times, cmap=cmap)
         elif color_by == 'particle':
-            c = cm.get_cmap(cmap, 128)
+            from matplotlib.cmap import get_cmap
+            c = get_cmap(cmap, 128)
             for p in range(self.npart):
                 ax.scatter(self.pos[:,p,axis_x], self.pos[:,p,axis_y], s=0.1, color=c(p/self.npart))
 
@@ -154,7 +155,6 @@ class Particles:
         ax.set_title('Particle position')
                 
     def plot_Ekin_vs_time (self, ax, cmap='rainbow', average=False, residuals=False):
-        c = cm.get_cmap(cmap, 128)
         data_to_plot = 1.*self.Ekin[:,:]
         if residuals: # subtract time-average
             data_to_plot -= np.mean(data_to_plot, axis=0)
@@ -163,10 +163,101 @@ class Particles:
             ax.set_title('Particle energy')
         if average: # average over particles
             data_to_plot = np.mean(data_to_plot, axis=1)
-            ax.scatter(self.times, data_to_plot, s=0.1, color=c(p/self.npart))
+            ax.scatter(self.times, data_to_plot, s=0.1)
         else: # plot each particle separately
+            from matplotlib.cm import get_cmap
+            c = get_cmap(cmap, min(512, self.npart))
             for p in range(self.npart):
                 ax.scatter(self.times, data_to_plot[:,p], s=0.1, color=c(p/self.npart))
         if residuals:
             ax.set_ylim(1.1*np.min(data_to_plot), 1.1*np.max(data_to_plot))
         ax.set_xlabel('Time')
+
+    def plot_Ekin_distribution (self, ax, cax=None, bins=None, log=True, cmap='rainbow', average=False, i=None, navg=1, data_to_plot=None):
+
+        # generate Ekin if needed
+        if len(self.Ekin) == 0:
+            self.update_aux_data()
+
+        if average or navg >= len(self.times): # plot time-averaged energy distribution
+            data_to_plot = np.mean(self.Ekin, axis=0)
+            ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
+
+        elif i != None: # plot a single frame
+            #data_to_plot = np.mean(np.transpose(self.Ekin)[:,i:(i+navg)], axis=1)
+            ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
+
+        else: # plot history of energy distr. color-coded with time
+            data_x = np.array(self.times)
+            data_y = np.transpose(self.Ekin)
+            if navg > 1: # box-smoothing over navg
+                boxcar = np.ones(navg) * 1. / navg
+                data_x = sp_convolve(data_x, boxcar, mode='valid')
+                boxcar.shape = (1,navg)
+                data_y = sp_convolve(data_y, boxcar, mode='valid')
+            from matplotlib.cm import get_cmap
+            c = get_cmap(cmap, min(512, len(data_x)))
+            colors = c((np.array(data_x) - data_x[0])/(data_x[-1] - data_x[0]))
+            ax.hist(data_y, bins, density=True, histtype='step', log=log, stacked=False, color=colors)
+            if cax != None: # add a color bar
+                from matplotlib.pyplot import colorbar
+                from matplotlib.cm import ScalarMappable
+                from matplotlib.colors import Normalize
+                colorbar(ScalarMappable(Normalize(vmin=data_x[0], vmax=data_x[-1]), cmap=c), cax=cax)
+                cax.set_ylabel('Time [sim.u.]')
+
+        ax.set_ylabel('PDF')
+        ax.set_xlabel('Particle energy')
+
+    def _plot_Ekin_distribution_frame (self, data_to_plot, bins=None, log=True, cmap='rainbow', i=None, navg=1, tempdir='./temp_EkinDistr/', force=False, verbose=True, xmin=None, xmax=None, ymin=None, ymax=None):
+        filename = ('EkinDistr_%08i.png' % i)
+        if os.path.isfile(tempdir + filename) and not force:
+            if verbose:
+                print(' - %s already processed. Skipping.' % filename, flush=True)
+            pass
+        else:
+            if verbose:
+                print(' - processing %s..' % filename, flush=True)
+            import matplotlib.pyplot as plt
+            fig = plt.figure(figsize=[8,6])
+            ax = plt.gca()
+            self.plot_Ekin_distribution(ax, bins=bins, log=log, cmap=cmap, i=i, navg=navg, data_to_plot=data_to_plot['data'][:,i])
+            ax.set_xlim(xmin,xmax)
+            ax.set_ylim(ymin,ymax)
+            ax.set_title('Ekin distribution, $t = %.2f$ sim.u.' % (data_to_plot['times'][i],))
+            fig.savefig(tempdir + filename, format='png')
+            plt.close(fig)
+
+    # WARNING: movie plots will not work in parallel if matplotlib is imported before calling this function!
+    def plot_Ekin_distribution_movie (self, nproc=1, bins=None, log=True, cmap='rainbow', navg=1, tempdir='./temp_EkinDistr/', outdir='./', force=False, verbose=True, xmin=None, xmax=None, ymin=None, ymax=None):
+        # create the temp folder if needed
+        if not os.path.exists(tempdir):
+            os.makedirs(tempdir)
+        # generate Ekin if needed
+        if len(self.Ekin) == 0:
+            self.update_aux_data()
+        # boxcar-average before plotting for more efficient code
+        data_to_plot = {'times': 1.*np.array(self.times), 'data': np.transpose(self.Ekin)}
+        if navg > 1:
+            boxcar = np.ones(navg) * 1. / navg
+            data_to_plot['times'] = sp_convolve(data_to_plot['times'], boxcar, mode='valid')
+            boxcar.shape = (1,navg)
+            data_to_plot['data'] = sp_convolve(data_to_plot['data'], boxcar, mode='valid')
+        # plot the frames (ideally in parallel)
+        if nproc == 1:
+            for i in range(len(self.times)-navg):
+                self.plot_Ekin_distribution_frame(data_to_plot, bins=bins, log=log, cmap=cmap, i=i, navg=navg, tempdir=tempdir, force=force, verbose=verbose, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+        else:
+            with ProcessPool(nproc) as pool:
+                _ = pool.map(lambda i : self._plot_Ekin_distribution_frame(data_to_plot, bins=bins, log=log, cmap=cmap, i=i, navg=navg, tempdir=tempdir, force=force, verbose=verbose, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax), range(len(self.times)-navg))
+        # render the movie
+        try:
+            print("Rendering the movie..", flush=True)
+            command = ("ffmpeg -y -r 20 -f image2 -i \"%sEkinDistr_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 %sEkinDistr.mp4" % (tempdir, outdir))
+            print(command, flush=True)
+            os.system(command)
+        except Exception as e:
+            print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, tempdir), flush=True)
+        # clean up
+        del data_to_plot
+        print('Done.', flush=True)
