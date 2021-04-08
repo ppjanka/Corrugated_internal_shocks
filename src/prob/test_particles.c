@@ -66,13 +66,32 @@ void problem(DomainS *pDomain)
   Real press;
   #endif //BAROTROPIC
   Real rho = par_getd("problem", "rho");
-  Real vel1 = par_getd("problem", "vel1");
-  Real vel2 = par_getd("problem", "vel2");
-  Real vel3 = par_getd("problem", "vel3");
+  Real vel1_in = par_getd("problem", "vel1");
+  Real vel2_in = par_getd("problem", "vel2");
+  Real vel3_in = par_getd("problem", "vel3");
+  Real vel1, vel2, vel3;
+  int vel_sin = par_geti("problem", "vel_sin");
+  if (vel_sin == 0) {
+    vel1 = vel1_in;
+    vel2 = vel2_in;
+    vel3 = vel3_in;
+  } else if (vel_sin == 1) {
+    vel2 = vel2_in;
+    vel3 = vel3_in;
+  }
   int npart = par_geti("particle", "parnumgrid");
   Real part_vel1 = par_getd("problem", "part_vel1");
   Real part_vel2 = par_getd("problem", "part_vel2");
   Real part_vel3 = par_getd("problem", "part_vel3");
+  int part_pos_type = par_geti("problem", "part_pos_type");
+  if (part_pos_type == 1) { // initialize rand()
+    time_t t;
+    #ifdef MPI_PARALLEL
+    srand((unsigned) myID_Comm_world * time(&t));
+    #else
+    srand((unsigned) time(&t));
+    #endif
+  }
   #ifdef MHD
   Real bfield1 = par_getd("problem", "bfield1");
   int bfield1_type = par_geti("problem", "bfield1_type");
@@ -90,8 +109,12 @@ void problem(DomainS *pDomain)
 	  for (j=js; j<=je; j++) {
       #pragma omp simd
 	    for (i=is; i<=ie; i++) {
-	      // resolve the physical location
+        // resolve the physical location
         cc_pos(pGrid,i,j,k,&x1,&x2,&x3);
+	      // adjust fluid velocities (add sin etc. if needed)
+	      if (vel_sin == 1) {
+	        vel1 = vel1_in * cos(2.*M_PI * (x1-x1min)/(x1max-x1min));
+	      }
         #ifndef SPECIAL_RELATIVITY
         // set hydro variables
         pGrid->U[k][j][i].d = rho;
@@ -209,14 +232,68 @@ void problem(DomainS *pDomain)
   }
   #endif //MHD
 
+  // Generate particle positions and broadcast to all ranks
+  Real3Vect positions [npart];
+  if (part_pos_type == 1) { // random
+    #ifdef MPI_PARALLEL
+    int nproc, step, pmin, pmax;
+    // figure out how many processes there are for parallelization
+    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+    step = (int) (npart / nproc) + 1;
+    pmin = (myID_Comm_world * step);
+    pmax = (int) fmin(npart, (myID_Comm_world+1) * step);
+    #pragma omp simd
+    for(p = pmin; p < pmax; p++) {
+      positions[p].x1 = x1min + (rand()*1./RAND_MAX) * (x1max-x1min);
+      positions[p].x2 = x2min + (rand()*1./RAND_MAX) * (x2max-x2min);
+      positions[p].x3 = x3min + (rand()*1./RAND_MAX) * (x3max-x3min);
+    }
+    // send the work from this rank to all other
+    MPI_Request request [nproc+1];
+    for (i = 0; i < nproc; i++) {
+      if (i == myID_Comm_world) continue;
+      MPI_Isend(&(positions[pmin]), 3*(pmax-pmin), MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &(request[nproc]));
+    }
+    // receive from all other ranks
+    for (i = 0; i < nproc; i++) {
+      if (i == myID_Comm_world) continue;
+      pmin = (i * step);
+      pmax = (int) fmin(npart, (i+1) * step);
+      MPI_Irecv(&(positions[pmin]), 3*(pmax-pmin), MPI_DOUBLE, i, 0, MPI_COMM_WORLD, &(request[i]));
+    }
+    // wait until communication done
+    MPI_Status status;
+    for (i = 0; i < nproc; i++) {
+      if (i == myID_Comm_world) continue;
+      MPI_Wait(&(request[i]), &status);
+    }
+    /*printf("Rank %i has positions of no 5 at: %.2f %.2f\n",
+        myID_Comm_world, positions[5].x1, positions[5].x2, positions[5].x3);
+    exit(0);*/
+    #else // MPI off
+    #pragma omp simd
+    for(p = 0; p < npart; p++) {
+      positions[p].x1 = x1min + (rand()/RAND_MAX) * (x1max-x1min);
+      positions[p].x2 = x2min + (rand()/RAND_MAX) * (x2max-x2min);
+      positions[p].x3 = x3min + (rand()/RAND_MAX) * (x3max-x3min);
+    }
+    #endif
+  }
+
 	// Prepare the particles
 	tstop0[0] = par_getd_def("particle","tstop",1.0e20); // particle stopping time, sim.u.
   grproperty[0].alpha = par_getd("particle", "alpha"); /*!< charge-to-mass ratio, q/mc, see Mignone et al. (2018), eq. 18 */
 	pGrid->nparticle = 0; pgrid = 0;
 	for (p = 0; p < npart; p++) {
 	  // set particle location
-	  pos.x1 = x1min + L1 * ((0.5 + p)/(npart+1));
-	  pos.x2 = 0.; pos.x3 = 0.;
+	  if (part_pos_type == 0) { // a line along x1
+      pos.x1 = x1min + L1 * ((0.5 + p)/(npart+1));
+      pos.x2 = 0.; pos.x3 = 0.;
+	  } else if (part_pos_type == 1) { // random
+	    pos.x1 = positions[p].x1;
+      pos.x2 = positions[p].x2;
+      pos.x3 = positions[p].x3;
+	  }
 	  if (part_in_rank(pos)) { // if in this MPI rank
 	    (pGrid->nparticle)++;
 	    if (pGrid->nparticle+2 > pGrid->arrsize)

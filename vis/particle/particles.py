@@ -112,6 +112,16 @@ class Particles:
           
         if verbose:
             print('done.', flush=True)
+
+    def sort (self): # sort to id indivitual particles across time
+        for idx_t in tqdm(range(len(self.times))):
+            sort_idxs = np.argsort(self.my_id[idx_t,:])
+            self.pos[idx_t,:,:] = self.pos[idx_t,sort_idxs,:]
+            self.vel[idx_t,:,:] = self.vel[idx_t,sort_idxs,:]
+            self.dpar[idx_t,:] = self.dpar[idx_t,sort_idxs]
+            self.grp[idx_t,:] = self.grp[idx_t,sort_idxs]
+            self.my_id[idx_t,:] = self.my_id[idx_t,sort_idxs]
+            self.init_id[idx_t,:] = self.init_id[idx_t,sort_idxs]
             
     def update_aux_data (self, to_update=['Ekin',]):
         if 'Ekin' in to_update:
@@ -190,15 +200,12 @@ class Particles:
         else: # plot history of energy distr. color-coded with time
             data_x = np.array(self.times)
             data_y = np.transpose(self.Ekin)
-            if navg > 1: # box-smoothing over navg
-                boxcar = np.ones(navg) * 1. / navg
-                data_x = sp_convolve(data_x, boxcar, mode='valid')
-                boxcar.shape = (1,navg)
-                data_y = sp_convolve(data_y, boxcar, mode='valid')
             from matplotlib.cm import get_cmap
             c = get_cmap(cmap, min(512, len(data_x)))
-            colors = c((np.array(data_x) - data_x[0])/(data_x[-1] - data_x[0]))
-            ax.hist(data_y, bins, density=True, histtype='step', log=log, stacked=False, color=colors)
+            no_plots = int(len(data_x)/navg)+1
+            for idx_t in tqdm(range(no_plots)):
+                data_to_plot = np.mean(data_y[:,(navg*idx_t):min(len(data_x),navg*(idx_t+1))], axis=1)
+                ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False, color=c(idx_t/no_plots))
             if cax != None: # add a color bar
                 from matplotlib.pyplot import colorbar
                 from matplotlib.cm import ScalarMappable
@@ -229,6 +236,7 @@ class Particles:
             plt.close(fig)
 
     # WARNING: movie plots will not work in parallel if matplotlib is imported before calling this function!
+    # [if you know how to fix this, please let me know ;) ]
     def plot_Ekin_distribution_movie (self, nproc=1, bins=None, log=True, cmap='rainbow', navg=1, tempdir='./temp_EkinDistr/', outdir='./', force=False, verbose=True, xmin=None, xmax=None, ymin=None, ymax=None):
         # create the temp folder if needed
         if not os.path.exists(tempdir):
