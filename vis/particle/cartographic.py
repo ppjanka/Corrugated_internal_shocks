@@ -2,7 +2,6 @@
 # Author: Patryk Pjanka, 2021
 
 import numpy as np
-from tqdm import tqdm
 
 def projection_EckertIV (theta, phi, tolerance=1.0e-3):
     # calculate the theta_eckert parameter
@@ -70,16 +69,24 @@ def add_patch (ax, projection, theta_range=[0.,180.], phi_range=[-180.,180.], in
     poly = Polygon(outline, color=color)
     ax.add_artist(poly)
 
-def plot_projected (ax, projection, thetas, phis, bin_vals, in_unit='rad', cmap='rainbow', res_patch=8):
+def plot_projected (ax, projection, thetas, phis, bin_vals, in_unit='rad', cmap='rainbow', res_patch=8, cax=None):
 
     from matplotlib import cm
-    _cmap = cm.get_cmap(cmap)
+    _cmap = cm.get_cmap(cmap, 512)
 
     # normalize the color scale
     vmin = np.nanmin(bin_vals)
     vmax = np.nanmax(bin_vals)
     colors = (bin_vals - vmin) / (vmax-vmin)
 
-    for j in tqdm(range(bin_vals.shape[0])):
+    # plot the function
+    for j in range(bin_vals.shape[0]):
         for k in range(bin_vals.shape[1]):
             add_patch(ax, projection, phi_range=phis[k:(k+2)], theta_range=thetas[j:(j+2)], in_unit=in_unit, color=_cmap(colors[j,k]), res=res_patch)
+
+    # plot colorbar
+    if cax != None:
+        from matplotlib.pyplot import colorbar
+        from matplotlib.cm import ScalarMappable
+        from matplotlib.colors import Normalize
+        colorbar(ScalarMappable(Normalize(vmin=vmin, vmax=vmax), cmap=_cmap), cax=cax)

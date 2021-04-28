@@ -12,6 +12,8 @@ import os
 import glob
 from tqdm import tqdm # progress bar
 
+import cartographic as cart
+
 class Particles:
     
     def __init__ (self, relativistic=False): # empty class
@@ -32,6 +34,8 @@ class Particles:
         self.init_id = []
         # auxiliary data calculated from the above
         self.Ekin = []
+        self.vel_theta = []
+        self.vel_phi = []
         
     def process_metadata (self):
         # Read the coordinate limits
@@ -285,3 +289,35 @@ class Particles:
         # clean up
         del data_to_plot
         print('Done.', flush=True)
+
+    def plot_direction_distribution (self, ax, projection, res, i=None, cmap='rainbow', res_patch=8, cax=None, weights=None, recalculate=True):
+
+        # first, create an angular grid for direction bins, with equal-area components
+        thetas = np.arccos(np.linspace(1.,-1., 2*res))
+        phis = np.linspace(-np.pi,np.pi, 2*res)
+
+        if i != None: # print a single frame
+            vel = self.vel[i,:,:].reshape(1,self.npart,3)
+        else: # calculate statistics for the entire simulation
+            vel = self.vel
+
+        # calculate angles for the particles
+        if recalculate or len(self.vel_theta) == 0 or len(self.vel_phi) == 0:
+            vel_xy = np.sqrt(vel[:,:,0]**2+vel[:,:,1]**2)
+            self.vel_theta = np.arctan(vel_xy/vel[:,:,2])
+            self.vel_phi = np.arccos(vel[:,:,0]/vel_xy)
+            self.vel_phi = np.where(vel[:,:,1] > 0, self.vel_phi, 2.*np.pi - self.vel_phi)
+            self.vel_phi = np.where(self.vel_phi < np.pi, self.vel_phi, self.vel_phi-2.*np.pi) # move to the [-pi,pi] range
+            self.vel_theta = self.vel_theta.flatten()
+            self.vel_phi = self.vel_phi.flatten()
+        if weights == 'mom':
+            weights = np.sqrt(np.sum(vel**2,axis=2)).flatten()
+
+        # calculate the 2d histogram
+        hist, edges_t, edges_p = np.histogram2d(self.vel_theta, self.vel_phi, bins=[thetas, phis], density=False, weights=weights)
+
+        # plot the 2d histogram
+        cart.plot_projected(ax, projection, thetas, phis, hist, in_unit='rad', cmap=cmap, res_patch=res_patch, cax=cax)
+
+        # plot the grid
+        cart.plot_cartographic_grid(ax, projection, phi_ticks=[-90.,0.,90.], theta_ticks=[30.,60.,90.,120.,150.])
