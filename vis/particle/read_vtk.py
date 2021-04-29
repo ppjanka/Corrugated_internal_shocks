@@ -1,4 +1,4 @@
-def vtk (filename):
+def vtk (filename, out_dt):
     
     # based on code by: Guillaume Jacquenot
     #  - https://stackoverflow.com/questions/11727822/reading-a-vtk-file-with-python
