@@ -7,7 +7,7 @@ def vtk (filename, out_dt):
     result = {}
 
     # map Athena4.2 variable names to Athena++ format
-    in2out = {'density':'rho', 'velocity':'vel', 'pressure':'press'}
+    in2out = {'density':'rho', 'velocity':'vel', 'pressure':'press', 'cell_centered_B':'Bcc'}
     
     # get time from the filename and out_dt
     time = int(filename.split('.')[-2]) * out_dt
@@ -53,7 +53,7 @@ def vtk (filename, out_dt):
 
     # process vectors
     dim = [i-1 if i>1 else i for i in data.GetDimensions()] + [3,]
-    for quantity in ['velocity',]:
+    for quantity in ['velocity','cell_centered_B']:
         u = VN.vtk_to_numpy(data.GetCellData().GetArray(quantity))
         u = u.reshape(dim,order='F')
         u = np.moveaxis(u, -1, 0)

@@ -18,6 +18,7 @@ class Particles:
     
     def __init__ (self, relativistic=False): # empty class
         self.initialized = False
+        self.sorted = True
         self.relativistic = relativistic
         self.npart = 0
         self.nparttypes = 0
@@ -36,6 +37,7 @@ class Particles:
         self.Ekin = []
         self.vel_theta = []
         self.vel_phi = []
+        self.hist = {}
         
     def process_metadata (self):
         # Read the coordinate limits
@@ -63,6 +65,32 @@ class Particles:
             self.coords = coords
         # time and dt will be added along with the whole snapshot
         return time, dt
+
+    def get_time (self, filename):
+        # Read from the file
+        self.file = open(filename, 'rb')
+        return self.process_metadata()
+
+    def drop_first_snapshot (self, n_to_drop=1):
+        if initialized:
+            n = min(len(self.times)-1, n_to_drop)
+            # raw data
+            self.times = self.times[n:]
+            self.dts = self.dts[n:]
+            self.pos = self.pos[n:]
+            self.vel = self.vel[n:]
+            self.dpar = self.dpar[n:]
+            self.grp = self.grp[n:]
+            self.my_id = self.my_id[n:]
+            self.init_id = self.init_id[n:]
+            # auxiliary data
+            if len(self.Ekin) > 0:
+                self.Ekin = self.Ekin[n:]
+            if len(self.val_theta) > 0:
+                self.vel_theta = self.vel_theta[n:]
+            if len(self.vel_phi) > 0:
+                self.vel_phi = self.vel_phi[n:]
+            self.hist = {}
     
     def add_snapshot (self, filename, verbose=True):
         
@@ -113,60 +141,120 @@ class Particles:
             self.init_id = 1.*buffer_init_id
             self.initialized = True
         del buffer_pos, buffer_vel, buffer_dpar, buffer_grp, buffer_my_id, buffer_init_id
+
+        self.sorted = False
           
         if verbose:
             print('done.', flush=True)
 
-    def sort (self): # sort to id indivitual particles across time
-        for idx_t in tqdm(range(len(self.times))):
-            sort_idxs = np.argsort(self.my_id[idx_t,:])
-            self.pos[idx_t,:,:] = self.pos[idx_t,sort_idxs,:]
-            self.vel[idx_t,:,:] = self.vel[idx_t,sort_idxs,:]
-            self.dpar[idx_t,:] = self.dpar[idx_t,sort_idxs]
-            self.grp[idx_t,:] = self.grp[idx_t,sort_idxs]
-            self.my_id[idx_t,:] = self.my_id[idx_t,sort_idxs]
-            self.init_id[idx_t,:] = self.init_id[idx_t,sort_idxs]
+    def add_snapshot_FIFO (self, filename, verbose=True):
+        # drop the oldest snapshot
+        self.drop_first_snapshot()
+        # add the new snapshot
+        self.add_snapshot(filename, verbose)
+
+    def sort (self, verbose=False): # sort to id indivitual particles across time
+        if not self.sorted:
+            if verbose:
+                t = tqdm
+            else:
+                t = lambda x : x
+            for idx_t in t(range(len(self.times))):
+                sort_idxs = np.argsort(self.my_id[idx_t,:])
+                self.pos[idx_t,:,:] = self.pos[idx_t,sort_idxs,:]
+                self.vel[idx_t,:,:] = self.vel[idx_t,sort_idxs,:]
+                self.dpar[idx_t,:] = self.dpar[idx_t,sort_idxs]
+                self.grp[idx_t,:] = self.grp[idx_t,sort_idxs]
+                self.my_id[idx_t,:] = self.my_id[idx_t,sort_idxs]
+                self.init_id[idx_t,:] = self.init_id[idx_t,sort_idxs]
+            self.sorted = True
             
+    # TODO: only update Ekin that has not been calculated before
     def update_aux_data (self, to_update=['Ekin',]):
         if 'Ekin' in to_update:
             if self.relativistic:
                 self.Ekin = np.sum(1.0 / np.sqrt(1.0 - (self.vel)**2), axis=-1)
             else:
                 self.Ekin = 0.5 * np.sum((self.vel)**2, axis=-1)
+
+    # returns n indices of particles with highest Ekin at the final or ith frame
+    def find_highest_Ekin (self, n=1, i=None):
+
+        if i == None:
+            idx = len(self.times)-1
+        else:
+            idx = i
+
+        # generate Ekin if needed
+        if len(self.Ekin) != len(self.my_id):
+            self.update_aux_data(to_update=['Ekin',])
+
+        # find ids of the particles with n highest energies
+        return self.my_id[idx, np.argpartition(self.Ekin[idx,:],-n)[-n:]]
+
+    # returns n indices of particles with Ekin closest to median at the final or ith frame
+    def find_median_Ekin (self, n=1, i=None):
+
+        if i == None:
+            idx = len(self.times)-1
+        else:
+            idx = i
+
+        # generate Ekin if needed
+        if len(self.Ekin) != len(self.my_id):
+            self.update_aux_data(to_update=['Ekin',])
+
+        # find ids:
+        part_idx = int(0.5*(self.npart+n))
+        return self.my_id[idx, np.argpartition(self.Ekin[idx,:],kth=[-part_idx,part_idx])[-part_idx:(part_idx+1)]]
             
-    def plot_pos2D (self, ax, color_by='time', cmap='rainbow', axis_x=0, axis_y=1):
+    def plot_pos2D (self, ax, color_by='time', cmap='rainbow', axis_x=0, axis_y=1, annotations=True, selection=[]):
+
+        # choose coloring
         if color_by == 'time':
-            for p in range(self.npart):
-                ax.scatter(self.pos[:,p,axis_x], self.pos[:,p,axis_y], s=0.1, c=self.times, cmap=cmap)
+            from matplotlib.cm import get_cmap
+            cmap_here = get_cmap(cmap, 128)
+            tmin, tmax = min(self.times), max(self.times)
+            c = lambda x : cmap_here((np.array(self.times)-tmin)/(tmax-tmin))
         elif color_by == 'particle':
-            from matplotlib.cmap import get_cmap
+            from matplotlib.cm import get_cmap
             c = get_cmap(cmap, 128)
-            for p in range(self.npart):
-                ax.scatter(self.pos[:,p,axis_x], self.pos[:,p,axis_y], s=0.1, color=c(p/self.npart))
+        else: #solid color assumed
+            c = lambda x : color_by
+
+        if len(selection) > 0:
+            p_idxs = np.array(selection).astype(np.int64)
+        else:
+            p_idxs = range(self.npart)
+
+        # plot the traces
+        for p in p_idxs:
+            ax.scatter(self.pos[:,p,axis_x], self.pos[:,p,axis_y], s=0.1, color=c(p/self.npart))
 
         ax.set_aspect(1.0)
 
-        if axis_x == 0:
-            ax.set_xlim(self.coords['x1min'],self.coords['x1max'])
-            ax.set_xlabel('x')
-        elif axis_x == 1:
-            ax.set_xlim(self.coords['x2min'],self.coords['x2max'])
-            ax.set_xlabel('y')
-        elif axis_x == 2:
-            ax.set_xlim(self.coords['x3min'],self.coords['x3max'])
-            ax.set_xlabel('z')
+        if annotations:
+            if axis_x == 0:
+                ax.set_xlim(self.coords['x1min'],self.coords['x1max'])
+                ax.set_xlabel('x')
+            elif axis_x == 1:
+                ax.set_xlim(self.coords['x2min'],self.coords['x2max'])
+                ax.set_xlabel('y')
+            elif axis_x == 2:
+                ax.set_xlim(self.coords['x3min'],self.coords['x3max'])
+                ax.set_xlabel('z')
 
-        if axis_y == 0:
-            ax.set_ylim(self.coords['x1min'],self.coords['x1max'])
-            ax.set_ylabel('x')
-        elif axis_y == 1:
-            ax.set_ylim(self.coords['x2min'],self.coords['x2max'])
-            ax.set_ylabel('y')
-        elif axis_y == 2:
-            ax.set_ylim(self.coords['x3min'],self.coords['x3max'])
-            ax.set_ylabel('z')
+            if axis_y == 0:
+                ax.set_ylim(self.coords['x1min'],self.coords['x1max'])
+                ax.set_ylabel('x')
+            elif axis_y == 1:
+                ax.set_ylim(self.coords['x2min'],self.coords['x2max'])
+                ax.set_ylabel('y')
+            elif axis_y == 2:
+                ax.set_ylim(self.coords['x3min'],self.coords['x3max'])
+                ax.set_ylabel('z')
 
-        ax.set_title('Particle position')
+            ax.set_title('Particle position')
                 
     def plot_Ekin_vs_time (self, ax, cmap='rainbow', average=False, residuals=False):
         data_to_plot = 1.*self.Ekin[:,:]
@@ -187,19 +275,24 @@ class Particles:
             ax.set_ylim(1.1*np.min(data_to_plot), 1.1*np.max(data_to_plot))
         ax.set_xlabel('Time')
 
-    def plot_Ekin_distribution (self, ax, cax=None, bins=None, log=True, cmap='rainbow', average=False, i=None, navg=1, data_to_plot=None):
+    def plot_Ekin_distribution (self, ax, cax=None, bins=None, log=True, cmap='rainbow', i=None, navg=None, history=False, data_to_plot=None):
 
         # generate Ekin if needed
-        if len(self.Ekin) == 0:
-            self.update_aux_data()
+        if len(self.Ekin) != len(self.my_id):
+            self.update_aux_data(to_update=['Ekin',])
 
-        if average or navg >= len(self.times): # plot time-averaged energy distribution
-            data_to_plot = np.mean(self.Ekin, axis=0)
-            ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
+        if not history:
 
-        elif i != None: # plot a single frame
-            #data_to_plot = np.mean(np.transpose(self.Ekin)[:,i:(i+navg)], axis=1)
-            ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
+            if i == None: # plot time-averaged energy distribution
+                data_to_plot = np.mean(self.Ekin, axis=0)
+                ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
+
+            elif navg == None: # plot a single frame
+                ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
+
+            else: # plot an average from the frames [i-navg, i]
+                data_to_plot = np.mean(self.Ekin[(i-navg):(i+1),:], axis=0)
+                ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
 
         else: # plot history of energy distr. color-coded with time
             data_x = np.array(self.times)
@@ -250,7 +343,7 @@ class Particles:
             if verbose:
                 print(" done", flush=True)
         # generate Ekin if needed
-        if len(self.Ekin) == 0:
+        if len(self.Ekin) != len(self.my_id):
             if verbose:
                 print("Calculating Ekin..", end='', flush=True)
             self.update_aux_data()
@@ -290,34 +383,90 @@ class Particles:
         del data_to_plot
         print('Done.', flush=True)
 
-    def plot_direction_distribution (self, ax, projection, res, i=None, cmap='rainbow', res_patch=8, cax=None, weights=None, recalculate=True):
+    def plot_direction_distribution_3D (self, ax, projection, res, i=None, navg=None, cmap='rainbow', res_patch=8, cax=None, weights=None, recalculate=True):
+
+        name = 'direction3D'
+        if weights != None:
+            name += "_" + weights
 
         # first, create an angular grid for direction bins, with equal-area components
-        thetas = np.arccos(np.linspace(1.,-1., 2*res))
+        thetas = np.arccos(np.linspace(1.,-1., res))
         phis = np.linspace(-np.pi,np.pi, 2*res)
 
-        if i != None: # print a single frame
-            vel = self.vel[i,:,:].reshape(1,self.npart,3)
-        else: # calculate statistics for the entire simulation
-            vel = self.vel
+        if recalculate or (name not in self.hist.keys()):
 
-        # calculate angles for the particles
-        if recalculate or len(self.vel_theta) == 0 or len(self.vel_phi) == 0:
-            vel_xy = np.sqrt(vel[:,:,0]**2+vel[:,:,1]**2)
-            self.vel_theta = np.arctan(vel_xy/vel[:,:,2])
-            self.vel_phi = np.arccos(vel[:,:,0]/vel_xy)
-            self.vel_phi = np.where(vel[:,:,1] > 0, self.vel_phi, 2.*np.pi - self.vel_phi)
-            self.vel_phi = np.where(self.vel_phi < np.pi, self.vel_phi, self.vel_phi-2.*np.pi) # move to the [-pi,pi] range
-            self.vel_theta = self.vel_theta.flatten()
-            self.vel_phi = self.vel_phi.flatten()
-        if weights == 'mom':
-            weights = np.sqrt(np.sum(vel**2,axis=2)).flatten()
+            if i == None: # calculate statistics for the entire simulation
+                vel = self.vel
+            elif navg == None: # print a single frame
+                vel = self.vel[i,:,:].reshape(1,self.npart,3)
+            else: # plot the population from the frames [i-navg, i]
+                vel = self.vel[(i-navg):(i+1),:,:]
 
-        # calculate the 2d histogram
-        hist, edges_t, edges_p = np.histogram2d(self.vel_theta, self.vel_phi, bins=[thetas, phis], density=False, weights=weights)
+            # calculate angles for the particles
+            if recalculate or len(self.vel_theta) == 0 or len(self.vel_phi) == 0:
+                vel_xy = np.sqrt(vel[:,:,0]**2+vel[:,:,1]**2)
+                self.vel_theta = np.arctan(vel_xy/vel[:,:,2])
+                self.vel_phi = np.arccos(vel[:,:,0]/vel_xy)
+                self.vel_phi = np.where(vel[:,:,1] > 0, self.vel_phi, 2.*np.pi - self.vel_phi)
+                self.vel_phi = np.where(self.vel_phi < np.pi, self.vel_phi, self.vel_phi-2.*np.pi) # move to the [-pi,pi] range
+                self.vel_theta = self.vel_theta.flatten()
+                self.vel_phi = self.vel_phi.flatten()
+            if weights == 'mom':
+                weights = np.sqrt(np.sum(vel**2,axis=2)).flatten()
+
+            # calculate the 2d histogram
+            # (values, theta_edges, phi_edges)
+            self.hist[name] = np.histogram2d(self.vel_theta, self.vel_phi, bins=[thetas, phis], density=False, weights=weights)
 
         # plot the 2d histogram
-        cart.plot_projected(ax, projection, thetas, phis, hist, in_unit='rad', cmap=cmap, res_patch=res_patch, cax=cax)
+        cart.plot_projected(ax, projection, thetas, phis, self.hist[name][0], in_unit='rad', cmap=cmap, res_patch=res_patch, cax=cax)
 
         # plot the grid
         cart.plot_cartographic_grid(ax, projection, phi_ticks=[-90.,0.,90.], theta_ticks=[30.,60.,90.,120.,150.])
+
+    def plot_direction_distribution_2D (self, ax, res, i=None, weights=None, recalculate=True):
+
+        name = 'direction2D'
+        if weights != None:
+            name += "_" + weights
+        # first, create an angular grid for direction bins, with equal-area components
+        phis = np.linspace(-np.pi,np.pi, 2*res)
+
+        if recalculate or (name not in self.hist.keys()):
+
+            # recalculate from the 3D histograms?
+            name_3D = 'direction3D'
+            if weights != None:
+                name_3D += "_" + weights
+            if not recalculate and (name_3D in self.hist.keys()):
+
+                # (values, phi_edges)
+                self.hist[name] = ( np.sum(self.hist[name_3D][0], axis=0), self.hist[name_3D][2] )
+
+            else: # calculate from scratch
+
+                if i != None: # print a single frame
+                    vel = self.vel[i,:,:].reshape(1,self.npart,3)
+                else: # calculate statistics for the entire simulation
+                    vel = self.vel
+
+                # calculate angles for the particles
+                if recalculate or len(self.vel_phi) == 0:
+                    vel_xy = np.sqrt(vel[:,:,0]**2+vel[:,:,1]**2)
+                    self.vel_phi = np.arccos(vel[:,:,0]/vel_xy)
+                    self.vel_phi = np.where(vel[:,:,1] > 0, self.vel_phi, 2.*np.pi - self.vel_phi)
+                    self.vel_phi = np.where(self.vel_phi < np.pi, self.vel_phi, self.vel_phi-2.*np.pi) # move to the [-pi,pi] range
+                    self.vel_phi = self.vel_phi.flatten()
+                if weights == 'mom':
+                    weights = np.sqrt(np.sum(vel**2,axis=2)).flatten()
+
+                # calculate the 2d histogram
+                # (values, theta_edges, phi_edges)
+                self.hist[name] = np.histogram(self.vel_phi, bins=phis, density=False, weights=weights)
+
+            # plot
+            ax.set_aspect(1.0)
+            datax = np.repeat(phis,2)
+            datay = np.repeat(self.hist[name][0],2)
+            datay = np.insert(datay, [0,len(datay)], [datay[0],datay[0]])
+            ax.plot(datax, datay)
