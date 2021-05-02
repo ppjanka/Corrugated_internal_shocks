@@ -3,7 +3,7 @@ This is a fork of the publicly available Athena-Cversion MHD code (hereafter, At
 
 Athena 4.2 includes a particle module intended for simulations of dust granules in protoplanetary disks (designed by Bai & Stone, 2010). In the original module, the particles are assumed to be non-relativistic and are coupled to the fluid by drag forces.
 
-Here, I have used the module of Bai & Stone (2010) as a basis (utilizing the MPI handling of particles implemented by them), and extended it to handle charged relativistic test particles coupled to the fluid only by Lorentz forces (one can think of them as "cosmic rays"). Note that no backreaction on the fluid is implemented (i.e., it is assumed that the test particles are not dynamically important for behavior of the fluid). I have also implemented additional diagnostics to thus modified particle module, written in Python.
+Here, I have used the module of Bai & Stone (2010) as a basis (utilizing the MPI handling of particles implemented by them), and extended it to handle charged relativistic test particles coupled to the fluid only by Lorentz forces (one can think of them as "cosmic rays"). In implementing these changes, I have followed the procedure described for the PLUTO code's particle module in Mignone et al. (2018). Note that no backreaction on the fluid is implemented here (i.e., it is assumed that the test particles are not dynamically important for behavior of the fluid). I have also implemented additional diagnostics to thus modified Athena 4.2 particle module, written in Python.
 
 Added features:
  - charged relativistic trace / test particles in cartesian coordinates,
