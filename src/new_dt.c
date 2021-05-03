@@ -151,19 +151,19 @@ void new_dt(MeshS *pM)
       }
     }}
 
-#endif /* SPECIAL_RELATIVITY */
+    /* compute maximum velocity with particles */
+    #ifdef PARTICLES
+        for (q=0; q<pGrid->nparticle; q++) {
+          if (pGrid->Nx[0] > 1)
+            max_v1 = MAX(max_v1, pGrid->particle[q].v1);
+          if (pGrid->Nx[1] > 1)
+            max_v2 = MAX(max_v2, pGrid->particle[q].v2);
+          if (pGrid->Nx[2] > 1)
+            max_v3 = MAX(max_v3, pGrid->particle[q].v3);
+        }
+    #endif /* PARTICLES */
 
-/* compute maximum velocity with particles */
-#ifdef PARTICLES
-    for (q=0; q<pGrid->nparticle; q++) {
-      if (pGrid->Nx[0] > 1)
-        max_v1 = MAX(max_v1, pGrid->particle[q].v1);
-      if (pGrid->Nx[1] > 1)
-        max_v2 = MAX(max_v2, pGrid->particle[q].v2);
-      if (pGrid->Nx[2] > 1)
-        max_v3 = MAX(max_v3, pGrid->particle[q].v3);
-    }
-#endif /* PARTICLES */
+#endif /* SPECIAL_RELATIVITY */
 
 /* compute maximum inverse of dt (corresponding to minimum dt) */
     if (pGrid->Nx[0] > 1)

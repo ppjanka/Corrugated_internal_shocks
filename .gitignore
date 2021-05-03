@@ -11,3 +11,7 @@ defs.h
 configure
 autom4te.cache
 athena
+*Makedepend
+*Makefile
+src/config.h
+src/defs.h

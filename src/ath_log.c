@@ -226,7 +226,6 @@ FILE *atherr_fp(void)
 void ath_flush_out(void)
 {
   FILE *fp;
-
   /* If the output log file needs to be opened then there's no data on
      the stream to flush.  Return with a successful completion. */
   if(open_out_flag) return;
