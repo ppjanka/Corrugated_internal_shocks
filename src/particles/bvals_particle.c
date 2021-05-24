@@ -104,7 +104,7 @@ static void reflect_ox2_particle(GridS *pG);
 static void reflect_ix3_particle(GridS *pG);
 static void reflect_ox3_particle(GridS *pG);
 
-static void outflow_particle(GridS *pG);
+void outflow_particle(GridS *pG);
 
 static void periodic_ix1_particle(GridS *pG);
 static void periodic_ox1_particle(GridS *pG);
@@ -1575,7 +1575,7 @@ static void reflect_ox3_particle(GridS *pG)
  * outermost layer of the ghost cells, which is done in remove_ghost_particle(),
  * see particle.c.
  */
-static void outflow_particle(GridS *pG)
+void outflow_particle(GridS *pG)
 {
   return;
 }

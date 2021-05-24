@@ -1403,6 +1403,10 @@ void exchange_gpcouple_init(MeshS *pM)
 
       switch(pM->BCFlag_ox1){
 
+      case 0: /* Outflow if user bvals */
+        apply_ox1 = outflow_exchange;
+        break;
+
       case 1: /* Reflecting */
 	apply_ox1 = reflect_ox1_exchange;
 	break;

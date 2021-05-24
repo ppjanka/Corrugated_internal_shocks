@@ -15,3 +15,8 @@ athena
 *Makefile
 src/config.h
 src/defs.h
+src/problem.c
+*__pycache__
+vis/particle/join_lis
+*temp*
+bin/test*

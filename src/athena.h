@@ -215,6 +215,9 @@ typedef struct Grain_s{
   int property;		/*!< index of particle properties */
   short pos;		/*!< position: 0: ghost; 1: grid; >=10: cross out/in; */
   long my_id;		/*!< particle id */
+  short shock_of_origin;
+  short injected;
+  Real shock_speed; // for un-injected particles, used to calculate the shift
 #ifdef MPI_PARALLEL
   int init_id;          /*!< particle's initial host processor id */
 #endif

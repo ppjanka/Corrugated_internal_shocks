@@ -1,0 +1,131 @@
+<comment>
+problem   = Jet internal shock model 2: Corrugated internal shocks with test particles
+reference = 
+configure = --enable-mpi --enable-special-relativity --with-problem=IntSh2-part --with-gas=mhd --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-flux=hlld --with-integrator=vl --with-particles=passive # --enable-ghost
+flags = export LIBS="-lgsl -lgslcblas -lm"
+
+<job>
+problem_id      = IntSh2-part # problem ID: basename of output filenames
+maxout          = 3           # Output blocks number from 1 -> maxout
+num_domains     = 1           # number of Domains in Mesh
+
+<output1>
+out_fmt    = lis      # particle list data dump (ONLY for particles)
+dt         = 0.5     # time step between output
+
+<output2>
+out_fmt    = hst      # History data dump
+dt         = 0.5     # time increment between outputs
+
+<output3>
+out_fmt    = vtk      # Binary data dump
+out        = prim     # variables to be output
+id         = prim     # file id string
+dt         = 0.5     # time increment between outputs
+
+#<output4>
+#out_fmt    = rst
+#id         = rst
+#dt         = 5.0
+
+<time>
+cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = -1         # cycle limit
+tlim       = 10.0       # time limit
+
+<domain1>
+level = 0
+
+Nx1        = 256        # Number of zones in X1-direction (x)
+x1min      = -20.       # minimum value of X1
+x1max      = 5.         # maximum value of X1
+bc_ix1     = 2          # (outflow) inner-X1 boundary flag
+# bc_ox1     = user     # (user) outer-X1 boundary flag
+# NGrid_x1   = 16         # MPI blocks in x1
+
+Nx2        = 64         # Number of zones in X2-direction (y)
+x2min      = -3.        # minimum value of X2
+x2max      = 3.         # maximum value of X2
+bc_ix2     = 4          # (periodic) inner-X2 boundary flag
+bc_ox2     = 4          # (periodic) outer-X2 boundary flag
+# NGrid_x2   = 4          # MPI blocks in x2
+
+Nx3        = 1          # Number of zones in X3-direction (z)
+x3min      = -0.01      # minimum value of X3
+x3max      = 0.01       # maximum value of X3
+bc_ix3     = 1          # (reflecting) inner-X3 boundary flag
+bc_ox3     = 1          # (reflecting) outer-X3 boundary flag
+# NGrid_x3   = 1          # MPI blocks in x3
+
+AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
+
+<particle>
+# NOTE: in this problem each particle should have its own type, i.e. partypes = no of particles, parnumgrid = 1
+partypes        = 10        # number of types of particles
+parnumgrid      = 1         # number of particles for each type
+integrator      = 4         # particle integrator
+                            #   (1: explicit; 2: semi-implicit; 3: fully-implicit;
+                            #    4: Boris with Lorentz force and SR particles)
+interp          = 2         # interpolation scheme (1: CIC; 2: TSC; 3: QP)
+tsmode          = 3         # stopping time calculation mode
+                            #   (1: General; 2: Epstein; 3: fixed);
+tstop           = 10.       # stopping time
+
+tshuf           = -1        # number of time steps to shuffle the particles
+
+alpha           = 0.1       # charge-to-mass ratio, q/mc
+                            #    see Mignone et al. (2018) eq. 18
+
+<problem>
+
+gamma   = 1.33333333333  # gamma = C_p/C_v
+
+# BASIC SETUP
+
+r_jet = 1.0
+
+# ambient medium
+rho_amb = 20.
+press_amb = 1.0
+
+# jet
+rho_jet = 20.
+press_jet = 1.0
+
+# magnetic fields; constant Bz
+bfield_A = 14.1 # amplitude
+
+# shock setup
+gamma_shock1 = 3.  # shock (frame) velocity in LAB frame
+z_shock1 = 0.      # initial shock position
+gamma_shock2 = 3.  # velocity of the consecutive shock
+                   #   in the previous shock's post-shock frame (if 0, no shock)
+z_shock2 = -17.5   # position of the consecutive shock
+
+# shock corrugation: sin
+corr_sin1_A = 0.  # amplitude
+corr_sin1_L = 6.0 # modulation wavelength perpendicular to the flow
+corr_sin1_Lz = 0. # modulation wavelength parallel to the flow
+corr_sin2_A = 0.
+corr_sin2_L = 3.0
+corr_sin2_Lz = 0.
+corr_sin3_A = 0.
+corr_sin3_L = 1.5
+corr_sin3_Lz = 0.
+# shock corrugation: cos
+corr_cos1_A = 0.  # amplitude
+corr_cos1_L = 6.0 # modulation wavelength perpendicular to the flow
+corr_cos1_Lz = 0. # modulation wavelength parallel to the flow
+corr_cos2_A = 0.
+corr_cos2_L = 3.0
+corr_cos2_Lz = 0.
+corr_cos3_A = 0.2
+corr_cos3_L = 1.5
+corr_cos3_Lz = 4.5
+
+# shock detection
+shock_detection_threshold = 0.25
+
+# particles
+fpart_shock1 = 0.5 # fraction of parnumgrid initialized at shock 1
+fpart_shock2 = 0.5 # fraction of parnumgrid initialized at shock 2
