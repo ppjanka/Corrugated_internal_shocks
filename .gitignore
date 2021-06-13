@@ -20,3 +20,4 @@ src/problem.c
 vis/particle/join_lis
 *temp*
 bin/test*
+*.mp4

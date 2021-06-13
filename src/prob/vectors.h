@@ -60,6 +60,7 @@ void TYPED_NAME(drop_from_vector) (struct TYPED_NAME(vector) *vector) {
     vector->first_element = NULL;
   }
   free(element);
+  vector->n_elements--;
 }
 
 void TYPED_NAME(clear_vector) (struct TYPED_NAME(vector) *vector) {

@@ -31,7 +31,7 @@ dt         = 0.5     # time increment between outputs
 <time>
 cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
 nlim       = -1         # cycle limit
-tlim       = 10.0       # time limit
+tlim       = 6.5        # time limit
 
 <domain1>
 level = 0
@@ -129,3 +129,13 @@ shock_detection_threshold = 0.25
 # particles
 fpart_shock1 = 0.5 # fraction of parnumgrid initialized at shock 1
 fpart_shock2 = 0.5 # fraction of parnumgrid initialized at shock 2
+
+# particle injection setup
+# time dependence of the injection process
+injection_time_type = 1    # 1: all at once, shock by shock
+injection_time_sh1 = 10.0
+injection_time_sh2 = 12.0
+# injected momentum (direction, energy) distribution
+injection_mom_type = 1     # 1: single velocity per shock, random direction
+injection_vel_sh1 = 0.05
+injection_vel_sh2 = 0.1

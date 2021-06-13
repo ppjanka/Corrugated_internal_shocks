@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 #include "defs.h"
 #include "athena.h"
 #include "globals.h"
@@ -40,11 +41,27 @@
 #undef TYPED_NAME
 
 // variables global to this file
+static int n_shocks = 2;
 #ifdef PARTICLES
 static Real shock_detection_threshold;
 static Real min_sin_angle = 1./sqrt(3);
 char name[50];
-#endif
+
+// PARTICLE INJECTION DISTRIBUTIONS
+
+static int injection_time_type = 0;
+// injection_time_type == 1 -- all at once, shock by shock
+static Real* injection_time;
+
+static int injection_mom_type = 1;
+static void (*draw_particle_vel) (Real time, int sh, Real* v1, Real* v2, Real* v3);
+// injection_energy_type == 1 -- all particles at the same energy, random angle
+static void draw_particle_vel_type1 (Real time, int sh, Real* v1, Real* v2, Real* v3);
+static Real* injection_vel;
+
+static bool* not_injected;
+
+#endif // PARTICLES
 
 //----------------------------------------------------------------------------------
 
@@ -195,6 +212,9 @@ void postshock_gamma_bfield (Real adiab_idx,
 
 void problem(DomainS *pDomain)
 {
+  // initialize the random number generator
+  time_t t;
+  srand((unsigned) time(&t));
 
   GridS *pGrid=(pDomain->Grid);
   int i, is = pGrid->is, ie = pGrid->ie;
@@ -433,6 +453,34 @@ void problem(DomainS *pDomain)
       } // i
     } // sh
   } // k
+
+  // set up particle injection variables
+  char buf [30];
+  // Injection as a function of time
+  injection_time_type = par_geti_def("problem", "injection_time_type", 0);
+  // 0 -> no injection
+  if (injection_time_type == 1) { // all at once, shock by shock
+    injection_time = malloc(n_shocks * sizeof(Real));
+    for (sh = 0; sh < n_shocks; sh++) {
+      sprintf(buf, "injection_time_sh%i", sh+1);
+      injection_time[sh] = par_getd("problem", buf);
+    }
+    not_injected = malloc(n_shocks * sizeof(bool));
+    for (sh = 0; sh < n_shocks; sh++) {
+      not_injected[sh] = true;
+    }
+  }
+  // Momentum distribution at injection
+  injection_mom_type = par_geti_def("problem", "injection_mom_type", 1);
+  if (injection_mom_type == 1) { // single velocity, random direction
+    draw_particle_vel = &draw_particle_vel_type1;
+    injection_vel = malloc(n_shocks * sizeof(Real));
+    for (sh = 0; sh < n_shocks; sh++) {
+      sprintf(buf, "injection_vel_sh%i", sh+1);
+      injection_vel[sh] = par_getd("problem", buf);
+    }
+  }
+
   #endif // PARTICLES
 }
 
@@ -536,19 +584,20 @@ void Userwork_in_loop(MeshS *pM)
   struct Real_vector_element *Real_elem;
   struct int_vector idx_max_value = int_vector_default;
   struct int_vector_element *int_elem;
-  int consecutive;
-  long int p = 0;
+  int consecutive; Real current_max_value;
+  long int p = 0, p_inj = 0;
   for (ng = 0; ng < n_local_grids; ng++) {
+    p = 0;
     nl = local_grids[ng][0];
     nd = local_grids[ng][1];
     grid = pM->Domain[nl][nd].Grid;
     ilen = grid->Nx[0] + nghost - 1;
     jlen = grid->Nx[1] + nghost - 1;
     x1len = grid->MaxX[0] - grid->MinX[0];
-    for (j = 0; j < jlen; j++) {
+    for (j = 1; j < jlen-1; j++) {
       consecutive = 0;
       idx_max_value = int_vector_default;
-      for (i = 1; i < ilen; i++) {
+      for (i = 1; i < ilen-1; i++) {
         gradient[ng][j][i] =
               SQR((grid->Whalf[0][j][i+1].V1 - grid->Whalf[0][j][i].V1) / (grid->dx1))
             + SQR((grid->Whalf[0][j+1][i].V1 - grid->Whalf[0][j][i].V1) / (grid->dx2));
@@ -556,22 +605,33 @@ void Userwork_in_loop(MeshS *pM)
         if (gradient[ng][j][i] > shock_detection_threshold) {
           if (consecutive == 0) {
             int_append_to_vector(&idx_max_value, i, 0);
-          } else {
+            current_max_value = gradient[ng][j][i];
+          } else if (gradient[ng][j][i] > current_max_value) {
             idx_max_value.last_element->first = i;
           }
           consecutive++;
-        } else {
+        } else if (consecutive > 0) {
+          // ensure that the indices aren't too close to the ghost zones
+          if (   idx_max_value.last_element->first < 2
+              || idx_max_value.last_element->first > ilen-3) {
+            int_drop_from_vector(&idx_max_value);
+          }
+          // reset consecutive counter
           consecutive = 0;
         }
       } // i
+      if (consecutive > 0) {
+        // ensure that the indices aren't too close to the ghost zones
+        if (   idx_max_value.last_element->first < 2
+            || idx_max_value.last_element->first > ilen-3) {
+          int_drop_from_vector(&idx_max_value);
+        }
+      }
       if (idx_max_value.n_elements > 0) {
         for (int_elem = idx_max_value.first_element;
              int_elem != NULL;
              int_elem = int_elem->next) {
           idx = int_elem->first;
-          // move the idx_max_value away from the grid edges
-          idx = fmax(idx, 1);
-          idx = fmin(idx, ilen-3);
           // calculate the centroid
           centroid = 0; norm = 0;
           for (i = idx-1; i <= idx+1; i++) {
@@ -618,11 +678,42 @@ void Userwork_in_loop(MeshS *pM)
             centroid = Real_elem->first;
           }
         }
-        grid->particle[p].shock_speed = (centroid - grid->particle[p].x1) / (grid->dt);
+        if (grid->particle[p].shock_of_origin == 1)
+        if (centroid > grid->MinX[0] && centroid < grid->MaxX[0]) {
+          if (grid->particle[p].shock_of_origin == 1)
+          grid->particle[p].shock_speed = (centroid - grid->particle[p].x1) / (grid->dt);
+        }
         grid->particle[p].x1 = centroid;
       } // p loop
       // 4) initialize particles if needed
-      //TODO
+        if (injection_time_type == 1) { // all at once
+          bool in_shock;
+          Real theta, z;
+          p_inj = 0;
+          for (sh = 0; sh < n_shocks; sh++) {
+            if (not_injected[sh] && grid->time > injection_time[sh]) {
+              printf("Injecting particles into shock #%i... ", sh);
+              in_shock = false;
+              // particles are initialized in the order of shocks,
+              //  so we can continue the loop below
+              for (; p_inj < grid->nparticle; p_inj++) {
+                if (grid->particle[p_inj].shock_of_origin == sh) {
+                  in_shock = true;
+                  (*draw_particle_vel) (grid->time, sh,
+                      &(grid->particle[p_inj].v1),
+                      &(grid->particle[p_inj].v2),
+                      &(grid->particle[p_inj].v3));
+                  // mark particle as injected
+                  grid->particle[p_inj].injected += 1;
+                } else if (in_shock) {
+                  break; // we're done with this shock
+                }
+              }
+              not_injected[sh] = false;
+              printf("done.\n");
+            }
+          }
+        }
       } else { // no shocks detected in the grid
         // 3b) move uninitialized particles with constant velocity (to reach the shock that has moved out of the current grid
         fc_pos(grid, 0,j+1,0, &x1l,&x2,&x3);
@@ -638,8 +729,30 @@ void Userwork_in_loop(MeshS *pM)
   #endif // PARTICLES
 }
 
+// particle injection functions
+static void draw_particle_vel_type1 (Real time, int sh, Real* v1, Real* v2, Real* v3) {
+  static Real theta, z;
+  // draw a random 3D angle
+  // -- using equal-area cylindrical projection, as described at https://math.stackexchange.com/questions/44689/how-to-find-a-random-axis-or-unit-vector-in-3d
+  theta = (2.*M_PI * rand()) / RAND_MAX;
+  z = (2. * rand()) / RAND_MAX - 1.0;
+  // select particle velocity
+  //TODO: Should I limit particles velocities to 2D? Or allow them to move in three dimensions? Ask Camilia how it is done in PIC.
+  (*v1) = injection_vel[sh] * sqrt(1.-z*z) * cos(theta);
+  (*v2) = injection_vel[sh] * sqrt(1.-z*z) * sin(theta);
+  (*v3) = injection_vel[sh] * z * cos(theta);
+}
+
 void Userwork_after_loop(MeshS *pM)
 {
+  // destroy the dynamically allocated global variables
+  if (injection_time_type == 1) {
+    free(injection_time);
+    free(not_injected);
+  }
+  if (injection_mom_type == 1) {
+    free(injection_vel);
+  }
 }
 
 void inflow_boundary (GridS *pGrid) {
