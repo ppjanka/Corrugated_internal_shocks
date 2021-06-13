@@ -374,7 +374,7 @@ void problem(DomainS *pDomain)
   pGrid->nparticle = 0; pgrid = 0;
   // Figure out how to split particles between shocks and cells
   int npart_shock [2]; int part_jstep [2]; int npart_per_j [2];
-  int z_shock [2] = {z_shock1, z_shock2};
+  Real z_shock [2] = {z_shock1, z_shock2};
   int sh, ibuff, npart_tot = 0;
   char sbuff [50];
   for (sh = 0; sh < 2; sh++) {
