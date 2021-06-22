@@ -50,7 +50,7 @@ void TYPED_NAME(append_to_vector) (struct TYPED_NAME(vector) *vector, TYPE first
     vector->first_element = element;
     vector->last_element = element;
   }
-  vector->n_elements += 1;
+  vector->n_elements++;
 }
 
 void TYPED_NAME(drop_from_vector) (struct TYPED_NAME(vector) *vector) {

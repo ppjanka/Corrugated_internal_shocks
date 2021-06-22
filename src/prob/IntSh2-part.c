@@ -576,12 +576,13 @@ void Userwork_in_loop(MeshS *pM)
   Real centroid, norm, sin_angle;
   int il, iu, sh, idx;
   Real x1l, x1r, x2, x3, dist_x1, dist_x1_min, x1len;
-  struct Real_vector centroids_row = Real_vector_default;
+  struct Real_vector *centroids;
   struct Real_vector_element *Real_elem;
   struct int_vector idx_max_value = int_vector_default;
   struct int_vector_element *int_elem;
   int consecutive; Real current_max_value;
   long int p;
+  bool move;
   for (ng = 0; ng < n_local_grids; ng++) {
     nl = local_grids[ng][0];
     nd = local_grids[ng][1];
@@ -589,6 +590,14 @@ void Userwork_in_loop(MeshS *pM)
     ilen = grid->Nx[0] + nghost - 1;
     jlen = grid->Nx[1] + nghost - 1;
     x1len = grid->MaxX[0] - grid->MinX[0];
+
+    // initialize centroids for this grid
+    centroids = (struct Real_vector*) malloc((jlen-1) * sizeof(struct Real_vector));
+    for (j = 1; j < jlen-1; j++) {
+      centroids[j] = Real_vector_default;
+    }
+
+    // localize shocks
     for (j = 1; j < jlen-1; j++) {
       consecutive = 0;
       idx_max_value = int_vector_default;
@@ -651,48 +660,56 @@ void Userwork_in_loop(MeshS *pM)
             i = idx;
             sin_angle = fabs((grid->Whalf[0][j][i+1].V1 - grid->Whalf[0][j][i].V1) / (grid->dx1)) / sqrt(gradient[ng][j][i]);
             sin_angle = fmax(sin_angle, min_sin_angle);
-            Real_append_to_vector(&centroids_row, centroid, sin_angle);
+            Real_append_to_vector(&(centroids[j]), centroid, sin_angle);
           }
         }
         int_clear_vector(&idx_max_value);
-      // UPDATE PARTICLES ----------------------------------------------------------
-      // 3) move uninitialized particles to their nearest shock's position
-      cc_pos(grid, 0,j,0, &x1l,&x2,&x3);
-      for (p = 0; p < grid->nparticle; p++) {
-        // TODO: this is very unoptimal, move out of the loop?
-        if (   grid->particle[p].injected > 0
-            || fabs(grid->particle[p].x2 - x2) > 0.5*grid->dx1) continue;
-        // move the un-injected particles to the nearest shock position along x-dir
+      }
+    } // j
+
+    // UPDATE PARTICLES ----------------------------------------------------------
+    // 3) move uninitialized particles to their nearest shock's position
+    for (p = 0; p < grid->nparticle; p++) {
+      if (grid->particle[p].injected > 0) continue;
+      // find out the j index corresponding to this particle
+      j = (int) ((grid->particle[p].x2 - grid->MinX[1]) / (grid->dx2))
+          + nghost/2;
+      // check whether there is a shock nearby (~ within the particle's light cone) along the x1-dir
+      if (grid->time > grid->dt) {
+        dist_x1_min = 1.5*grid->dt;
+      } else { // always move to the shock on first timestep
         dist_x1_min = x1len;
-        for (Real_elem = centroids_row.first_element;
-             Real_elem != NULL;
-             Real_elem = Real_elem->next) {
-          dist_x1 = fabs(Real_elem->first - grid->particle[p].x1);
-          if (dist_x1 < dist_x1_min) {
-            dist_x1_min = dist_x1;
-            centroid = Real_elem->first;
-          }
+      }
+      move = false;
+      for (Real_elem = centroids[j].first_element;
+           Real_elem != NULL;
+           Real_elem = Real_elem->next) {
+        dist_x1 = fabs(Real_elem->first - grid->particle[p].x1);
+        if (dist_x1 < dist_x1_min) {
+          dist_x1_min = dist_x1;
+          centroid = Real_elem->first;
+          move = true;
         }
+      }
+      // if there is a shock nearby (~ within the particle's light cone) along the x1-dir, move the particle there
+      if (move) {
         if (centroid > grid->MinX[0] && centroid < grid->MaxX[0]) {
           grid->particle[p].shock_speed = (centroid - grid->particle[p].x1) / (grid->dt);
         }
         grid->particle[p].x1 = centroid;
-      } // p loop
-      } else { // no shocks detected in the grid
-        // 3b) move uninitialized particles with constant velocity (to reach the shock that has moved out of the current grid
-        cc_pos(grid, 0,j,0, &x1l,&x2,&x3);
-        for (p = 0; p < grid->nparticle; p++) {
-          // TODO: this is very unoptimal, move out of the loop?
-          if (   grid->particle[p].injected > 0
-              || fabs(grid->particle[p].x2 - x2) > 0.5*grid->dx1) continue;
-          else {
-            grid->particle[p].x1 += grid->particle[p].shock_speed * grid->dt;
-          }
-        }
+      } else {
+        // otherwise, advect the particle with its saved shock speed
+        grid->particle[p].x1 += grid->particle[p].shock_speed * grid->dt;
       }
-      Real_clear_vector(&centroids_row);
-    } // j
-  // 4) initialize particles if needed
+    } // p loop
+
+    // clean up the centroids vector
+    for (j = 1; j < jlen-1; j++) {
+      Real_clear_vector(&(centroids[j]));
+    }
+    free(centroids);
+
+    // 4) initialize particles if needed
     if (injection_time_type == 1) { // all at once
       for (sh = 0; sh < n_shocks; sh++) {
         if (   grid->time <= injection_time[sh]
@@ -700,9 +717,14 @@ void Userwork_in_loop(MeshS *pM)
           for (p = 0; p < grid->nparticle; p++) {
             if (grid->particle[p].shock_of_origin == sh
                 && grid->particle[p].injected == 0) {
+              #ifdef MPI_PARALLEL
               printf(" - [Proc %i] Injecting particle no (%i,%i) into shock %i.\n",
                   myID_Comm_world,
                   grid->particle[p].init_id, grid->particle[p].my_id, sh);
+              #else // MPI off
+              printf(" - Injecting particle no %i into shock %i.\n",
+                  grid->particle[p].my_id, sh);
+              #endif
               (*draw_particle_vel) (grid->time, sh,
                   &(grid->particle[p].v1),
                   &(grid->particle[p].v2),
