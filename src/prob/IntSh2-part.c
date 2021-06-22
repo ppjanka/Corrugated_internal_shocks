@@ -59,8 +59,6 @@ static void (*draw_particle_vel) (Real time, int sh, Real* v1, Real* v2, Real* v
 static void draw_particle_vel_type1 (Real time, int sh, Real* v1, Real* v2, Real* v3);
 static Real* injection_vel;
 
-static bool* not_injected;
-
 #endif // PARTICLES
 
 //----------------------------------------------------------------------------------
@@ -362,15 +360,14 @@ void problem(DomainS *pDomain)
 
   #ifdef PARTICLES
   // Initialize particles
-  long int p, pgrid;
-  int npart = par_geti("particle", "partypes");
   // initialize particle properties for each type
-  for (p = 0; p < npart; p++) {
-    // particle stopping time, sim.u., obsolete here
-    tstop0[p] = par_getd_def("particle","tstop",1.0e20);
-    // charge-to-mass ratio, q/mc, see Mignone et al. (2018), eq. 18
-    grproperty[p].alpha = 0.0; // particle initialized as inert!
-  }
+  // particle stopping time, sim.u., obsolete here
+  tstop0[0] = par_getd_def("particle","tstop",1.0e20);
+  // charge-to-mass ratio, q/mc, see Mignone et al. (2018), eq. 18
+  grproperty[0].alpha = par_getd_def("particle", "alpha", 0.0);
+
+  long int p, pgrid;
+  int npart = par_geti("particle", "parnumgrid");
   pGrid->nparticle = 0; pgrid = 0;
   // Figure out how to split particles between shocks and cells
   int npart_shock [2]; int part_jstep [2]; int npart_per_j [2];
@@ -425,28 +422,30 @@ void problem(DomainS *pDomain)
               pos.x1 = z_shock[sh];
               pos.x2 = r;
               pos.x3 = x3;
-            }
-            if (part_in_rank(pos)) {
-              (pGrid->nparticle)++;
-              if (pGrid->nparticle+2 > pGrid->arrsize)
-                particle_realloc(pGrid, pGrid->nparticle+2);
-              // particle properties
-              pGrid->particle[pgrid].property = p; // each particle is its own type
-              pGrid->particle[pgrid].x1 = pos.x1;
-              pGrid->particle[pgrid].x2 = pos.x2;
-              pGrid->particle[pgrid].x3 = pos.x3;
-              pGrid->particle[pgrid].v1 = 0.;
-              pGrid->particle[pgrid].v2 = 0.;
-              pGrid->particle[pgrid].v3 = 0.;
-              pGrid->particle[pgrid].pos = 1; /* grid particle */
-              pGrid->particle[pgrid].my_id = p;
-              pGrid->particle[pgrid].shock_of_origin = sh;
-              pGrid->particle[pgrid].injected = 0;
-              #ifdef MPI_PARALLEL
-              pGrid->particle[pgrid].init_id = myID_Comm_world;
-              #endif
-              pgrid++;
-            } // part_in_rank
+              if (part_in_rank(pos)) {
+                (pGrid->nparticle)++;
+                if (pGrid->nparticle+2 > pGrid->arrsize)
+                  particle_realloc(pGrid, pGrid->nparticle+2);
+                // particle properties
+                pGrid->particle[pgrid].property = 0;
+                pGrid->particle[pgrid].x1 = pos.x1;
+                pGrid->particle[pgrid].x2 = pos.x2;
+                pGrid->particle[pgrid].x3 = pos.x3;
+                pGrid->particle[pgrid].v1 = 0.;
+                pGrid->particle[pgrid].v2 = 0.;
+                pGrid->particle[pgrid].v3 = 0.;
+                pGrid->particle[pgrid].pos = 1; /* grid particle */
+                // NOTE: my_id is NOT unique across processors / grids
+                //  - The unique particle ID is the (init_id, my_id) pair
+                pGrid->particle[pgrid].my_id = pgrid;
+                pGrid->particle[pgrid].shock_of_origin = sh;
+                pGrid->particle[pgrid].injected = 0;
+                #ifdef MPI_PARALLEL
+                pGrid->particle[pgrid].init_id = myID_Comm_world;
+                #endif
+                pgrid++;
+              } // part_in_rank
+            } // p
           } // j
           sh += 1; // if IF is passed, the shock is done, proceed to the next one from the current i-index
         } // if z_shock inside i'th cell
@@ -464,10 +463,6 @@ void problem(DomainS *pDomain)
     for (sh = 0; sh < n_shocks; sh++) {
       sprintf(buf, "injection_time_sh%i", sh+1);
       injection_time[sh] = par_getd("problem", buf);
-    }
-    not_injected = malloc(n_shocks * sizeof(bool));
-    for (sh = 0; sh < n_shocks; sh++) {
-      not_injected[sh] = true;
     }
   }
   // Momentum distribution at injection
@@ -563,6 +558,7 @@ void Userwork_in_loop(MeshS *pM)
     n_local_grids = local_grids_vec.n_elements;
     local_grids = int_vector_to_array(&local_grids_vec);
   }
+
   // prepare arrays to hold gradient values
   static Real*** gradient;
   if (gradient == NULL) { // initialize on first use
@@ -585,9 +581,8 @@ void Userwork_in_loop(MeshS *pM)
   struct int_vector idx_max_value = int_vector_default;
   struct int_vector_element *int_elem;
   int consecutive; Real current_max_value;
-  long int p = 0, p_inj = 0;
+  long int p;
   for (ng = 0; ng < n_local_grids; ng++) {
-    p = 0;
     nl = local_grids[ng][0];
     nd = local_grids[ng][1];
     grid = pM->Domain[nl][nd].Grid;
@@ -662,11 +657,11 @@ void Userwork_in_loop(MeshS *pM)
         int_clear_vector(&idx_max_value);
       // UPDATE PARTICLES ----------------------------------------------------------
       // 3) move uninitialized particles to their nearest shock's position
-      // NOTE: un-injected particles are initialized in the order of j, so we can continue this loop across the j loop iterations
-      fc_pos(grid, 0,j+1,0, &x1l,&x2,&x3);
-      for (; p < grid->nparticle; p++) {
-        if (grid->particle[p].injected > 0) continue;
-        else if (grid->particle[p].x2 > x2) break;
+      cc_pos(grid, 0,j,0, &x1l,&x2,&x3);
+      for (p = 0; p < grid->nparticle; p++) {
+        // TODO: this is very unoptimal, move out of the loop?
+        if (   grid->particle[p].injected > 0
+            || fabs(grid->particle[p].x2 - x2) > 0.5*grid->dx1) continue;
         // move the un-injected particles to the nearest shock position along x-dir
         dist_x1_min = x1len;
         for (Real_elem = centroids_row.first_element;
@@ -678,53 +673,47 @@ void Userwork_in_loop(MeshS *pM)
             centroid = Real_elem->first;
           }
         }
-        if (grid->particle[p].shock_of_origin == 1)
         if (centroid > grid->MinX[0] && centroid < grid->MaxX[0]) {
-          if (grid->particle[p].shock_of_origin == 1)
           grid->particle[p].shock_speed = (centroid - grid->particle[p].x1) / (grid->dt);
         }
         grid->particle[p].x1 = centroid;
       } // p loop
-      // 4) initialize particles if needed
-        if (injection_time_type == 1) { // all at once
-          bool in_shock;
-          Real theta, z;
-          p_inj = 0;
-          for (sh = 0; sh < n_shocks; sh++) {
-            if (not_injected[sh] && grid->time > injection_time[sh]) {
-              printf("Injecting particles into shock #%i... ", sh);
-              in_shock = false;
-              // particles are initialized in the order of shocks,
-              //  so we can continue the loop below
-              for (; p_inj < grid->nparticle; p_inj++) {
-                if (grid->particle[p_inj].shock_of_origin == sh) {
-                  in_shock = true;
-                  (*draw_particle_vel) (grid->time, sh,
-                      &(grid->particle[p_inj].v1),
-                      &(grid->particle[p_inj].v2),
-                      &(grid->particle[p_inj].v3));
-                  // mark particle as injected
-                  grid->particle[p_inj].injected += 1;
-                } else if (in_shock) {
-                  break; // we're done with this shock
-                }
-              }
-              not_injected[sh] = false;
-              printf("done.\n");
-            }
-          }
-        }
       } else { // no shocks detected in the grid
         // 3b) move uninitialized particles with constant velocity (to reach the shock that has moved out of the current grid
-        fc_pos(grid, 0,j+1,0, &x1l,&x2,&x3);
-        for (; p < grid->nparticle; p++) {
-          if (grid->particle[p].injected > 0) continue;
-          else if (grid->particle[p].x2 > x2) break;
-          else grid->particle[p].x1 += grid->particle[p].shock_speed * grid->dt;
+        cc_pos(grid, 0,j,0, &x1l,&x2,&x3);
+        for (p = 0; p < grid->nparticle; p++) {
+          // TODO: this is very unoptimal, move out of the loop?
+          if (   grid->particle[p].injected > 0
+              || fabs(grid->particle[p].x2 - x2) > 0.5*grid->dx1) continue;
+          else {
+            grid->particle[p].x1 += grid->particle[p].shock_speed * grid->dt;
+          }
         }
       }
       Real_clear_vector(&centroids_row);
     } // j
+  // 4) initialize particles if needed
+    if (injection_time_type == 1) { // all at once
+      for (sh = 0; sh < n_shocks; sh++) {
+        if (   grid->time <= injection_time[sh]
+            && grid->time+grid->dt > injection_time[sh]) {
+          for (p = 0; p < grid->nparticle; p++) {
+            if (grid->particle[p].shock_of_origin == sh
+                && grid->particle[p].injected == 0) {
+              printf(" - [Proc %i] Injecting particle no (%i,%i) into shock %i.\n",
+                  myID_Comm_world,
+                  grid->particle[p].init_id, grid->particle[p].my_id, sh);
+              (*draw_particle_vel) (grid->time, sh,
+                  &(grid->particle[p].v1),
+                  &(grid->particle[p].v2),
+                  &(grid->particle[p].v3));
+              // mark particle as injected
+              grid->particle[p].injected += 1;
+            }
+          }
+        }
+      }
+    }
   } // ng loop
   #endif // PARTICLES
 }
@@ -748,7 +737,6 @@ void Userwork_after_loop(MeshS *pM)
   // destroy the dynamically allocated global variables
   if (injection_time_type == 1) {
     free(injection_time);
-    free(not_injected);
   }
   if (injection_mom_type == 1) {
     free(injection_vel);

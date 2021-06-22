@@ -209,6 +209,7 @@ typedef struct Unit_S{
 #ifdef PARTICLES
 
 /* Physical quantities of a particle */
+// Note: if adding new properties, update NVAR_P, packing_one_particle, unpack_particle in bvals_particle.c
 typedef struct Grain_s{
   Real x1,x2,x3;	/*!< coordinate in X,Y,Z */
   Real v1,v2,v3;	/*!< velocity in X,Y,Z */

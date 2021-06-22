@@ -50,9 +50,9 @@
 
 /* particle structure size */
 #ifdef MPI_PARALLEL
-#define NVAR_P 10
+#define NVAR_P 13
 #else
-#define NVAR_P 9
+#define NVAR_P 12
 #endif
 
 /* send and receive buffer, size dynamically determined
@@ -2034,6 +2034,9 @@ static void packing_one_particle(GrainS *gr, long n, short pos)
   *(pd++) = (double)(gr->property)+0.01;
   *(pd++) = (double)(pos)+0.01;
   *(pd++) = (double)(gr->my_id)+0.01;
+  *(pd++) = (double)(gr->shock_of_origin)+0.01;
+  *(pd++) = (double)(gr->injected)+0.01;
+  *(pd++) = gr->shock_speed;
 #ifdef MPI_PARALLEL
   *(pd++) = (double)(gr->init_id)+0.01;
 #endif
@@ -2104,6 +2107,9 @@ static void unpack_particle(GridS *pG, double *buf, long n)
     grproperty[gr->property].num += 1;
     gr->pos = (short)(*(pd++));
     gr->my_id = (long)(*(pd++));
+    gr->shock_of_origin = (short)(*(pd++));
+    gr->injected = (short)(*(pd++));
+    gr->shock_speed = *(pd++);
 #ifdef MPI_PARALLEL
     gr->init_id = (int)(*(pd++));
 #endif

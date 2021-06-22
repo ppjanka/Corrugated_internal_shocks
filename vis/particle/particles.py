@@ -14,6 +14,10 @@ from tqdm import tqdm # progress bar
 
 import cartographic as cart
 
+# find all elements in a that do not appear in b
+def array_diff (a,b):
+    return np.array(list(set([tuple(x) for x in a]).difference(set([tuple(x) for x in b]))))
+
 class Particles:
     
     def __init__ (self, relativistic=False): # empty class
@@ -25,6 +29,8 @@ class Particles:
         self.coords = {}
         self.times = []
         self.dts = []
+        self.uniq_id = [] # (my_id, init_id) pair for each particle in the database (rows filled with np.nan if not existent at a given time step)
+        # auxiliary data calculated from the above
         # arrays with particle data:
         #   [ dimensions: <time> <particle> <quantity> ]
         self.pos = []
@@ -33,7 +39,6 @@ class Particles:
         self.grp = []
         self.my_id = []
         self.init_id = []
-        # auxiliary data calculated from the above
         self.Ekin = []
         self.vel_theta = []
         self.vel_phi = []
@@ -56,20 +61,23 @@ class Particles:
         # Read particle number
         npart, = struct.unpack('l', self.file.read(8))
         if self.initialized: # check for consistency
-            if self.npart != npart or self.nparttypes != self.nparttypes or self.coords != coords:
+            if self.coords != coords: #self.npart != npart or self.nparttypes != nparttypes
                 print('ERROR: metadata mismatch, aborting.', flush=True)
+                print(' self.npart = %i, npart = %i,' % (self.npart, npart))
+                print(' self.nparttypes = %i, nparttypes = %i,' % (self.nparttypes, nparttypes))
+                print(' self.coords = %s\n coords = %s.' % (self.coords, coords), flush=True)
                 sys.exit(1)
         else: # initialize metadata
             self.npart = npart
             self.nparttypes = nparttypes
             self.coords = coords
         # time and dt will be added along with the whole snapshot
-        return time, dt
+        return time, dt, npart
 
     def get_time (self, filename):
         # Read from the file
         self.file = open(filename, 'rb')
-        return self.process_metadata()
+        return self.process_metadata()[:2]
 
     def drop_first_snapshot (self, n_to_drop=1):
         if initialized:
@@ -83,6 +91,7 @@ class Particles:
             self.grp = self.grp[n:]
             self.my_id = self.my_id[n:]
             self.init_id = self.init_id[n:]
+            self.uniq_id = self.uniq_id[n:]
             # auxiliary data
             if len(self.Ekin) > 0:
                 self.Ekin = self.Ekin[n:]
@@ -100,14 +109,14 @@ class Particles:
         # Read from the file
         self.file = open(filename, 'rb')
             
-        time, dt = self.process_metadata()
+        time, dt, npart = self.process_metadata()
 
         # Read all particle data
 
         data_type_vector = np.dtype([('x1', np.float32), ('x2', np.float32), ('x3', np.float32)])
         data_type = np.dtype([('pos', data_type_vector), ('vel', data_type_vector), ('dpar', np.float32), ('gr_property', np.int32), ('my_id', np.int64), ('init_id', np.int32)])
 
-        buffer = np.frombuffer(self.file.read(data_type.__sizeof__() *self.npart), dtype=data_type, count=self.npart)
+        buffer = np.frombuffer(self.file.read(data_type.__sizeof__() *self.npart), dtype=data_type, count=npart)
 
         # organize buffer data (note extra dimension)
         buffer_pos = np.array([[list(x[0]) for x in buffer],])
@@ -116,8 +125,70 @@ class Particles:
         buffer_grp = np.array([[x[3] for x in buffer],])
         buffer_my_id = np.array([[x[4] for x in buffer],])
         buffer_init_id = np.array([[x[5] for x in buffer],])
+
+        # read in the unique particle ids
+        uniq_id, idxs = np.unique(np.array([ [x[5],x[4]] for x in buffer]).astype(np.int), axis=0, return_index=True)
+
+        # np.unique sorts the data, ensure the same order
+        buffer_pos = buffer_pos[:,idxs]
+        buffer_vel = buffer_vel[:,idxs]
+        buffer_dpar = buffer_dpar[:,idxs]
+        buffer_grp = buffer_grp[:,idxs]
+        buffer_my_id = buffer_my_id[:,idxs]
+        buffer_init_id = buffer_init_id[:,idxs]
+
+        if self.initialized:
+            # compare uniq_id in the class with uniq_id in the file
+            add_to_self = array_diff(uniq_id, self.uniq_id[-1])
+            add_to_file = array_diff(self.uniq_id[-1], uniq_id)
+            # do we need to add any uniq_id to the class?
+            if len(add_to_self) > 0:
+                if verbose:
+                    print('   > adding %i particles to the class', len(add_to_self), flush=True)
+                # add np.nan to particle data where it did not exist
+                buffer_nan = np.ones((self.pos.shape[0],len(add_to_self),3)) * np.nan
+                self.pos = np.concatenate([self.pos, 1.*buffer_nan], axis=1)
+                self.vel = np.concatenate([self.vel, 1.*buffer_nan], axis=1)
+                buffer_nan = np.ones((self.pos.shape[0],len(add_to_self),3)) * np.nan
+                self.dpar = np.concatenate([self.dpar, 1.*buffer_nan], axis=1)
+                self.grp = np.concatenate([self.grp, 1.*buffer_nan], axis=1)
+                self.my_id = np.concatenate([self.my_id, 1.*buffer_nan], axis=1)
+                self.init_id = np.concatenate([self.init_id, 1.*buffer_nan], axis=1)
+                # auxiliary data
+                if len(self.Ekin) > 0:
+                    self.Ekin = np.concatenate([self.Ekin, 1.*buffer_nan], axis=1)
+                if len(self.val_theta) > 0:
+                    self.vel_theta = np.concatenate([self.vel_theta, 1.*buffer_nan], axis=1)
+                if len(self.vel_phi) > 0:
+                    self.vel_phi = np.concatenate([self.vel_phi, 1.*buffer_nan], axis=1)
+                buffer_nan = np.tile(add_to_self, (self.pos.shape[0],1))
+                self.uniq_id = np.concatenate([self.uniq_id, buffer_nan], axis=1)
+                del buffer_nan
+                self.hist = {}
+                # update the particle number
+                self.npart = self.uniq_id.shape[1]
+            # do we need to add any uniq_id to the data from the file?
+            if len(add_to_file) > 0:
+                if verbose:
+                    print('   > adding %i particles to the file data', len(add_to_file), flush=True)
+                uniq_id = np.concatenate([uniq_id, add_to_file], axis=0)
+                # add np.nan to particle data where it no longer exists
+                buffer_nan = np.ones((1,len(add_to_file),3)) * np.nan
+                buffer_pos = np.concatenate([buffer_pos, 1.*buffer_nan], axis=1)
+                buffer_vel = np.concatenate([buffer_vel, 1.*buffer_nan], axis=1)
+                buffer_nan = np.ones((1,len(add_to_file))) * np.nan
+                buffer_dpar = np.concatenate([buffer_dpar, 1.*buffer_nan], axis=1)
+                buffer_grp = np.concatenate([buffer_grp, 1.*buffer_nan], axis=1)
+                buffer_my_id = np.concatenate([buffer_my_id, 1.*buffer_nan], axis=1)
+                buffer_init_id = np.concatenate([buffer_init_id, 1.*buffer_nan], axis=1)
+                del buffer_nan
+            # final check
+            if len(uniq_id) != len(self.uniq_id[-1]):
+                print('ERROR: uniq_id mismatch between the new file and Particles. Could not resolve. Aborting.', flush=True)
+                sys.exit()
+
+        # clean up
         del buffer
-        
         self.file.close()
         
         # Add data to the class structures
@@ -130,6 +201,7 @@ class Particles:
             self.grp = np.concatenate([self.grp, buffer_grp], axis=0)
             self.my_id = np.concatenate([self.my_id, buffer_my_id], axis=0)
             self.init_id = np.concatenate([self.init_id, buffer_init_id], axis=0)
+            self.uniq_id = np.concatenate([self.uniq_id, [uniq_id,]], axis=0)
         else: # initialize
             self.times.append(1.*time)
             self.dts.append(1.*dt)
@@ -139,8 +211,9 @@ class Particles:
             self.grp = 1.*buffer_grp
             self.my_id = 1.*buffer_my_id
             self.init_id = 1.*buffer_init_id
+            self.uniq_id = np.array([uniq_id,])
             self.initialized = True
-        del buffer_pos, buffer_vel, buffer_dpar, buffer_grp, buffer_my_id, buffer_init_id
+        del buffer_pos, buffer_vel, buffer_dpar, buffer_grp, buffer_my_id, buffer_init_id, uniq_id
 
         self.sorted = False
           
@@ -153,20 +226,28 @@ class Particles:
         # add the new snapshot
         self.add_snapshot(filename, verbose)
 
+
+        #uniq_id = uniq_id[uniq_id[:,0].argsort(axis=0)]
+        #uniq_id = uniq_id[uniq_id[:,1].argsort(kind='mergesort',axis=0)]
+
     def sort (self, verbose=False): # sort to id indivitual particles across time
         if not self.sorted:
             if verbose:
+                print('Sorting particles..', flush=True)
                 t = tqdm
             else:
                 t = lambda x : x
             for idx_t in t(range(len(self.times))):
-                sort_idxs = np.argsort(self.my_id[idx_t,:])
+                # sort first by init_id, then by my_id (reverse order with argsort)
+                dtype_uniq = np.dtype([('init_id', np.int32), ('my_id', np.int32)])
+                sort_idxs = self.uniq_id[idx_t,:,:].astype(np.int32).view(dtype_uniq).argsort(order=['init_id','my_id'], axis=0)[:,0]
                 self.pos[idx_t,:,:] = self.pos[idx_t,sort_idxs,:]
                 self.vel[idx_t,:,:] = self.vel[idx_t,sort_idxs,:]
                 self.dpar[idx_t,:] = self.dpar[idx_t,sort_idxs]
                 self.grp[idx_t,:] = self.grp[idx_t,sort_idxs]
                 self.my_id[idx_t,:] = self.my_id[idx_t,sort_idxs]
                 self.init_id[idx_t,:] = self.init_id[idx_t,sort_idxs]
+                self.uniq_id[idx_t,:] = self.uniq_id[idx_t,sort_idxs]
             self.sorted = True
             
     # TODO: only update Ekin that has not been calculated before
@@ -186,11 +267,14 @@ class Particles:
             idx = i
 
         # generate Ekin if needed
-        if len(self.Ekin) != len(self.my_id):
+        if len(self.Ekin) != len(self.uniq_id):
             self.update_aux_data(to_update=['Ekin',])
 
+        # count np.nan values to ignore (they will show up as the highest energies)
+        nan_count = np.isnan(self.Ekin[idx,:]).sum()
+
         # find ids of the particles with n highest energies
-        return self.my_id[idx, np.argpartition(self.Ekin[idx,:],-n)[-n:]]
+        return self.uniq_id[idx, np.argpartition(self.Ekin[idx,:],-n-nan_count)[(-n-nan_count):(-nan_count)]]
 
     # returns n indices of particles with Ekin closest to median at the final or ith frame
     def find_median_Ekin (self, n=1, i=None):
@@ -201,12 +285,15 @@ class Particles:
             idx = i
 
         # generate Ekin if needed
-        if len(self.Ekin) != len(self.my_id):
+        if len(self.Ekin) != len(self.uniq_id):
             self.update_aux_data(to_update=['Ekin',])
+
+        # count np.nan values to ignore (they will show up as the highest energies)
+        nan_count = np.isnan(self.Ekin[idx,:]).sum()
 
         # find ids:
         part_idx = int(0.5*(self.npart+n))
-        return self.my_id[idx, np.argpartition(self.Ekin[idx,:],kth=[-part_idx,part_idx])[-part_idx:(part_idx+1)]]
+        return self.uniq_id[idx, np.argpartition(self.Ekin[idx,:],kth=[-part_idx-nan_count,part_idx-nan_count])[(-part_idx-nan_count):(part_idx+1-nan_count)]]
             
     def plot_pos2D (self, ax, color_by='time', cmap='rainbow', axis_x=0, axis_y=1, annotations=True, selection=[]):
 
@@ -219,6 +306,8 @@ class Particles:
         elif color_by == 'particle':
             from matplotlib.cm import get_cmap
             c = get_cmap(cmap, 128)
+            # sort if needed
+            self.sort(verbose=True)
         else: #solid color assumed
             c = lambda x : color_by
 
@@ -272,7 +361,7 @@ class Particles:
             for p in range(self.npart):
                 ax.scatter(self.times, data_to_plot[:,p], s=0.1, color=c(p/self.npart))
         if residuals:
-            ax.set_ylim(1.1*np.min(data_to_plot), 1.1*np.max(data_to_plot))
+            ax.set_ylim(1.1*np.nanmin(data_to_plot), 1.1*np.nanmax(data_to_plot))
         ax.set_xlabel('Time')
 
     def plot_Ekin_distribution (self, ax, cax=None, bins=None, log=True, cmap='rainbow', i=None, navg=None, history=False, data_to_plot=None):

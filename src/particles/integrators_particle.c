@@ -96,6 +96,12 @@ void Integrate_Particles(DomainS *pD)
   {/* loop over all particles */
     curG = &(pG->particle[p]);
 
+    // only update the injected particles
+    if (curG->injected == 0) {
+      p++;
+      continue;
+    }
+
     #ifdef DEBUG_PART_INTGR
     printf("INITIAL STATE: x = %.2e %.2e %.2e, v = %.2e %.2e %.2e\n", curG->x1, curG->x2, curG->x3, curG->v1, curG->v2, curG->v3);
     //exit(0);
