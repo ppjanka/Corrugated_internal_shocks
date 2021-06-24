@@ -42,6 +42,7 @@ int main(int argc, char* argv[])
   int i,p,err,cpuid,ntype,property;
   long j,n,ntot,pid;
   float time[2],buffer[20],*typeinfo;
+  short shock_of_origin, injected;
 
   /* Read Arguments */
   for (i=1; i<argc; i++) {
@@ -180,11 +181,18 @@ int main(int argc, char* argv[])
         fread(&property,sizeof(int),1,fidin);
         fread(&pid,sizeof(long),1,fidin);
         fread(&cpuid,sizeof(int),1,fidin);
+        fread(&shock_of_origin,sizeof(short),1,fidin);
+        fread(&injected,sizeof(short),1,fidin);
 
         fwrite(buffer,sizeof(float),7,fidout);
         fwrite(&property,sizeof(int),1,fidout);
         fwrite(&pid,sizeof(long),1,fidout);
         fwrite(&cpuid,sizeof(int),1,fidout);
+        fwrite(&shock_of_origin,sizeof(short),1,fidout);
+        fwrite(&injected,sizeof(short),1,fidout);
+
+        // [PP] additional quantities
+
       }
 
       fclose(fidin);

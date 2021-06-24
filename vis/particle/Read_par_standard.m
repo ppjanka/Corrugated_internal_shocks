@@ -34,6 +34,8 @@ fname=''; % Input the file name here
      mas(i) = parinfo(8);
      pid(i) = fread(fid,1,'int64');
      cpuid(i) = fread(fid,1,'int32');
+     shock_of_origin(i) = fread(fid,1,'int16');
+     injected(i) = fread(fid,1,'int16');
  end
  
  plot(x1,x2,'.');

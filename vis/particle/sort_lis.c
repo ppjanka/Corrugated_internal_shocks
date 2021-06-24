@@ -42,6 +42,7 @@ int main(int argc, char* argv[])
   int i,*cpuid,*property,ntype;
   long p,n,*pid,*order;
   float header[20],**data,time[2],*typeinfo=NULL;
+  short *shock_of_origin, *injected;
 
   /* Read Arguments */
   for (i=1; i<argc; i++) {
@@ -109,6 +110,8 @@ int main(int argc, char* argv[])
     property = (int*)calloc_1d_array(n,sizeof(int));
     pid   = (long*)calloc_1d_array(n,sizeof(long));
     cpuid = (int*)calloc_1d_array(n,sizeof(int));
+    shock_of_origin = (short*)calloc_1d_array(n,sizeof(short));
+    injected = (short*)calloc_1d_array(n,sizeof(short));
     order = (long*)calloc_1d_array(n,sizeof(long));
 
     /* read data */
@@ -118,6 +121,8 @@ int main(int argc, char* argv[])
       fread(&(property[p]),sizeof(int),1,fid);
       fread(&(pid[p]),sizeof(long),1,fid);
       fread(&(cpuid[p]),sizeof(int),1,fid);
+      fread(&shock_of_origin[p],sizeof(short),1,fid);
+      fread(&injected[p],sizeof(short),1,fid);
     }
 
     fclose(fid);
@@ -145,6 +150,8 @@ int main(int argc, char* argv[])
       fwrite(&property[order[p]],sizeof(int),1,fid);
       fwrite(&pid[order[p]],sizeof(long),1,fid);
       fwrite(&cpuid[order[p]],sizeof(int),1,fid);
+      fwrite(&shock_of_origin[p],sizeof(short),1,fid);
+      fwrite(&injected[p],sizeof(short),1,fid);
     }
 
     free_2d_array(data);          free(property);

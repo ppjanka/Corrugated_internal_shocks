@@ -253,15 +253,21 @@ void dump_particle_binary(MeshS *pM, OutputS *pOut)
 //      fdata[6] = (float)(pG->grproperty[gr->property].rad);
       fdata[6] = (float)(pG->parsub[p].dpar);
       my_id = gr->my_id;
-#ifdef MPI_PARALLEL
+      #ifdef MPI_PARALLEL
       init_id = gr->init_id;
-#endif
+      #else
+      init_id = 0;
+      #endif
       pos = gr->pos;
 
       fwrite(fdata,sizeof(float),7,pfile);
       fwrite(&(gr->property),sizeof(int),1,pfile);
       fwrite(&(my_id),sizeof(long),1,pfile);
       fwrite(&(init_id),sizeof(int),1,pfile);
+
+      // [PP] additional quantities
+      fwrite(&(gr->shock_of_origin), sizeof(short),1,pfile);
+      fwrite(&(gr->injected), sizeof(short),1,pfile);
 
     }
   }
