@@ -37,8 +37,8 @@ class Particles:
         self.vel = []
         self.dpar = []
         self.grp = []
-        self.my_id = []
-        self.init_id = []
+        #self.my_id = []
+        #self.init_id = []
         self.shock_of_origin = []
         self.injected = []
         self.Ekin = []
@@ -91,8 +91,8 @@ class Particles:
             self.vel = self.vel[n:]
             self.dpar = self.dpar[n:]
             self.grp = self.grp[n:]
-            self.my_id = self.my_id[n:]
-            self.init_id = self.init_id[n:]
+            #self.my_id = self.my_id[n:]
+            #self.init_id = self.init_id[n:]
             self.uniq_id = self.uniq_id[n:]
             # auxiliary data
             if len(self.Ekin) > 0:
@@ -125,8 +125,8 @@ class Particles:
         buffer_vel = np.array([[list(x[1]) for x in buffer],])
         buffer_dpar = np.array([[x[2] for x in buffer],])
         buffer_grp = np.array([[x[3] for x in buffer],])
-        buffer_my_id = np.array([[x[4] for x in buffer],])
-        buffer_init_id = np.array([[x[5] for x in buffer],])
+        #buffer_my_id = np.array([[x[4] for x in buffer],])
+        #buffer_init_id = np.array([[x[5] for x in buffer],])
         buffer_shock_of_origin = np.array([[x[6] for x in buffer],])
         buffer_injected = np.array([[x[7] for x in buffer],])
 
@@ -138,8 +138,8 @@ class Particles:
         buffer_vel = buffer_vel[:,idxs]
         buffer_dpar = buffer_dpar[:,idxs]
         buffer_grp = buffer_grp[:,idxs]
-        buffer_my_id = buffer_my_id[:,idxs]
-        buffer_init_id = buffer_init_id[:,idxs]
+        #buffer_my_id = buffer_my_id[:,idxs]
+        #buffer_init_id = buffer_init_id[:,idxs]
         buffer_shock_of_origin = buffer_shock_of_origin[:,idxs]
         buffer_injected = buffer_injected[:,idxs]
 
@@ -158,8 +158,8 @@ class Particles:
                 buffer_nan = np.ones((self.pos.shape[0],len(add_to_self),3)) * np.nan
                 self.dpar = np.concatenate([self.dpar, 1.*buffer_nan], axis=1)
                 self.grp = np.concatenate([self.grp, 1.*buffer_nan], axis=1)
-                self.my_id = np.concatenate([self.my_id, 1.*buffer_nan], axis=1)
-                self.init_id = np.concatenate([self.init_id, 1.*buffer_nan], axis=1)
+                #self.my_id = np.concatenate([self.my_id, 1.*buffer_nan], axis=1)
+                #self.init_id = np.concatenate([self.init_id, 1.*buffer_nan], axis=1)
                 self.shock_of_origin = np.concatenate([self.shock_of_origin, 1.*buffer_nan], axis=1)
                 self.injected = np.concatenate([self.injected, 1.*buffer_nan], axis=1)
                 # auxiliary data
@@ -187,8 +187,8 @@ class Particles:
                 buffer_nan = np.ones((1,len(add_to_file))) * np.nan
                 buffer_dpar = np.concatenate([buffer_dpar, 1.*buffer_nan], axis=1)
                 buffer_grp = np.concatenate([buffer_grp, 1.*buffer_nan], axis=1)
-                buffer_my_id = np.concatenate([buffer_my_id, 1.*buffer_nan], axis=1)
-                buffer_init_id = np.concatenate([buffer_init_id, 1.*buffer_nan], axis=1)
+                #buffer_my_id = np.concatenate([buffer_my_id, 1.*buffer_nan], axis=1)
+                #buffer_init_id = np.concatenate([buffer_init_id, 1.*buffer_nan], axis=1)
                 buffer_shock_of_origin = np.concatenate([buffer_shock_of_origin, 1.*buffer_nan], axis=1)
                 buffer_injected = np.concatenate([buffer_injected, 1.*buffer_nan], axis=1)
                 del buffer_nan
@@ -209,8 +209,8 @@ class Particles:
             self.vel = np.concatenate([self.vel, buffer_vel], axis=0)
             self.dpar = np.concatenate([self.dpar, buffer_dpar], axis=0)
             self.grp = np.concatenate([self.grp, buffer_grp], axis=0)
-            self.my_id = np.concatenate([self.my_id, buffer_my_id], axis=0)
-            self.init_id = np.concatenate([self.init_id, buffer_init_id], axis=0)
+            #self.my_id = np.concatenate([self.my_id, buffer_my_id], axis=0)
+            #self.init_id = np.concatenate([self.init_id, buffer_init_id], axis=0)
             self.uniq_id = np.concatenate([self.uniq_id, [uniq_id,]], axis=0)
             self.shock_of_origin = np.concatenate([self.shock_of_origin, buffer_shock_of_origin], axis=0)
             self.injected = np.concatenate([self.injected, buffer_injected], axis=0)
@@ -221,13 +221,13 @@ class Particles:
             self.vel = 1.*buffer_vel
             self.dpar = 1.*buffer_dpar
             self.grp = 1.*buffer_grp
-            self.my_id = 1.*buffer_my_id
-            self.init_id = 1.*buffer_init_id
+            #self.my_id = 1.*buffer_my_id
+            #self.init_id = 1.*buffer_init_id
             self.uniq_id = np.array([uniq_id,])
             self.shock_of_origin = 1.*buffer_shock_of_origin
             self.injected = 1.*buffer_injected
             self.initialized = True
-        del buffer_pos, buffer_vel, buffer_dpar, buffer_grp, buffer_my_id, buffer_init_id, uniq_id, buffer_shock_of_origin, buffer_injected
+        del buffer_pos, buffer_vel, buffer_dpar, buffer_grp, uniq_id, buffer_shock_of_origin, buffer_injected #, buffer_my_id, buffer_init_id
 
         self.sorted = False
           
@@ -255,8 +255,8 @@ class Particles:
                 self.vel[idx_t,:,:] = self.vel[idx_t,sort_idxs,:]
                 self.dpar[idx_t,:] = self.dpar[idx_t,sort_idxs]
                 self.grp[idx_t,:] = self.grp[idx_t,sort_idxs]
-                self.my_id[idx_t,:] = self.my_id[idx_t,sort_idxs]
-                self.init_id[idx_t,:] = self.init_id[idx_t,sort_idxs]
+                #self.my_id[idx_t,:] = self.my_id[idx_t,sort_idxs]
+                #self.init_id[idx_t,:] = self.init_id[idx_t,sort_idxs]
                 self.uniq_id[idx_t,:] = self.uniq_id[idx_t,sort_idxs]
                 self.shock_of_origin[idx_t,:] = self.shock_of_origin[idx_t,sort_idxs]
                 self.injected[idx_t,:] = self.injected[idx_t,sort_idxs]
@@ -379,7 +379,7 @@ class Particles:
     def plot_Ekin_distribution (self, ax, cax=None, bins=None, log=True, cmap='rainbow', i=None, navg=None, history=False, data_to_plot=None):
 
         # generate Ekin if needed
-        if len(self.Ekin) != len(self.my_id):
+        if len(self.Ekin) != len(self.uniq_id):
             self.update_aux_data(to_update=['Ekin',])
 
         if not history:
@@ -444,7 +444,7 @@ class Particles:
             if verbose:
                 print(" done", flush=True)
         # generate Ekin if needed
-        if len(self.Ekin) != len(self.my_id):
+        if len(self.Ekin) != len(self.uniq_id):
             if verbose:
                 print("Calculating Ekin..", end='', flush=True)
             self.update_aux_data()
@@ -507,6 +507,7 @@ class Particles:
             if recalculate or len(self.vel_theta) == 0 or len(self.vel_phi) == 0:
                 vel_xy = np.sqrt(vel[:,:,0]**2+vel[:,:,1]**2)
                 self.vel_theta = np.arctan(vel_xy/vel[:,:,2])
+                self.vel_theta = np.where(self.vel_theta > 0, self.vel_theta, self.vel_theta + np.pi)
                 self.vel_phi = np.arccos(vel[:,:,0]/vel_xy)
                 self.vel_phi = np.where(vel[:,:,1] > 0, self.vel_phi, 2.*np.pi - self.vel_phi)
                 self.vel_phi = np.where(self.vel_phi < np.pi, self.vel_phi, self.vel_phi-2.*np.pi) # move to the [-pi,pi] range
