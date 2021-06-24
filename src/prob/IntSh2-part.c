@@ -212,7 +212,7 @@ void problem(DomainS *pDomain)
 {
   // initialize the random number generator
   time_t t;
-  srand((unsigned) time(&t));
+  srand((unsigned) (time(&t) + myID_Comm_world));
 
   GridS *pGrid=(pDomain->Grid);
   int i, is = pGrid->is, ie = pGrid->ie;
