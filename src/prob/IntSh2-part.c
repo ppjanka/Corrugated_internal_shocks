@@ -246,7 +246,7 @@ void problem(DomainS *pDomain)
   Real rho1, press1, vel1, B1, gamma1;
   Real sqr_b, sqr_gamma;
 
-  // initialize the MHD grid
+  // INITIALIZE THE MHD GRID -----------------------------------------------------
 	for (k = ks; k <= ke; k++) {
     for (j = js; j <= je+1; j++) {
       for (i = ie; i >= is-1; i--) {
@@ -359,7 +359,7 @@ void problem(DomainS *pDomain)
   }
 
   #ifdef PARTICLES
-  // Initialize particles
+  // INITIALIZE THE PARTICLES -----------------------------------------------------
   // initialize particle properties for each type
   // particle stopping time, sim.u., obsolete here
   tstop0[0] = par_getd_def("particle","tstop",1.0e20);
@@ -374,7 +374,7 @@ void problem(DomainS *pDomain)
   Real z_shock [2] = {z_shock1, z_shock2};
   int sh, ibuff, npart_tot = 0;
   char sbuff [50];
-  for (sh = 0; sh < 2; sh++) {
+  for (sh = 0; sh < n_shocks; sh++) {
     snprintf(sbuff, 50, "fpart_shock%d", sh+1);
     npart_shock[sh] = (int) (npart * par_getd("problem", sbuff));
     ibuff = (int) npart_shock[0]/pGrid->Nx[1];
@@ -391,7 +391,7 @@ void problem(DomainS *pDomain)
   if (npart_tot != npart) {
     printf("The total number of injected particles does not match the parnumgrid given. Please ensure that either:\n 1) The number of particles for each shock is divisible by the number of cells in the x2 direction.\n OR\n 2) The number of cells in the x2 direction is divisible by the number of particles for each shock.\n");
     printf(" -- Current setup -- \n");
-    for (sh = 0; sh < 2; sh++) {
+    for (sh = 0; sh < n_shocks; sh++) {
       printf("  > Shock%i:\n", sh+1);
       printf("     npart_shock = %i\n", npart_shock[sh]);
       printf("     npart_per_j = %i\n", npart_per_j[sh]);
@@ -400,16 +400,16 @@ void problem(DomainS *pDomain)
     printf("\n");
     exit(0);
   }
-  // Set up particles
+  // Set up the particles
   Real x1l, x1u;
   Real3Vect pos;
   for (k = ks; k <= ke; k++) {
-    for (sh = 0; sh < 2; sh++) {
+    for (sh = 0; sh < n_shocks; sh++) {
       for (i = ie; i >= is-1; i--) {
         // read the current location
         fc_pos(pGrid,i  ,j,k,&x1l,&r,&x3);
         fc_pos(pGrid,i+1,j,k,&x1u,&r,&x3);
-        if ((x1l < z_shock[sh]) && (z_shock[sh] < x1u)) {
+        if ((x1l <= z_shock[sh]) && (z_shock[sh] < x1u)) {
           for (j = js; j <= je+1; j+=part_jstep[sh]) {
 
             // read the current location
@@ -424,8 +424,9 @@ void problem(DomainS *pDomain)
               pos.x3 = x3;
               if (part_in_rank(pos)) {
                 (pGrid->nparticle)++;
-                if (pGrid->nparticle+2 > pGrid->arrsize)
+                if (pGrid->nparticle+2 > pGrid->arrsize) {
                   particle_realloc(pGrid, pGrid->nparticle+2);
+                }
                 // particle properties
                 pGrid->particle[pgrid].property = 0;
                 pGrid->particle[pgrid].x1 = pos.x1;
@@ -851,6 +852,7 @@ void inflow_boundary (GridS *pGrid) {
       rho = eta * (rho_jet - rho_amb) + rho_amb;
       press = eta * (press_jet - press_amb) + press_amb;
 
+      #pragma omp simd
       for (i = iu; i <= iu+nghost; i++) {
 
         // read the current location
