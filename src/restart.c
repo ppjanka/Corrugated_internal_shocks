@@ -347,6 +347,7 @@ void restart_grids(char *res_file, MeshS *pM)
 #endif
         fread(&(grproperty[i].rad),sizeof(Real),1,fp);
         fread(&(grproperty[i].rho),sizeof(Real),1,fp);
+        fread(&(grproperty[i].alpha),sizeof(Real),1,fp);
         fread(&(tstop0[i]),sizeof(Real),1,fp);
         fread(&(grrhoa[i]),sizeof(Real),1,fp);
       }
@@ -434,6 +435,36 @@ void restart_grids(char *res_file, MeshS *pM)
         ath_error("[restart_grids]: Expected PARTICLE MY_ID, found %s",line);
       for (p=0; p<pG->nparticle; p++) {
         fread(&(pG->particle[p].my_id),sizeof(long),1,fp);
+      }
+
+/* Read particle shock_of_origin */
+
+      fgets(line,MAXLEN,fp); /* Read the '\n' preceeding the next string */
+      fgets(line,MAXLEN,fp);
+      if(strncmp(line,"PARTICLE SHOCK_OF_ORIGIN",24) != 0)
+        ath_error("[restart_grids]: Expected PARTICLE SHOCK_OF_ORIGIN, found %s",line);
+      for (p=0; p<pG->nparticle; p++) {
+        fread(&(pG->particle[p].shock_of_origin),sizeof(short),1,fp);
+      }
+
+/* Read particle injected */
+
+      fgets(line,MAXLEN,fp); /* Read the '\n' preceeding the next string */
+      fgets(line,MAXLEN,fp);
+      if(strncmp(line,"PARTICLE INJECTED",17) != 0)
+        ath_error("[restart_grids]: Expected PARTICLE INJECTED, found %s",line);
+      for (p=0; p<pG->nparticle; p++) {
+        fread(&(pG->particle[p].injected),sizeof(short),1,fp);
+      }
+
+/* Read particle shock_speed */
+
+      fgets(line,MAXLEN,fp); /* Read the '\n' preceeding the next string */
+      fgets(line,MAXLEN,fp);
+      if(strncmp(line,"PARTICLE SHOCK_SPEED",20) != 0)
+        ath_error("[restart_grids]: Expected PARTICLE SHOCK_SPEED, found %s",line);
+      for (p=0; p<pG->nparticle; p++) {
+        fread(&(pG->particle[p].shock_speed),sizeof(Real),1,fp);
       }
 
 #ifdef MPI_PARALLEL
@@ -781,9 +812,9 @@ void dump_restart(MeshS *pM, OutputS *pout)
 /* Write out the particle properties */
     
 #ifdef FEEDBACK
-      nprop = 5;
+      nprop = 6;
 #else
-      nprop = 4;
+      nprop = 5;
 #endif
       fwrite(&(npartypes),sizeof(int),1,fp); /* number of particle types */
       for (i=0; i<npartypes; i++) {          /* particle property list */
@@ -792,6 +823,7 @@ void dump_restart(MeshS *pM, OutputS *pout)
 #endif
         buf[nbuf++] = grproperty[i].rad;
         buf[nbuf++] = grproperty[i].rho;
+        buf[nbuf++] = grproperty[i].alpha;
         buf[nbuf++] = tstop0[i];
         buf[nbuf++] = grrhoa[i];
         if ((nbuf+nprop) > bufsize) {
@@ -943,6 +975,54 @@ void dump_restart(MeshS *pM, OutputS *pout)
       if (nlbuf > 0) {
         fwrite(lbuf,sizeof(long),nlbuf,fp);
         nlbuf = 0;
+      }
+
+/* Write shock_of_origin */
+
+      fprintf(fp,"\nPARTICLE SHOCK_OF_ORIGIN\n");
+      for (p=0;p<pG->nparticle;p++)
+      if (pG->particle[p].pos == 1){
+        sbuf[nsbuf++] = pG->particle[p].shock_of_origin;
+        if ((nsbuf+1) > sbufsize) {
+          fwrite(sbuf,sizeof(short),nsbuf,fp);
+          nsbuf = 0;
+        }
+      }
+      if (nsbuf > 0) {
+        fwrite(sbuf,sizeof(short),nsbuf,fp);
+        nsbuf = 0;
+      }
+
+/* Write injected */
+
+      fprintf(fp,"\nPARTICLE INJECTED\n");
+      for (p=0;p<pG->nparticle;p++)
+      if (pG->particle[p].pos == 1){
+        sbuf[nsbuf++] = pG->particle[p].injected;
+        if ((nsbuf+1) > sbufsize) {
+          fwrite(sbuf,sizeof(short),nsbuf,fp);
+          nsbuf = 0;
+        }
+      }
+      if (nsbuf > 0) {
+        fwrite(sbuf,sizeof(short),nsbuf,fp);
+        nsbuf = 0;
+      }
+
+/* Write shock_speed */
+
+      fprintf(fp,"\nPARTICLE SHOCK_SPEED\n");
+      for (p=0;p<pG->nparticle;p++)
+      if (pG->particle[p].pos == 1){
+        buf[nbuf++] = pG->particle[p].shock_speed;
+        if ((nbuf+1) > bufsize) {
+          fwrite(buf,sizeof(Real),nbuf,fp);
+          nbuf = 0;
+        }
+      }
+      if (nbuf > 0) {
+        fwrite(buf,sizeof(Real),nbuf,fp);
+        nbuf = 0;
       }
     
 #ifdef MPI_PARALLEL

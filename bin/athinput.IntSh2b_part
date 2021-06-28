@@ -6,7 +6,7 @@ flags = export LIBS="-lgsl -lgslcblas -lm"
 
 <job>
 problem_id      = IntSh2-part # problem ID: basename of output filenames
-maxout          = 3           # Output blocks number from 1 -> maxout
+maxout          = 4           # Output blocks number from 1 -> maxout
 num_domains     = 1           # number of Domains in Mesh
 
 <output1>
@@ -23,15 +23,15 @@ out        = prim     # variables to be output
 id         = prim     # file id string
 dt         = 0.5     # time increment between outputs
 
-#<output4>
-#out_fmt    = rst
-#id         = rst
-#dt         = 5.0
+<output4>
+out_fmt    = rst
+id         = rst
+dt         = 1.0
 
 <time>
 cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
 nlim       = -1         # cycle limit
-tlim       = 20.0       # time limit
+tlim       = 2.0        # time limit
 
 <domain1>
 level = 0
@@ -57,7 +57,7 @@ bc_ix3     = 1          # (reflecting) inner-X3 boundary flag
 bc_ox3     = 1          # (reflecting) outer-X3 boundary flag
 # NGrid_x3   = 1          # MPI blocks in x3
 
-AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
+# AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
 
 <particle>
 # NOTE: in this problem each particle should have its own type, i.e. partypes = no of particles, parnumgrid = 1

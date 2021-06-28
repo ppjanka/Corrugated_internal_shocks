@@ -491,20 +491,73 @@ void problem(DomainS *pDomain)
  * Userwork_after_loop     - problem specific work AFTER  main loop
  *----------------------------------------------------------------------------*/
 
-// TODO: ensure to include the vars global in this file in restart files
-
 void problem_write_restart(MeshS *pM, FILE *fp)
 {
+  // write the global variables
+
   fwrite(name, sizeof(char),50,fp);
+  fwrite(&n_shocks, sizeof(int),1,fp);
+  fwrite(&shock_detection_threshold, sizeof(Real),1,fp);
+  fwrite(&min_sin_angle, sizeof(Real),1,fp);
+
+  #ifdef PARTICLES
+  fwrite(&injection_time_type, sizeof(int),1,fp);
+  if (injection_time_type == 1) { // all at once, shock by shock
+    fwrite(injection_time, sizeof(Real),n_shocks,fp);
+  }
+  fwrite(&injection_mom_type, sizeof(int),1,fp);
+  if (injection_mom_type == 1) { // single velocity, random direction
+    fwrite(injection_vel, sizeof(Real),n_shocks,fp);
+  }
+  #endif
+
   return;
 }
 
 void problem_read_restart(MeshS *pM, FILE *fp)
 {
+  // read the global variables
+
   fread(name, sizeof(char),50,fp);
-  // enroll the bvals function
-  if ((*pM->Domain)->Level == 0) {
-    bvals_mhd_fun(*(pM->Domain), right_x1, inflow_boundary);
+  fread(&n_shocks, sizeof(int),1,fp);
+  fread(&shock_detection_threshold, sizeof(Real),1,fp);
+  fread(&min_sin_angle, sizeof(Real),1,fp);
+
+  #ifdef PARTICLES
+  fread(&injection_time_type, sizeof(int),1,fp);
+  if (injection_time_type == 1) { // all at once, shock by shock
+    injection_time = malloc(n_shocks * sizeof(Real));
+    fread(injection_time, sizeof(Real),n_shocks,fp);
+  }
+  fread(&injection_mom_type, sizeof(int),1,fp);
+  if (injection_mom_type == 1) { // single velocity, random direction
+    draw_particle_vel = &draw_particle_vel_type1;
+    injection_vel = malloc(n_shocks * sizeof(Real));
+    fread(injection_vel, sizeof(Real),n_shocks,fp);
+  }
+  #endif
+
+  // initialize the random number generator
+  time_t t;
+  srand((unsigned) (time(&t) + myID_Comm_world));
+
+  // enroll the bvals functions
+  int nl, nd;
+  Real z,r,x3;
+  GridS* grid;
+  for (nl=0; nl<(pM->NLevels); nl++){
+    for (nd=0; nd<(pM->DomainsPerLevel[nl]); nd++){
+      grid = pM->Domain[nl][nd].Grid;
+      if (grid != NULL){
+        fc_pos(grid,grid->ie+1,0,0,&z,&r,&x3);
+        if ((z - par_getd("domain1", "x1max")) < 1.0e-6) {
+          bvals_mhd_fun(&(pM->Domain[nl][nd]), right_x1, inflow_boundary);
+          #ifdef PARTICLES
+          set_bvals_particle_fun(right_x1, outflow_particle);
+          #endif
+        }
+      }
+    }
   }
 
   return;
