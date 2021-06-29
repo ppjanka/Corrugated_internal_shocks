@@ -40,6 +40,8 @@
 #undef TYPE
 #undef TYPED_NAME
 
+#define RANDOM_DIM 2 // dimensionality of velocity space for drawing random directions
+
 // variables global to this file
 static int n_shocks = 2;
 #ifdef PARTICLES
@@ -50,6 +52,7 @@ char name[50];
 // PARTICLE INJECTION DISTRIBUTIONS
 
 static int injection_time_type = 0;
+// injection_time_type == 0 -- no particle injection, shock tracking only
 // injection_time_type == 1 -- all at once, shock by shock
 static Real* injection_time;
 
@@ -57,9 +60,87 @@ static int injection_mom_type = 1;
 static void (*draw_particle_vel) (Real time, int sh, Real* v1, Real* v2, Real* v3);
 // injection_energy_type == 1 -- all particles at the same energy, random angle
 static void draw_particle_vel_type1 (Real time, int sh, Real* v1, Real* v2, Real* v3);
+// injection_energy_type == 2 -- gaussian distr. in energy, random angle
+static void draw_particle_vel_type2 (Real time, int sh, Real* v1, Real* v2, Real* v3);
+// injection_energy_type - related variables
 static Real* injection_vel;
+static Real* injection_gamma;
+static Real* injection_gamma_sigma;
 
 #endif // PARTICLES
+
+//----------------------------------------------------------------------------------
+
+// Inverse CDF of a gaussian distribution
+// Credits: Peter John Acklam (https://stackedboxes.org/2017/05/01/acklams-normal-quantile-function/)
+// Direct source: https://stackoverflow.com/questions/27830995/inverse-cumulative-distribution-function-in-c
+
+double gaussianInverseCDF (double p) {
+
+  double a1 = -39.69683028665376;
+  double a2 = 220.9460984245205;
+  double a3 = -275.9285104469687;
+  double a4 = 138.3577518672690;
+  double a5 =-30.66479806614716;
+  double a6 = 2.506628277459239;
+
+  double b1 = -54.47609879822406;
+  double b2 = 161.5858368580409;
+  double b3 = -155.6989798598866;
+  double b4 = 66.80131188771972;
+  double b5 = -13.28068155288572;
+
+  double c1 = -0.007784894002430293;
+  double c2 = -0.3223964580411365;
+  double c3 = -2.400758277161838;
+  double c4 = -2.549732539343734;
+  double c5 = 4.374664141464968;
+  double c6 = 2.938163982698783;
+
+  double d1 = 0.007784695709041462;
+  double d2 = 0.3224671290700398;
+  double d3 = 2.445134137142996;
+  double d4 = 3.754408661907416;
+
+  //Define break-points.
+  double p_low =  0.02425;
+  double p_high = 1 - p_low;
+  long double  q, r, e, u;
+  long double x = 0.0;
+
+  //Rational approximation for lower region.
+  if (0 < p && p < p_low) {
+      q = sqrt(-2*log(p));
+      x = (((((c1*q+c2)*q+c3)*q+c4)*q+c5)*q+c6) / ((((d1*q+d2)*q+d3)*q+d4)*q+1);
+  }
+
+  //Rational approximation for central region.
+  if (p_low <= p && p <= p_high) {
+      q = p - 0.5;
+      r = q*q;
+      x = (((((a1*r+a2)*r+a3)*r+a4)*r+a5)*r+a6)*q / (((((b1*r+b2)*r+b3)*r+b4)*r+b5)*r+1);
+  }
+
+  //Rational approximation for upper region.
+  if (p_high < p && p < 1) {
+      q = sqrt(-2*log(1-p));
+      x = -(((((c1*q+c2)*q+c3)*q+c4)*q+c5)*q+c6) / ((((d1*q+d2)*q+d3)*q+d4)*q+1);
+  }
+
+  //Pseudo-code algorithm for refinement
+  if(( 0 < p)&&(p < 1)){
+      e = 0.5 * erfc(-x/sqrt(2)) - p;
+      u = e * sqrt(2*M_PI) * exp(x*x/2);
+      x = x - u/(1 + x*u/2);
+  }
+
+  return x;
+}
+
+static inline Real draw_random_gaussian (Real x0, Real sigma) {
+  Real draw = gaussianInverseCDF(rand() * 1.0 / RAND_MAX);
+  return draw*sigma + x0;
+}
 
 //----------------------------------------------------------------------------------
 
@@ -68,6 +149,10 @@ static inline Real v2gamma (Real vel)
 {return 1./sqrt(1.-vel*vel);}
 static inline Real gamma2v (Real _gamma)
 {return sqrt(1.-1./(_gamma*_gamma));}
+static inline Real dv2dgamma(Real vel, Real dv)
+{return dv * vel/pow(1.0-SQR(vel),1.5);}
+static inline Real dgamma2dv (Real gamma, Real dgamma)
+{return dgamma / (SQR(gamma)*sqrt(SQR(gamma)-1.0));}
 
 // declarations
 void inflow_boundary (GridS *pGrid);
@@ -475,6 +560,16 @@ void problem(DomainS *pDomain)
       sprintf(buf, "injection_vel_sh%i", sh+1);
       injection_vel[sh] = par_getd("problem", buf);
     }
+  } else if (injection_mom_type == 2) { // gaussian in energy, random direction
+    draw_particle_vel = &draw_particle_vel_type2;
+    injection_gamma = malloc(n_shocks * sizeof(Real));
+    injection_gamma_sigma = malloc(n_shocks * sizeof(Real));
+    for (sh = 0; sh < n_shocks; sh++) {
+      sprintf(buf, "injection_gamma_sh%i", sh+1);
+      injection_gamma[sh] = par_getd("problem", buf);
+      sprintf(buf, "injection_gamma_sigma_sh%i", sh+1);
+      injection_gamma_sigma[sh] = par_getd("problem", buf);
+    }
   }
 
   #endif // PARTICLES
@@ -508,6 +603,9 @@ void problem_write_restart(MeshS *pM, FILE *fp)
   fwrite(&injection_mom_type, sizeof(int),1,fp);
   if (injection_mom_type == 1) { // single velocity, random direction
     fwrite(injection_vel, sizeof(Real),n_shocks,fp);
+  } else if (injection_mom_type == 2) { // gaussian in energy, random direction
+    fwrite(injection_gamma, sizeof(Real),n_shocks,fp);
+    fwrite(injection_gamma_sigma, sizeof(Real),n_shocks,fp);
   }
   #endif
 
@@ -546,6 +644,16 @@ void problem_read_restart(MeshS *pM, FILE *fp)
     fread(injection_vel, sizeof(Real),n_shocks,fp);
     for (int sh = 0; sh < n_shocks; sh++) {
       buffer_length += sprintf(buffer+buffer_length, "    inj_vel[%i] = %.2f\n", sh, injection_vel[sh]);
+    }
+  } else if (injection_mom_type == 2) { // gaussian energy, random direction
+    draw_particle_vel = &draw_particle_vel_type2;
+    injection_gamma = (Real*) malloc(n_shocks * sizeof(Real));
+    injection_gamma_sigma = (Real*) malloc(n_shocks * sizeof(Real));
+    fread(injection_gamma, sizeof(Real),n_shocks,fp);
+    fread(injection_gamma_sigma, sizeof(Real),n_shocks,fp);
+    for (int sh = 0; sh < n_shocks; sh++) {
+      buffer_length += sprintf(buffer+buffer_length, "    inj_gamma[%i] = %.2f\n", sh, injection_gamma[sh]);
+      buffer_length += sprintf(buffer+buffer_length, "    inj_gamma_sigma[%i] = %.2f\n", sh, injection_gamma_sigma[sh]);
     }
   }
   #endif
@@ -811,17 +919,60 @@ void Userwork_in_loop(MeshS *pM)
 }
 
 // particle injection functions
+
+// type1: const velocity, random direction
 static void draw_particle_vel_type1 (Real time, int sh, Real* v1, Real* v2, Real* v3) {
+  #if RANDOM_DIM==2
+  static Real phi;
+  phi = (2.*M_PI * rand()) / RAND_MAX;
+  (*v1) = injection_vel[sh] * cos(phi);
+  (*v2) = injection_vel[sh] * sin(phi);
+  (*v3) = 0.0;
+  #elif RANDOM_DIM==3
   static Real theta, z;
   // draw a random 3D angle
   // -- using equal-area cylindrical projection, as described at https://math.stackexchange.com/questions/44689/how-to-find-a-random-axis-or-unit-vector-in-3d
   theta = (2.*M_PI * rand()) / RAND_MAX;
   z = (2. * rand()) / RAND_MAX - 1.0;
   // select particle velocity
-  //TODO: Should I limit particles velocities to 2D? Or allow them to move in three dimensions? Ask Camilia how it is done in PIC.
   (*v1) = injection_vel[sh] * sqrt(1.-z*z) * cos(theta);
   (*v2) = injection_vel[sh] * sqrt(1.-z*z) * sin(theta);
   (*v3) = injection_vel[sh] * z * cos(theta);
+  #endif
+}
+
+// type2: gaussian energy distr., random direction
+static void draw_particle_vel_type2 (Real time, int sh, Real* v1, Real* v2, Real* v3) {
+
+  // draw particle energy
+  static Real energy = 0.0;
+  static Real vel = 0.0;
+  static unsigned char safety;
+  for (safety = 0; energy < 1.0 && safety < 128; safety++) {
+    // we need at least mc^2 of energy
+    energy = draw_random_gaussian(injection_gamma[sh], injection_gamma_sigma[sh]);
+  }
+  vel = gamma2v(energy);
+
+  // draw particle direction and apply
+  #if RANDOM_DIM==2
+  static Real phi;
+  phi = (2.*M_PI * rand()) / RAND_MAX;
+  (*v1) = vel * cos(phi);
+  (*v2) = vel * sin(phi);
+  (*v3) = 0.0;
+  #elif RANDOM_DIM==3
+  static Real theta, z;
+  // draw a random 3D angle
+  // -- using equal-area cylindrical projection, as described at https://math.stackexchange.com/questions/44689/how-to-find-a-random-axis-or-unit-vector-in-3d
+  theta = (2.*M_PI * rand()) / RAND_MAX;
+  z = (2. * rand()) / RAND_MAX - 1.0;
+  // select particle velocity
+  (*v1) = vel * sqrt(1.-z*z) * cos(theta);
+  (*v2) = vel * sqrt(1.-z*z) * sin(theta);
+  (*v3) = vel * z * cos(theta);
+  #endif
+
 }
 
 void Userwork_after_loop(MeshS *pM)
@@ -833,6 +984,9 @@ void Userwork_after_loop(MeshS *pM)
   }
   if (injection_mom_type == 1) {
     free(injection_vel);
+  } else if (injection_mom_type == 2) {
+    free(injection_gamma);
+    free(injection_gamma_sigma);
   }*/
 }
 
