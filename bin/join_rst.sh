@@ -1,0 +1,1 @@
+../vis/join_rst.sh

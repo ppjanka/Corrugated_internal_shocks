@@ -518,24 +518,40 @@ void problem_read_restart(MeshS *pM, FILE *fp)
 {
   // read the global variables
 
+  char buffer[1024]; int buffer_length = 0;
+  buffer_length += sprintf(buffer+buffer_length, "[Proc %i] Reading problem data from restart file:\n", myID_Comm_world);
+
   fread(name, sizeof(char),50,fp);
   fread(&n_shocks, sizeof(int),1,fp);
   fread(&shock_detection_threshold, sizeof(Real),1,fp);
   fread(&min_sin_angle, sizeof(Real),1,fp);
 
+  buffer_length += sprintf(buffer+buffer_length, "  n_shocks = %i\n  shock_detection_thr = %.2e\n  min_sin_angle = %.2e\n", n_shocks, shock_detection_threshold, min_sin_angle);
+
   #ifdef PARTICLES
   fread(&injection_time_type, sizeof(int),1,fp);
+  buffer_length += sprintf(buffer+buffer_length, "  inj_time_type = %i\n", injection_time_type);
   if (injection_time_type == 1) { // all at once, shock by shock
-    injection_time = malloc(n_shocks * sizeof(Real));
+    injection_time = (Real*) malloc(n_shocks * sizeof(Real));
     fread(injection_time, sizeof(Real),n_shocks,fp);
+    for (int sh = 0; sh < n_shocks; sh++) {
+      buffer_length += sprintf(buffer+buffer_length, "    inj_time[%i] = %.2f\n", sh, injection_time[sh]);
+    }
   }
   fread(&injection_mom_type, sizeof(int),1,fp);
+  buffer_length += sprintf(buffer+buffer_length, "  inj_mom_type = %i\n", injection_mom_type);
   if (injection_mom_type == 1) { // single velocity, random direction
     draw_particle_vel = &draw_particle_vel_type1;
-    injection_vel = malloc(n_shocks * sizeof(Real));
+    injection_vel = (Real*) malloc(n_shocks * sizeof(Real));
     fread(injection_vel, sizeof(Real),n_shocks,fp);
+    for (int sh = 0; sh < n_shocks; sh++) {
+      buffer_length += sprintf(buffer+buffer_length, "    inj_vel[%i] = %.2f\n", sh, injection_vel[sh]);
+    }
   }
   #endif
+  buffer_length += sprintf(buffer+buffer_length, "all problem data read from restart file.\n");
+
+  printf("%s\n", buffer);
 
   // initialize the random number generator
   time_t t;
@@ -811,12 +827,13 @@ static void draw_particle_vel_type1 (Real time, int sh, Real* v1, Real* v2, Real
 void Userwork_after_loop(MeshS *pM)
 {
   // destroy the dynamically allocated global variables
-  if (injection_time_type == 1) {
+  //  -- unnecessary, and disrupts restart functionality
+  /*if (injection_time_type == 1) {
     free(injection_time);
   }
   if (injection_mom_type == 1) {
     free(injection_vel);
-  }
+  }*/
 }
 
 void inflow_boundary (GridS *pGrid) {
