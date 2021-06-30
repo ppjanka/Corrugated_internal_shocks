@@ -75,7 +75,7 @@ static Real* injection_gamma_sigma;
 // Credits: Peter John Acklam (https://stackedboxes.org/2017/05/01/acklams-normal-quantile-function/)
 // Direct source: https://stackoverflow.com/questions/27830995/inverse-cumulative-distribution-function-in-c
 
-double gaussianInverseCDF (double p) {
+static double gaussianInverseCDF (double p) {
 
   double a1 = -39.69683028665376;
   double a2 = 220.9460984245205;
@@ -945,9 +945,10 @@ static void draw_particle_vel_type1 (Real time, int sh, Real* v1, Real* v2, Real
 static void draw_particle_vel_type2 (Real time, int sh, Real* v1, Real* v2, Real* v3) {
 
   // draw particle energy
-  static Real energy = 0.0;
-  static Real vel = 0.0;
+  static Real energy;
+  static Real vel;
   static unsigned char safety;
+  energy = 0.0;
   for (safety = 0; energy < 1.0 && safety < 128; safety++) {
     // we need at least mc^2 of energy
     energy = draw_random_gaussian(injection_gamma[sh], injection_gamma_sigma[sh]);

@@ -62,7 +62,7 @@ AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
 <particle>
 # NOTE: in this problem each particle should have its own type, i.e. partypes = no of particles, parnumgrid = 1
 partypes        = 1         # number of types of particles
-parnumgrid      = 10        # number of particles for each type
+parnumgrid      = 1024      # number of particles for each type
 integrator      = 4         # particle integrator
                             #   (1: explicit; 2: semi-implicit; 3: fully-implicit;
                             #    4: Boris with Lorentz force and SR particles)
@@ -138,12 +138,12 @@ injection_time_sh1 = 3.0
 injection_time_sh2 = 12.0
 
 # injected momentum (direction, energy) distribution
-injection_mom_type = 1
+injection_mom_type = 2
 # 1: single velocity per shock, random direction
 injection_vel_sh1 = 0.5
 injection_vel_sh2 = 0.6
 # 2: gaussian energy, random direction
 injection_gamma_sh1 = 1.2
 injection_gamma_sigma_sh1 = 0.5
-injection_gamma_sh2 = 2.2
-injection_gamma_sigma_sh2 = 0.5
+injection_gamma_sh2 = 3.5
+injection_gamma_sigma_sh2 = 1.0

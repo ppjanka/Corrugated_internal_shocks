@@ -12,6 +12,8 @@ import os
 import glob
 from tqdm import tqdm # progress bar
 
+from collections.abc import Iterable
+
 import cartographic as cart
 
 # find all elements in a that do not appear in b
@@ -265,13 +267,14 @@ class Particles:
     # TODO: only update Ekin that has not been calculated before
     def update_aux_data (self, to_update=['Ekin',]):
         if 'Ekin' in to_update:
+            # uninjected particles are given negative energy for easy discrimination
             if self.relativistic:
-                self.Ekin = np.sum(1.0 / np.sqrt(1.0 - (self.vel)**2), axis=-1)
+                self.Ekin = np.where(np.isnan(self.grp), np.nan, np.where(self.injected > 0, 1.0 / np.sqrt(1.0 - np.sum((self.vel)**2, axis=-1)), -1.0))
             else:
-                self.Ekin = 0.5 * np.sum((self.vel)**2, axis=-1)
+                self.Ekin = np.where(np.isnan(self.grp), np.nan, np.where(self.injected > 0, 0.5 * np.sum((self.vel)**2, axis=-1), -1.0))
 
     # returns n indices of particles with highest Ekin at the final or ith frame
-    def find_highest_Ekin (self, n=1, i=None):
+    def find_highest_Ekin (self, n=1, i=None, only_injected=True):
 
         if i == None:
             idx = len(self.times)-1
@@ -286,10 +289,19 @@ class Particles:
         nan_count = np.isnan(self.Ekin[idx,:]).sum()
 
         # find ids of the particles with n highest energies
-        return self.uniq_id[idx, np.argpartition(self.Ekin[idx,:],-n-nan_count)[(-n-nan_count):(-nan_count)]]
+        if nan_count > 0:
+            idxs = np.argpartition(self.Ekin[idx,:],-n-nan_count)[(-n-nan_count):(-nan_count)]
+        else:
+            idxs = np.argpartition(self.Ekin[idx,:],-n)[(-n):]
+
+        # discard uninjected if requested
+        if only_injected:
+            idxs = idxs[self.injected[idx, idxs] > 0]
+
+        return self.uniq_id[idx, idxs]
 
     # returns n indices of particles with Ekin closest to median at the final or ith frame
-    def find_median_Ekin (self, n=1, i=None):
+    def find_median_Ekin (self, n=1, i=None, only_injected=True):
 
         if i == None:
             idx = len(self.times)-1
@@ -303,11 +315,23 @@ class Particles:
         # count np.nan values to ignore (they will show up as the highest energies)
         nan_count = np.isnan(self.Ekin[idx,:]).sum()
 
+        # count the uninjected particles to ignore
+        if only_injected:
+            uninjected = (self.injected[idx,:] < 1).sum()
+        else:
+            uninjected = 0
+
         # find ids:
-        part_idx = int(0.5*(self.npart+n))
-        return self.uniq_id[idx, np.argpartition(self.Ekin[idx,:],kth=[-part_idx-nan_count,part_idx-nan_count])[(-part_idx-nan_count):(part_idx+1-nan_count)]]
+        part_idx = int(0.5*(self.npart-nan_count-uninjected+n))
+        idxs = np.argpartition(self.Ekin[idx,:],kth=[-part_idx-nan_count,part_idx-nan_count])[(-part_idx-nan_count):(part_idx+1-nan_count)]
+
+        # discard uninjected if requested
+        if only_injected:
+            idxs = idxs[self.injected[idx, idxs] > 0]
+
+        return self.uniq_id[idx, idxs]
             
-    def plot_pos2D (self, ax, color_by='time', cmap='rainbow', axis_x=0, axis_y=1, annotations=True, selection=[]):
+    def plot_pos2D (self, ax, color_by='time', cmap='rainbow', axis_x=0, axis_y=1, annotations=True, selection=None, only_injected=True):
 
         # choose coloring
         if color_by == 'time':
@@ -323,14 +347,23 @@ class Particles:
         else: #solid color assumed
             c = lambda x : color_by
 
-        if len(selection) > 0:
-            p_idxs = np.array(selection).astype(np.int64)
+        if isinstance(selection, Iterable):
+            dtype_uniq = np.dtype([('init_id', np.int32), ('my_id', np.int32)])
+            uniq_ids = self.uniq_id[-1,:,:].astype(np.int32).view(dtype_uniq)
+            selection = np.array(selection).astype(np.int32).view(dtype_uniq)
+            p_idxs = np.where(np.in1d(uniq_ids,selection))[0]
+            del uniq_ids, selection
         else:
             p_idxs = range(self.npart)
 
         # plot the traces
         for p in p_idxs:
-            ax.scatter(self.pos[:,p,axis_x], self.pos[:,p,axis_y], s=0.1, color=c(p/self.npart))
+            if only_injected:
+                time_injected = np.where(self.injected[:,p] > 0)[0]
+            else:
+                time_injected = range(len(self.times))
+            if len(time_injected) > 0:
+                ax.scatter(self.pos[time_injected,p,axis_x], self.pos[time_injected,p,axis_y], s=0.1, color=c(p/self.npart))
 
         ax.set_aspect(1.0)
 
@@ -357,15 +390,18 @@ class Particles:
 
             ax.set_title('Particle position')
                 
-    def plot_Ekin_vs_time (self, ax, cmap='rainbow', average=False, residuals=False):
-        data_to_plot = 1.*self.Ekin[:,:]
+    def plot_Ekin_vs_time (self, ax, cmap='rainbow', average=False, residuals=False, only_injected=True):
+        if only_injected:
+            data_to_plot = np.ma.array(self.Ekin, mask=(self.injected < 1), fill_value=np.nan)
+        else:
+            data_to_plot = 1.*self.Ekin[:,:]
         if residuals: # subtract time-average
-            data_to_plot -= np.mean(data_to_plot, axis=0)
+            data_to_plot -= np.nanmean(data_to_plot, axis=0)
             ax.set_title('Particle energy: Residuals')
         else:
             ax.set_title('Particle energy')
         if average: # average over particles
-            data_to_plot = np.mean(data_to_plot, axis=1)
+            data_to_plot = np.nanmean(data_to_plot, axis=1)
             ax.scatter(self.times, data_to_plot, s=0.1)
         else: # plot each particle separately
             from matplotlib.cm import get_cmap
@@ -376,33 +412,39 @@ class Particles:
             ax.set_ylim(1.1*np.nanmin(data_to_plot), 1.1*np.nanmax(data_to_plot))
         ax.set_xlabel('Time')
 
-    def plot_Ekin_distribution (self, ax, cax=None, bins=None, log=True, cmap='rainbow', i=None, navg=None, history=False, data_to_plot=None):
+    def plot_Ekin_distribution (self, ax, cax=None, bins=None, log=False, cmap='rainbow', i=None, navg=None, history=False, data_to_plot=None, only_injected=True):
 
         # generate Ekin if needed
-        if len(self.Ekin) != len(self.uniq_id):
-            self.update_aux_data(to_update=['Ekin',])
+        if data_to_plot == None:
+            if len(self.Ekin) != len(self.uniq_id):
+                self.update_aux_data(to_update=['Ekin',])
+            data_to_plot = 1.*self.Ekin[:,:]
+
+        # limit to injected particles if requested
+        if only_injected:
+            data_to_plot = np.ma.array(data_to_plot, mask=(self.injected < 1), fill_value=np.nan)
 
         if not history:
 
             if i == None: # plot time-averaged energy distribution
-                data_to_plot = np.mean(self.Ekin, axis=0)
+                data_to_plot = np.nanmean(data_to_plot, axis=0)
                 ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
 
             elif navg == None: # plot a single frame
                 ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
 
             else: # plot an average from the frames [i-navg, i]
-                data_to_plot = np.mean(self.Ekin[(i-navg):(i+1),:], axis=0)
+                data_to_plot = np.mean(data_to_plot[(i-navg):(i+1),:], axis=0)
                 ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
 
         else: # plot history of energy distr. color-coded with time
             data_x = np.array(self.times)
-            data_y = np.transpose(self.Ekin)
+            data_y = np.transpose(data_to_plot)
             from matplotlib.cm import get_cmap
             c = get_cmap(cmap, min(512, len(data_x)))
             no_plots = int(len(data_x)/navg)+1
             for idx_t in tqdm(range(no_plots)):
-                data_to_plot = np.mean(data_y[:,(navg*idx_t):min(len(data_x),navg*(idx_t+1))], axis=1)
+                data_to_plot = np.nanmean(data_y[:,(navg*idx_t):min(len(data_x),navg*(idx_t+1))], axis=1)
                 ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False, color=c(idx_t/no_plots))
             if cax != None: # add a color bar
                 from matplotlib.pyplot import colorbar
@@ -412,9 +454,12 @@ class Particles:
                 cax.set_ylabel('Time [sim.u.]')
 
         ax.set_ylabel('PDF')
-        ax.set_xlabel('Particle energy')
+        xlabel = 'Particle energy'
+        if log:
+            xlabel = 'Log ' + xlabel
+        ax.set_xlabel(xlabel)
 
-    def _plot_Ekin_distribution_frame (self, data_to_plot, bins=None, log=True, cmap='rainbow', i=None, navg=1, tempdir='./temp_EkinDistr/', force=False, verbose=True, xmin=None, xmax=None, ymin=None, ymax=None):
+    def _plot_Ekin_distribution_frame (self, data_to_plot, bins=None, log=True, cmap='rainbow', i=None, navg=1, tempdir='./temp_EkinDistr/', force=False, verbose=True, xmin=None, xmax=None, ymin=None, ymax=None, only_injected=True):
         filename = ('EkinDistr_%08i.png' % i)
         if os.path.isfile(tempdir + filename) and not force:
             if verbose:
@@ -426,7 +471,7 @@ class Particles:
             import matplotlib.pyplot as plt
             fig = plt.figure(figsize=[8,6])
             ax = plt.gca()
-            self.plot_Ekin_distribution(ax, bins=bins, log=log, cmap=cmap, i=i, navg=navg, data_to_plot=data_to_plot['data'][:,i])
+            self.plot_Ekin_distribution(ax, bins=bins, log=log, cmap=cmap, i=i, navg=navg, data_to_plot=data_to_plot['data'][:,i], only_injected=only_injected)
             ax.set_xlim(xmin,xmax)
             ax.set_ylim(ymin,ymax)
             ax.set_title('Ekin distribution, $t = %.2f$ sim.u.' % (data_to_plot['times'][i],))
@@ -435,7 +480,7 @@ class Particles:
 
     # WARNING: movie plots will not work in parallel if matplotlib is imported before calling this function!
     # [if you know how to fix this, please let me know ;) ]
-    def plot_Ekin_distribution_movie (self, nproc=1, bins=None, log=True, cmap='rainbow', navg=1, tempdir='./temp_EkinDistr/', outdir='./', force=False, verbose=True, xmin=None, xmax=None, ymin=None, ymax=None):
+    def plot_Ekin_distribution_movie (self, nproc=1, bins=None, log=True, cmap='rainbow', navg=1, tempdir='./temp_EkinDistr/', outdir='./', force=False, verbose=True, xmin=None, xmax=None, ymin=None, ymax=None, only_injected=True):
         # create the temp folder if needed
         if not os.path.exists(tempdir):
             if verbose:
@@ -466,16 +511,16 @@ class Particles:
             print("Generating frames..", flush=True)
         if nproc == 1:
             for i in range(len(self.times)-navg):
-                self.plot_Ekin_distribution_frame(data_to_plot, bins=bins, log=log, cmap=cmap, i=i, navg=navg, tempdir=tempdir, force=force, verbose=verbose, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+                self.plot_Ekin_distribution_frame(data_to_plot, bins=bins, log=log, cmap=cmap, i=i, navg=navg, tempdir=tempdir, force=force, verbose=verbose, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, only_injected=only_injected)
         else:
             with ProcessPool(nproc) as pool:
-                _ = pool.map(lambda i : self._plot_Ekin_distribution_frame(data_to_plot, bins=bins, log=log, cmap=cmap, i=i, navg=navg, tempdir=tempdir, force=force, verbose=verbose, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax), range(len(self.times)-navg))
+                _ = pool.map(lambda i : self._plot_Ekin_distribution_frame(data_to_plot, bins=bins, log=log, cmap=cmap, i=i, navg=navg, tempdir=tempdir, force=force, verbose=verbose, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, only_injected=only_injected), range(len(self.times)-navg))
         if verbose:
             print(" All frames generated.", flush=True)
         # render the movie
         try:
             print("Rendering the movie..", flush=True)
-            command = ("ffmpeg -y -r 20 -f image2 -i \"%sEkinDistr_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 %sEkinDistr.mp4" % (tempdir, outdir))
+            command = ("ffmpeg -threads %i -y -r 20 -f image2 -i \"%sEkinDistr_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 %sEkinDistr.mp4" % (nproc, tempdir, outdir))
             print(command, flush=True)
             os.system(command)
         except Exception as e:
@@ -484,9 +529,11 @@ class Particles:
         del data_to_plot
         print('Done.', flush=True)
 
-    def plot_direction_distribution_3D (self, ax, projection, res, i=None, navg=None, cmap='rainbow', res_patch=8, cax=None, weights=None, recalculate=True):
+    def plot_direction_distribution_3D (self, ax, projection, res, i=None, navg=None, cmap='rainbow', res_patch=8, cax=None, weights=None, recalculate=True, only_injected=True):
 
         name = 'direction3D'
+        if only_injected:
+            name += '_injected'
         if weights != None:
             name += "_" + weights
 
@@ -498,10 +545,13 @@ class Particles:
 
             if i == None: # calculate statistics for the entire simulation
                 vel = self.vel
+                if only_injected: mask = (self.injected < 1)
             elif navg == None: # print a single frame
                 vel = self.vel[i,:,:].reshape(1,self.npart,3)
+                if only_injected: mask = (self.injected[i,:].reshape(1,self.npart) < 1)
             else: # plot the population from the frames [i-navg, i]
                 vel = self.vel[(i-navg):(i+1),:,:]
+                if only_injected: mask = (self.injected[(i-navg):(i+1),:,:] < 1)
 
             # calculate angles for the particles
             if recalculate or len(self.vel_theta) == 0 or len(self.vel_phi) == 0:
@@ -516,9 +566,20 @@ class Particles:
             if weights == 'mom':
                 weights = np.sqrt(np.sum(vel**2,axis=2)).flatten()
 
+            # ignore uninjected particles if requested
+            if only_injected:
+                mask = mask.flatten()
+                vel_theta = np.ma.array(self.vel_theta, mask=mask, fill_value=np.nan)
+                vel_phi = np.ma.array(self.vel_phi, mask=mask, fill_value=np.nan)
+                if isinstance(weights, Iterable):
+                    weights = np.ma.array(weights, mask=mask, fill_value=np.nan)
+            else:
+                vel_theta = self.vel_theta
+                vel_phi = self.vel_phi
+
             # calculate the 2d histogram
             # (values, theta_edges, phi_edges)
-            self.hist[name] = np.histogram2d(self.vel_theta, self.vel_phi, bins=[thetas, phis], density=False, weights=weights)
+            self.hist[name] = np.histogram2d(vel_theta, vel_phi, bins=[thetas, phis], density=False, weights=weights)
 
         # plot the 2d histogram
         cart.plot_projected(ax, projection, thetas, phis, self.hist[name][0], in_unit='rad', cmap=cmap, res_patch=res_patch, cax=cax)
@@ -526,9 +587,11 @@ class Particles:
         # plot the grid
         cart.plot_cartographic_grid(ax, projection, phi_ticks=[-90.,0.,90.], theta_ticks=[30.,60.,90.,120.,150.])
 
-    def plot_direction_distribution_2D (self, ax, res, i=None, weights=None, recalculate=True):
+    def plot_direction_distribution_2D (self, ax, res, i=None, weights=None, recalculate=True, only_injected=True):
 
         name = 'direction2D'
+        if only_injected:
+            name += '_injected'
         if weights != None:
             name += "_" + weights
         # first, create an angular grid for direction bins, with equal-area components
@@ -543,14 +606,16 @@ class Particles:
             if not recalculate and (name_3D in self.hist.keys()):
 
                 # (values, phi_edges)
-                self.hist[name] = ( np.sum(self.hist[name_3D][0], axis=0), self.hist[name_3D][2] )
+                self.hist[name] = ( np.nansum(self.hist[name_3D][0], axis=0), self.hist[name_3D][2] )
 
             else: # calculate from scratch
 
                 if i != None: # print a single frame
                     vel = self.vel[i,:,:].reshape(1,self.npart,3)
+                    if only_injected: mask = (self.injected[i,:].reshape(1,self.npart) < 1)
                 else: # calculate statistics for the entire simulation
                     vel = self.vel
+                    if only_injected: mask = (self.injected < 1)
 
                 # calculate angles for the particles
                 if recalculate or len(self.vel_phi) == 0:
@@ -560,7 +625,16 @@ class Particles:
                     self.vel_phi = np.where(self.vel_phi < np.pi, self.vel_phi, self.vel_phi-2.*np.pi) # move to the [-pi,pi] range
                     self.vel_phi = self.vel_phi.flatten()
                 if weights == 'mom':
-                    weights = np.sqrt(np.sum(vel**2,axis=2)).flatten()
+                    weights = np.sqrt(np.nansum(vel**2,axis=2)).flatten()
+
+                # ignore uninjected particles if requested
+                if only_injected:
+                    mask = mask.flatten()
+                    vel_phi = np.ma.array(self.vel_phi, mask=mask, fill_value=np.nan)
+                    if isinstance(weights, Iterable):
+                        weights = np.ma.array(weights, mask=mask, fill_value=np.nan)
+                else:
+                    vel_phi = self.vel_phi
 
                 # calculate the 2d histogram
                 # (values, theta_edges, phi_edges)
