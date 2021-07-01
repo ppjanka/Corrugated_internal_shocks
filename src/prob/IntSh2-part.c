@@ -56,16 +56,36 @@ static int injection_time_type = 0;
 // injection_time_type == 1 -- all at once, shock by shock
 static Real* injection_time;
 
-static int injection_mom_type = 1;
+// pointer to a wrapper function that will set particle injection velocity
 static void (*draw_particle_vel) (Real time, int sh, Real* v1, Real* v2, Real* v3);
+
+static int injection_type = 1; // 1 -- separable energy / direction distributions
+
+// particle injection with separable energy / direction distributions
+static void draw_particle_vel_separable (Real time, int sh, Real* v1, Real* v2, Real* v3);
+static void (*draw_particle_vel_separable_value) (Real time, int sh, Real* vel);
+static void (*draw_particle_vel_separable_dir) (Real time, int sh, Real* vel, Real* v1, Real* v2, Real* v3);
+
+// [Separable distr.] injection energy
+static int injection_en_type = 1;
 // injection_energy_type == 1 -- all particles at the same energy, random angle
-static void draw_particle_vel_type1 (Real time, int sh, Real* v1, Real* v2, Real* v3);
+static void draw_particle_vel_separable_value_type1 (Real time, int sh, Real* vel);
 // injection_energy_type == 2 -- gaussian distr. in energy, random angle
-static void draw_particle_vel_type2 (Real time, int sh, Real* v1, Real* v2, Real* v3);
+static void draw_particle_vel_separable_value_type2 (Real time, int sh, Real* vel);
 // injection_energy_type - related variables
 static Real* injection_vel;
 static Real* injection_gamma;
 static Real* injection_gamma_sigma;
+
+// [Separable distr.] injection direction
+static int injection_dir_type = 1;
+// injection_dir_type == 1 -- random direction
+static void draw_particle_vel_separable_dir_type1 (Real time, int sh, Real* vel, Real* v1, Real* v2, Real* v3);
+// injection_dir_type == 2 -- elongated in m directions, PDF ~ 1+A*sin(m*(phi-phi0)+pi/2)
+static void draw_particle_vel_separable_dir_type2 (Real time, int sh, Real* vel, Real* v1, Real* v2, Real* v3);
+static Real* injection_A;
+static int* injection_m;
+static Real* injection_phi0;
 
 #endif // PARTICLES
 
@@ -140,6 +160,28 @@ static double gaussianInverseCDF (double p) {
 static inline Real draw_random_gaussian (Real x0, Real sigma) {
   Real draw = gaussianInverseCDF(rand() * 1.0 / RAND_MAX);
   return draw*sigma + x0;
+}
+
+static inline Real dirDistrCDF (Real phi, Real m, Real A) {
+  return (1. / (2.*M_PI)) * (phi + (A/m)*(1.-cos(m*phi)));
+}
+static Real dirDistrInverseCDF (Real x, Real m, Real A, Real phi0) {
+  static Real precision=0.01;
+  // just a simple numerical inversion here, note that the CDF is monotonic
+  Real l=0., r=2*M_PI, mid;
+  while (r-l > precision) {
+    mid = 0.5*(l+r);
+    if ((dirDistrCDF(l,m,A)-x) * (dirDistrCDF(mid,m,A)-x) <= 0) {
+      r = mid;
+    } else {
+      l = mid;
+    }
+  }
+  return 0.5*(l+r) + phi0 - M_PI/(2.*m);
+}
+
+static inline Real draw_random_dirDistr (Real m, Real A, Real phi0) {
+  return dirDistrInverseCDF(rand() * 1.0 / RAND_MAX, m,A,phi0);
 }
 
 //----------------------------------------------------------------------------------
@@ -551,24 +593,48 @@ void problem(DomainS *pDomain)
       injection_time[sh] = par_getd("problem", buf);
     }
   }
-  // Momentum distribution at injection
-  injection_mom_type = par_geti_def("problem", "injection_mom_type", 1);
-  if (injection_mom_type == 1) { // single velocity, random direction
-    draw_particle_vel = &draw_particle_vel_type1;
-    injection_vel = malloc(n_shocks * sizeof(Real));
-    for (sh = 0; sh < n_shocks; sh++) {
-      sprintf(buf, "injection_vel_sh%i", sh+1);
-      injection_vel[sh] = par_getd("problem", buf);
+
+  // Energy / direction distributions at injection
+  injection_type = par_geti_def("problem", "injection_type", 1);
+  if (injection_type == 1) { // separable energy / direction distr.
+    draw_particle_vel = &draw_particle_vel_separable;
+    // energy distribution setup
+    injection_en_type = par_geti_def("problem", "injection_en_type", 1);
+    if (injection_en_type == 1) { // single velocity
+      draw_particle_vel_separable_value = &draw_particle_vel_separable_value_type1;
+      injection_vel = malloc(n_shocks * sizeof(Real));
+      for (sh = 0; sh < n_shocks; sh++) {
+        sprintf(buf, "injection_vel_sh%i", sh+1);
+        injection_vel[sh] = par_getd("problem", buf);
+      }
+    } else if (injection_en_type == 2) { // gaussian in energy
+      draw_particle_vel_separable_value = &draw_particle_vel_separable_value_type2;
+      injection_gamma = malloc(n_shocks * sizeof(Real));
+      injection_gamma_sigma = malloc(n_shocks * sizeof(Real));
+      for (sh = 0; sh < n_shocks; sh++) {
+        sprintf(buf, "injection_gamma_sh%i", sh+1);
+        injection_gamma[sh] = par_getd("problem", buf);
+        sprintf(buf, "injection_gamma_sigma_sh%i", sh+1);
+        injection_gamma_sigma[sh] = par_getd("problem", buf);
+      }
     }
-  } else if (injection_mom_type == 2) { // gaussian in energy, random direction
-    draw_particle_vel = &draw_particle_vel_type2;
-    injection_gamma = malloc(n_shocks * sizeof(Real));
-    injection_gamma_sigma = malloc(n_shocks * sizeof(Real));
-    for (sh = 0; sh < n_shocks; sh++) {
-      sprintf(buf, "injection_gamma_sh%i", sh+1);
-      injection_gamma[sh] = par_getd("problem", buf);
-      sprintf(buf, "injection_gamma_sigma_sh%i", sh+1);
-      injection_gamma_sigma[sh] = par_getd("problem", buf);
+    // direction distribution setup
+    injection_dir_type = par_geti_def("problem", "injection_dir_type", 1);
+    if (injection_dir_type == 1) { // random direction
+      draw_particle_vel_separable_dir = &draw_particle_vel_separable_dir_type1;
+    } else if (injection_dir_type == 2) { // elongated in m directions, PDF ~ 1+A*sin(m*(phi-phi0)+pi/2)
+      draw_particle_vel_separable_dir = &draw_particle_vel_separable_dir_type2;
+      injection_A = malloc(n_shocks * sizeof(Real));
+      injection_m = malloc(n_shocks * sizeof(int));
+      injection_phi0 = malloc(n_shocks * sizeof(Real));
+      for (sh = 0; sh < n_shocks; sh++) {
+        sprintf(buf, "injection_A_sh%i", sh+1);
+        injection_A[sh] = par_getd("problem", buf);
+        sprintf(buf, "injection_m_sh%i", sh+1);
+        injection_m[sh] = par_geti("problem", buf);
+        sprintf(buf, "injection_phi0_sh%i", sh+1);
+        injection_phi0[sh] = par_getd("problem", buf);
+      }
     }
   }
 
@@ -600,12 +666,21 @@ void problem_write_restart(MeshS *pM, FILE *fp)
   if (injection_time_type == 1) { // all at once, shock by shock
     fwrite(injection_time, sizeof(Real),n_shocks,fp);
   }
-  fwrite(&injection_mom_type, sizeof(int),1,fp);
-  if (injection_mom_type == 1) { // single velocity, random direction
-    fwrite(injection_vel, sizeof(Real),n_shocks,fp);
-  } else if (injection_mom_type == 2) { // gaussian in energy, random direction
-    fwrite(injection_gamma, sizeof(Real),n_shocks,fp);
-    fwrite(injection_gamma_sigma, sizeof(Real),n_shocks,fp);
+  fwrite(&injection_type, sizeof(int),1,fp);
+  if (injection_type == 1) { // separable energy / direction distributions
+    fwrite(&injection_en_type, sizeof(int),1,fp);
+    if (injection_en_type == 1) { // single velocity, random direction
+      fwrite(injection_vel, sizeof(Real),n_shocks,fp);
+    } else if (injection_en_type == 2) { // gaussian in energy, random direction
+      fwrite(injection_gamma, sizeof(Real),n_shocks,fp);
+      fwrite(injection_gamma_sigma, sizeof(Real),n_shocks,fp);
+    }
+    fwrite(&injection_dir_type, sizeof(int),1,fp);
+    if (injection_dir_type == 2) { // elongated in m directions, PDF ~ 1+A*sin(m*(phi-phi0)+pi/2)
+      fwrite(injection_A, sizeof(Real),n_shocks,fp);
+      fwrite(injection_m, sizeof(int),n_shocks,fp);
+      fwrite(injection_phi0, sizeof(Real),n_shocks,fp);
+    }
   }
   #endif
 
@@ -627,6 +702,8 @@ void problem_read_restart(MeshS *pM, FILE *fp)
   buffer_length += sprintf(buffer+buffer_length, "  n_shocks = %i\n  shock_detection_thr = %.2e\n  min_sin_angle = %.2e\n", n_shocks, shock_detection_threshold, min_sin_angle);
 
   #ifdef PARTICLES
+
+  // injection times
   fread(&injection_time_type, sizeof(int),1,fp);
   buffer_length += sprintf(buffer+buffer_length, "  inj_time_type = %i\n", injection_time_type);
   if (injection_time_type == 1) { // all at once, shock by shock
@@ -636,24 +713,50 @@ void problem_read_restart(MeshS *pM, FILE *fp)
       buffer_length += sprintf(buffer+buffer_length, "    inj_time[%i] = %.2f\n", sh, injection_time[sh]);
     }
   }
-  fread(&injection_mom_type, sizeof(int),1,fp);
-  buffer_length += sprintf(buffer+buffer_length, "  inj_mom_type = %i\n", injection_mom_type);
-  if (injection_mom_type == 1) { // single velocity, random direction
-    draw_particle_vel = &draw_particle_vel_type1;
-    injection_vel = (Real*) malloc(n_shocks * sizeof(Real));
-    fread(injection_vel, sizeof(Real),n_shocks,fp);
-    for (int sh = 0; sh < n_shocks; sh++) {
-      buffer_length += sprintf(buffer+buffer_length, "    inj_vel[%i] = %.2f\n", sh, injection_vel[sh]);
+
+  // injection energy / direction distributions
+  fread(&injection_type, sizeof(int),1,fp);
+  buffer_length += sprintf(buffer+buffer_length, "  inj_type = %i\n", injection_type);
+  if (injection_type == 1) { // separable distributions
+    draw_particle_vel = &draw_particle_vel_separable;
+    // energy distribution setup
+    fread(&injection_en_type, sizeof(int),1,fp);
+    buffer_length += sprintf(buffer+buffer_length, "  inj_en_type = %i\n", injection_en_type);
+    if (injection_en_type == 1) { // single velocity, random direction
+      draw_particle_vel_separable_value = &draw_particle_vel_separable_value_type1;
+      injection_vel = (Real*) malloc(n_shocks * sizeof(Real));
+      fread(injection_vel, sizeof(Real),n_shocks,fp);
+      for (int sh = 0; sh < n_shocks; sh++) {
+        buffer_length += sprintf(buffer+buffer_length, "    inj_vel[%i] = %.2f\n", sh, injection_vel[sh]);
+      }
+    } else if (injection_en_type == 2) { // gaussian energy, random direction
+      draw_particle_vel_separable_value = &draw_particle_vel_separable_value_type2;
+      injection_gamma = (Real*) malloc(n_shocks * sizeof(Real));
+      injection_gamma_sigma = (Real*) malloc(n_shocks * sizeof(Real));
+      fread(injection_gamma, sizeof(Real),n_shocks,fp);
+      fread(injection_gamma_sigma, sizeof(Real),n_shocks,fp);
+      for (int sh = 0; sh < n_shocks; sh++) {
+        buffer_length += sprintf(buffer+buffer_length, "    inj_gamma[%i] = %.2f\n", sh, injection_gamma[sh]);
+        buffer_length += sprintf(buffer+buffer_length, "    inj_gamma_sigma[%i] = %.2f\n", sh, injection_gamma_sigma[sh]);
+      }
     }
-  } else if (injection_mom_type == 2) { // gaussian energy, random direction
-    draw_particle_vel = &draw_particle_vel_type2;
-    injection_gamma = (Real*) malloc(n_shocks * sizeof(Real));
-    injection_gamma_sigma = (Real*) malloc(n_shocks * sizeof(Real));
-    fread(injection_gamma, sizeof(Real),n_shocks,fp);
-    fread(injection_gamma_sigma, sizeof(Real),n_shocks,fp);
-    for (int sh = 0; sh < n_shocks; sh++) {
-      buffer_length += sprintf(buffer+buffer_length, "    inj_gamma[%i] = %.2f\n", sh, injection_gamma[sh]);
-      buffer_length += sprintf(buffer+buffer_length, "    inj_gamma_sigma[%i] = %.2f\n", sh, injection_gamma_sigma[sh]);
+    // direction distribution setup
+    fread(&injection_dir_type, sizeof(int),1,fp);
+    if (injection_dir_type == 1) { // random direction
+      draw_particle_vel_separable_dir = &draw_particle_vel_separable_dir_type1;
+    } else if (injection_dir_type == 2) { // // elongated in m directions, PDF ~ 1+A*sin(m*(phi-phi0)+pi/2)
+      draw_particle_vel_separable_dir = &draw_particle_vel_separable_dir_type2;
+      injection_A = malloc(n_shocks * sizeof(Real));
+      injection_m = malloc(n_shocks * sizeof(int));
+      injection_phi0 = malloc(n_shocks * sizeof(Real));
+      fread(injection_A, sizeof(Real),n_shocks,fp);
+      fread(injection_m, sizeof(int),n_shocks,fp);
+      fread(injection_phi0, sizeof(Real),n_shocks,fp);
+      for (int sh = 0; sh < n_shocks; sh++) {
+        buffer_length += sprintf(buffer+buffer_length, "    inj_A[%i] = %.2f\n", sh, injection_A[sh]);
+        buffer_length += sprintf(buffer+buffer_length, "    inj_m[%i] = %i\n", sh, injection_m[sh]);
+        buffer_length += sprintf(buffer+buffer_length, "    inj_phi0[%i] = %.2f\n", sh, injection_A[sh]);
+      }
     }
   }
   #endif
@@ -920,47 +1023,39 @@ void Userwork_in_loop(MeshS *pM)
 
 // particle injection functions
 
-// type1: const velocity, random direction
-static void draw_particle_vel_type1 (Real time, int sh, Real* v1, Real* v2, Real* v3) {
-  #if RANDOM_DIM==2
-  static Real phi;
-  phi = (2.*M_PI * rand()) / RAND_MAX;
-  (*v1) = injection_vel[sh] * cos(phi);
-  (*v2) = injection_vel[sh] * sin(phi);
-  (*v3) = 0.0;
-  #elif RANDOM_DIM==3
-  static Real theta, z;
-  // draw a random 3D angle
-  // -- using equal-area cylindrical projection, as described at https://math.stackexchange.com/questions/44689/how-to-find-a-random-axis-or-unit-vector-in-3d
-  theta = (2.*M_PI * rand()) / RAND_MAX;
-  z = (2. * rand()) / RAND_MAX - 1.0;
-  // select particle velocity
-  (*v1) = injection_vel[sh] * sqrt(1.-z*z) * cos(theta);
-  (*v2) = injection_vel[sh] * sqrt(1.-z*z) * sin(theta);
-  (*v3) = injection_vel[sh] * z * cos(theta);
-  #endif
+// wrapper for separable energy / direction distributions
+static void draw_particle_vel_separable (Real time, int sh, Real* v1, Real* v2, Real* v3) {
+  Real vel;
+  draw_particle_vel_separable_value(time, sh, &vel);
+  draw_particle_vel_separable_dir(time, sh, &vel, v1,v2,v3);
 }
 
-// type2: gaussian energy distr., random direction
-static void draw_particle_vel_type2 (Real time, int sh, Real* v1, Real* v2, Real* v3) {
+// separable energy distr. type1: const velocity
+static void draw_particle_vel_separable_value_type1 (Real time, int sh, Real* vel) {
+  (*vel) = injection_vel[sh];
+}
 
+// separable energy distr. type2: gaussian energy
+static void draw_particle_vel_separable_value_type2 (Real time, int sh, Real* vel) {
   // draw particle energy
   static Real energy;
-  static Real vel;
   static unsigned char safety;
   energy = 0.0;
   for (safety = 0; energy < 1.0 && safety < 128; safety++) {
     // we need at least mc^2 of energy
     energy = draw_random_gaussian(injection_gamma[sh], injection_gamma_sigma[sh]);
   }
-  vel = gamma2v(energy);
+  (*vel) = gamma2v(energy);
+}
 
+// separable direction distr. type1: random direction
+static void draw_particle_vel_separable_dir_type1 (Real time, int sh, Real* vel, Real* v1, Real* v2, Real* v3) {
   // draw particle direction and apply
   #if RANDOM_DIM==2
   static Real phi;
   phi = (2.*M_PI * rand()) / RAND_MAX;
-  (*v1) = vel * cos(phi);
-  (*v2) = vel * sin(phi);
+  (*v1) = (*vel) * cos(phi);
+  (*v2) = (*vel) * sin(phi);
   (*v3) = 0.0;
   #elif RANDOM_DIM==3
   static Real theta, z;
@@ -969,11 +1064,22 @@ static void draw_particle_vel_type2 (Real time, int sh, Real* v1, Real* v2, Real
   theta = (2.*M_PI * rand()) / RAND_MAX;
   z = (2. * rand()) / RAND_MAX - 1.0;
   // select particle velocity
-  (*v1) = vel * sqrt(1.-z*z) * cos(theta);
-  (*v2) = vel * sqrt(1.-z*z) * sin(theta);
-  (*v3) = vel * z * cos(theta);
+  (*v1) = (*vel) * sqrt(1.-z*z) * cos(theta);
+  (*v2) = (*vel) * sqrt(1.-z*z) * sin(theta);
+  (*v3) = (*vel) * z * cos(theta);
   #endif
+}
 
+// separable direction distr. type2 -- elongated in m directions (1+a*sin(phi*m/2)-shaped)
+static void draw_particle_vel_separable_dir_type2 (Real time, int sh, Real* vel, Real* v1, Real* v2, Real* v3) {
+  #if RANDOM_DIM!=2
+  printf("[IntSh2-part.c] Error: Elongated injection direction distr. is currently only implemented for injection in 2D. Aborting.\n");
+  exit(1);
+  #endif
+  Real phi = draw_random_dirDistr(injection_m[sh],injection_A[sh],injection_phi0[sh]);
+  (*v1) = (*vel) * cos(phi);
+  (*v2) = (*vel) * sin(phi);
+  (*v3) = 0.0;
 }
 
 void Userwork_after_loop(MeshS *pM)
@@ -983,12 +1089,18 @@ void Userwork_after_loop(MeshS *pM)
   /*if (injection_time_type == 1) {
     free(injection_time);
   }
-  if (injection_mom_type == 1) {
+  if (injection_en_type == 1) {
     free(injection_vel);
-  } else if (injection_mom_type == 2) {
+  } else if (injection_en_type == 2) {
     free(injection_gamma);
     free(injection_gamma_sigma);
-  }*/
+  }
+  if (injection_dir_type == 2 {
+    free(injection_A);
+    free(injection_m);
+    free(injection_phi0);
+  }
+  */
 }
 
 void inflow_boundary (GridS *pGrid) {
