@@ -322,12 +322,8 @@ class Particles:
             uninjected = 0
 
         # find ids:
-        part_idx = int(0.5*(self.npart-nan_count-uninjected+n))
-        idxs = np.argpartition(self.Ekin[idx,:],kth=[-part_idx-nan_count,part_idx-nan_count])[(-part_idx-nan_count):(part_idx+1-nan_count)]
-
-        # discard uninjected if requested
-        if only_injected:
-            idxs = idxs[self.injected[idx, idxs] > 0]
+        part_idx = uninjected + int(0.5*(self.npart-nan_count-uninjected-n))
+        idxs = np.argpartition(self.Ekin[idx,:],kth=[part_idx,part_idx+n])[(part_idx):min(part_idx+n+1, len(self.Ekin[idx,:])-nan_count)]
 
         return self.uniq_id[idx, idxs]
             
@@ -412,7 +408,7 @@ class Particles:
             ax.set_ylim(1.1*np.nanmin(data_to_plot), 1.1*np.nanmax(data_to_plot))
         ax.set_xlabel('Time')
 
-    def plot_Ekin_distribution (self, ax, cax=None, bins=None, log=False, cmap='rainbow', i=None, navg=None, history=False, data_to_plot=None, only_injected=True):
+    def plot_Ekin_distribution (self, ax, cax=None, bins=None, log=False, cmap='rainbow', i=None, navg=None, history=False, data_to_plot=None, only_injected=True, pdf=True):
 
         # generate Ekin if needed
         if data_to_plot == None:
@@ -428,14 +424,14 @@ class Particles:
 
             if i == None: # plot time-averaged energy distribution
                 data_to_plot = np.nanmean(data_to_plot, axis=0)
-                ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
+                ax.hist(data_to_plot, bins, density=pdf, histtype='step', log=log, stacked=False)
 
             elif navg == None: # plot a single frame
-                ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
+                ax.hist(data_to_plot, bins, density=pdf, histtype='step', log=log, stacked=False)
 
             else: # plot an average from the frames [i-navg, i]
                 data_to_plot = np.mean(data_to_plot[(i-navg):(i+1),:], axis=0)
-                ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False)
+                ax.hist(data_to_plot, bins, density=pdf, histtype='step', log=log, stacked=False)
 
         else: # plot history of energy distr. color-coded with time
             data_x = np.array(self.times)
@@ -445,7 +441,7 @@ class Particles:
             no_plots = int(len(data_x)/navg)+1
             for idx_t in tqdm(range(no_plots)):
                 data_to_plot = np.nanmean(data_y[:,(navg*idx_t):min(len(data_x),navg*(idx_t+1))], axis=1)
-                ax.hist(data_to_plot, bins, density=True, histtype='step', log=log, stacked=False, color=c(idx_t/no_plots))
+                ax.hist(data_to_plot, bins, density=pdf, histtype='step', log=log, stacked=False, color=c(idx_t/no_plots))
             if cax != None: # add a color bar
                 from matplotlib.pyplot import colorbar
                 from matplotlib.cm import ScalarMappable
@@ -453,7 +449,10 @@ class Particles:
                 colorbar(ScalarMappable(Normalize(vmin=data_x[0], vmax=data_x[-1]), cmap=c), cax=cax)
                 cax.set_ylabel('Time [sim.u.]')
 
-        ax.set_ylabel('PDF')
+        if pdf:
+            ax.set_ylabel('PDF')
+        else:
+            ax.set_ylabel('Count')
         xlabel = 'Particle energy'
         if log:
             xlabel = 'Log ' + xlabel

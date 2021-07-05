@@ -55,6 +55,8 @@ static int injection_time_type = 0;
 // injection_time_type == 0 -- no particle injection, shock tracking only
 // injection_time_type == 1 -- all at once, shock by shock
 static Real* injection_time;
+// injection_time_type == 2 -- gaussian, shock by shock
+static Real* injection_time_sigma;
 
 // pointer to a wrapper function that will set particle injection velocity
 static void (*draw_particle_vel) (Real time, int sh, Real* v1, Real* v2, Real* v3);
@@ -91,10 +93,13 @@ static Real* injection_phi0;
 
 //----------------------------------------------------------------------------------
 
+static inline Real gaussianCDF (Real x, Real x0, Real sigma) {
+  return 0.5 * (1.0 + erf((x-x0)/(sigma*sqrt(2.0))));
+}
+
 // Inverse CDF of a gaussian distribution
 // Credits: Peter John Acklam (https://stackedboxes.org/2017/05/01/acklams-normal-quantile-function/)
 // Direct source: https://stackoverflow.com/questions/27830995/inverse-cumulative-distribution-function-in-c
-
 static double gaussianInverseCDF (double p) {
 
   double a1 = -39.69683028665376;
@@ -592,6 +597,15 @@ void problem(DomainS *pDomain)
       sprintf(buf, "injection_time_sh%i", sh+1);
       injection_time[sh] = par_getd("problem", buf);
     }
+  } else if (injection_time_type == 2) { // gaussian, shock by shock
+    injection_time = malloc(n_shocks * sizeof(Real));
+    injection_time_sigma = malloc(n_shocks * sizeof(Real));
+    for (sh = 0; sh < n_shocks; sh++) {
+      sprintf(buf, "injection_time_sh%i", sh+1);
+      injection_time[sh] = par_getd("problem", buf);
+      sprintf(buf, "injection_time_sigma_sh%i", sh+1);
+      injection_time_sigma[sh] = par_getd("problem", buf);
+    }
   }
 
   // Energy / direction distributions at injection
@@ -665,6 +679,9 @@ void problem_write_restart(MeshS *pM, FILE *fp)
   fwrite(&injection_time_type, sizeof(int),1,fp);
   if (injection_time_type == 1) { // all at once, shock by shock
     fwrite(injection_time, sizeof(Real),n_shocks,fp);
+  } else if (injection_time_type == 2) { // gaussian, shock by shock
+    fwrite(injection_time, sizeof(Real),n_shocks,fp);
+    fwrite(injection_time_sigma, sizeof(Real),n_shocks,fp);
   }
   fwrite(&injection_type, sizeof(int),1,fp);
   if (injection_type == 1) { // separable energy / direction distributions
@@ -691,7 +708,7 @@ void problem_read_restart(MeshS *pM, FILE *fp)
 {
   // read the global variables
 
-  char buffer[1024]; int buffer_length = 0;
+  char buffer[2048]; int buffer_length = 0;
   buffer_length += sprintf(buffer+buffer_length, "[Proc %i] Reading problem data from restart file:\n", myID_Comm_world);
 
   fread(name, sizeof(char),50,fp);
@@ -707,10 +724,19 @@ void problem_read_restart(MeshS *pM, FILE *fp)
   fread(&injection_time_type, sizeof(int),1,fp);
   buffer_length += sprintf(buffer+buffer_length, "  inj_time_type = %i\n", injection_time_type);
   if (injection_time_type == 1) { // all at once, shock by shock
-    injection_time = (Real*) malloc(n_shocks * sizeof(Real));
+    injection_time = malloc(n_shocks * sizeof(Real));
     fread(injection_time, sizeof(Real),n_shocks,fp);
     for (int sh = 0; sh < n_shocks; sh++) {
       buffer_length += sprintf(buffer+buffer_length, "    inj_time[%i] = %.2f\n", sh, injection_time[sh]);
+    }
+  } else if (injection_time_type == 2) { // gaussian, shock by shock
+    injection_time = malloc(n_shocks * sizeof(Real));
+    injection_time_sigma = malloc(n_shocks * sizeof(Real));
+    fread(injection_time, sizeof(Real),n_shocks,fp);
+    fread(injection_time_sigma, sizeof(Real),n_shocks,fp);
+    for (int sh = 0; sh < n_shocks; sh++) {
+      buffer_length += sprintf(buffer+buffer_length, "    inj_time[%i] = %.2f\n", sh, injection_time[sh]);
+      buffer_length += sprintf(buffer+buffer_length, "    inj_time_sigma[%i] = %.2f\n", sh, injection_time_sigma[sh]);
     }
   }
 
@@ -1016,6 +1042,40 @@ void Userwork_in_loop(MeshS *pM)
           }
         }
       }
+    } else if (injection_time_type == 2) { // gaussian
+      static Real injection_probability_in_tstep;
+      for (sh = 0; sh < n_shocks; sh++) {
+        for (p = 0; p < grid->nparticle; p++) {
+          if (grid->particle[p].shock_of_origin == sh
+              && grid->particle[p].injected == 0) {
+            // apply temporal injection distribution
+            injection_probability_in_tstep =
+                gaussianCDF(grid->time+grid->dt,
+                  injection_time[sh],injection_time_sigma[sh]);
+            if (grid->time > 0) {
+              injection_probability_in_tstep -= gaussianCDF(grid->time,
+                  injection_time[sh],injection_time_sigma[sh]);
+            }
+            if ( (rand()*1.0/RAND_MAX) > injection_probability_in_tstep) {
+              continue;
+            }
+            #ifdef MPI_PARALLEL
+            printf(" - [Proc %i] Injecting particle no (%i,%i) into shock %i.\n",
+                myID_Comm_world,
+                grid->particle[p].init_id, grid->particle[p].my_id, sh);
+            #else // MPI off
+            printf(" - Injecting particle no %i into shock %i.\n",
+                grid->particle[p].my_id, sh);
+            #endif
+            (*draw_particle_vel) (grid->time, sh,
+                &(grid->particle[p].v1),
+                &(grid->particle[p].v2),
+                &(grid->particle[p].v3));
+            // mark particle as injected
+            grid->particle[p].injected += 1;
+          }
+        }
+      }
     }
   } // ng loop
   #endif // PARTICLES
@@ -1088,6 +1148,9 @@ void Userwork_after_loop(MeshS *pM)
   //  -- unnecessary, and disrupts restart functionality
   /*if (injection_time_type == 1) {
     free(injection_time);
+  } else if (injection_time_type == 2 {
+    free(injection_time);
+    free(injection_time_sigma);
   }
   if (injection_en_type == 1) {
     free(injection_vel);

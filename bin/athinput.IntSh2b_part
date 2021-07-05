@@ -133,9 +133,13 @@ fpart_shock2 = 0.5 # fraction of particles initialized at shock 2
 # particle injection setup
 
 # time dependence of the injection process
-injection_time_type = 1    # 1: all at once, shock by shock
+injection_time_type = 2
+# 1: all at once, shock by shock
 injection_time_sh1 = 3.0
 injection_time_sh2 = 12.0
+# 2: gaussian, shock by shock
+injection_time_sigma_sh1 = 3.0
+injection_time_sigma_sh2 = 5.0
 
 # injected energy / direction distributions
 injection_type = 1 # 1: separable energy / direction distributions
