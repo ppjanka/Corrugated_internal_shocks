@@ -1024,14 +1024,14 @@ void Userwork_in_loop(MeshS *pM)
           for (p = 0; p < grid->nparticle; p++) {
             if (grid->particle[p].shock_of_origin == sh
                 && grid->particle[p].injected == 0) {
-              #ifdef MPI_PARALLEL
+              /*#ifdef MPI_PARALLEL
               printf(" - [Proc %i] Injecting particle no (%i,%i) into shock %i.\n",
                   myID_Comm_world,
                   grid->particle[p].init_id, grid->particle[p].my_id, sh);
               #else // MPI off
               printf(" - Injecting particle no %i into shock %i.\n",
                   grid->particle[p].my_id, sh);
-              #endif
+              #endif*/
               (*draw_particle_vel) (grid->time, sh,
                   &(grid->particle[p].v1),
                   &(grid->particle[p].v2),
@@ -1059,14 +1059,14 @@ void Userwork_in_loop(MeshS *pM)
             if ( (rand()*1.0/RAND_MAX) > injection_probability_in_tstep) {
               continue;
             }
-            #ifdef MPI_PARALLEL
+            /*#ifdef MPI_PARALLEL
             printf(" - [Proc %i] Injecting particle no (%i,%i) into shock %i.\n",
                 myID_Comm_world,
                 grid->particle[p].init_id, grid->particle[p].my_id, sh);
             #else // MPI off
             printf(" - Injecting particle no %i into shock %i.\n",
                 grid->particle[p].my_id, sh);
-            #endif
+            #endif*/
             (*draw_particle_vel) (grid->time, sh,
                 &(grid->particle[p].v1),
                 &(grid->particle[p].v2),

@@ -61,7 +61,7 @@ AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
 
 <particle>
 partypes        = 1         # number of types of particles
-parnumgrid      = 1024      # number of particles for each type
+parnumgrid      = 1048576   # number of particles for each type
 integrator      = 4         # particle integrator
                             #   (1: explicit; 2: semi-implicit; 3: fully-implicit;
                             #    4: Boris with Lorentz force and SR particles)
@@ -72,7 +72,7 @@ tstop           = 10.       # stopping time
 
 tshuf           = -1        # number of time steps to shuffle the particles
 
-alpha           = 0.        # charge-to-mass ratio, q/mc
+alpha           = 0.025     # charge-to-mass ratio, q/mc
                             #    see Mignone et al. (2018) eq. 18
 
 <problem>
