@@ -24,11 +24,12 @@ nproc=`ls -d $1/id* | wc -l`
 nsnap=`ls $1/id0/*.lis | wc -l`
 
 # find the filename properties
-prefix=`ls $1/id0/*.lis | head -n 1 | awk '{split($0,words,"/"); split(words[3], words2, "."); print(words2[1]);}'`
-suffix=`ls $1/id0/*.lis | head -n 1 | awk '{split($0,words,"/"); split(words[3], words2, "."); print(words2[3]);}'`
+prefix=`ls $1/id0/*.lis | head -n 1 | awk '{n=split($0,words,"/"); split(words[n], words2, "."); print(words2[1]);}'`
+suffix=`ls $1/id0/*.lis | head -n 1 | awk '{n=split($0,words,"/"); split(words[n], words2, "."); print(words2[3]);}'`
 
 # join using join_lis
-( cd $1 && ../../vis/particle/join_lis -p $nproc -o $prefix -i $prefix -s $suffix -d joined_lis -f 0:$(($nsnap-1)) )
+absolute_path_join_lis="$(pwd)/../vis/particle/join_lis"
+( cd $1 && $absolute_path_join_lis -p $nproc -o $prefix -i $prefix -s $suffix -d joined_lis -f 0:$(($nsnap-1)) )
 
 # clean up
 rm $1/id*/*.lis

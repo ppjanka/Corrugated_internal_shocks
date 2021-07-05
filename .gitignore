@@ -21,3 +21,4 @@ vis/particle/join_lis
 *temp*
 bin/test*
 *.mp4
+bin/unit_tests

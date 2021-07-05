@@ -1,0 +1,99 @@
+<comment>
+
+problem = Problem for testing the particle module.
+author  = P. Pjanka
+config  = --with-particles=passive --with-gas=mhd --with-eos=adiabatic --with-problem=test_particles --with-integrator=vl --with-order=2p --with-flux=hlld --enable-special-relativity --enable-mpi
+
+explanation = Unit test 8a: gyroradius = (v/c) gamma / (alpha * B) ~ 1.01
+
+<job>
+
+problem_id      = testPart  # problem ID: basename of output filenames
+maxout          = 3         # Output blocks number from 1 -> maxout
+num_domains     = 1         # number of Domains in Mesh
+
+<output1>
+out_fmt = lis               # particle list data dump (ONLY for particles)
+dt      = 0.01              # time step between output
+
+<output2>
+out_fmt = hst               # History data dump
+dt      = 0.01              # time increment between outputs
+
+<output3>
+out_fmt    = vtk            # Binary data dump
+out        = prim           # variables to be output
+id         = prim           # file id string
+dt         = 1.0            # time increment between outputs
+
+<time>
+
+cour_no         = 0.03        # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim            = 20000000   # cycle limit
+tlim            = 100.0      # time limit
+
+<domain1>
+level           = 0
+Nx1             = 8        # Number of zones in X-direction
+x1min           = -2.0      # minimum value of X
+x1max           = 2.0       # maximum value of X
+bc_ix1          = 4         # inner-I (X) boundary flag (1:refl,4:periodic)
+bc_ox1          = 4         # outer-I (X) boundary flag (1:refl,4:periodic)
+NGrid_x1        = 2
+
+Nx2             = 8         # Number of zones in X2-direction
+x2min           = -2.0      # minimum value of X2
+x2max           = 2.0       # maximum value of X2
+bc_ix2          = 4         # inner-J (Y) boundary flag (periodic)
+bc_ox2          = 4         # outer-J (Y) boundary flag (periodic)
+NGrid_x2        = 2
+
+Nx3             = 1         # Number of zones in X3-direction
+x3min           = -2.0      # minimum value of X3
+x3max           = 2.0       # maximum value of X3
+bc_ix3          = 4         # inner-K (Z) boundary flag (periodic)
+bc_ox3          = 4         # outer-K (Z) boundary flag (periodic)
+NGrid_x3        = 1
+
+<particle>
+
+partypes        = 1         # number of types of particles
+parnumgrid      = 10        # number of particles for each type
+integrator      = 4         # particle integrator
+                            #   (1: explicit; 2: semi-implicit; 3: fully-implicit;
+                            #    4: Boris with Lorentz force and SR particles)
+interp          = 2         # interpolation scheme (1: CIC; 2: TSC; 3: QP)
+tsmode          = 3         # stopping time calculation mode
+                            #   (1: General; 2: Epstein; 3: fixed);
+tstop           = 10.       # stopping time
+
+tshuf           = -1        # number of time steps to shuffle the particles
+
+alpha           = 0.1       # charge-to-mass ratio, q/mc
+                            #    see Mignone et al. (2018) eq. 18
+
+<problem>
+
+gamma           = 1.66666666
+iso_csound      = 0.1
+
+# fluid
+rho             = 1.0
+vel1            = 0.
+vel2            = 0.
+vel3            = 0.
+vel_sin         = 0        # 0: const. velocity, 1: sin variation of v1 with x1
+
+# particles
+part_vel1       = 0.
+part_vel2       = 0.1
+part_vel3       = 0.
+part_pos_type   = 0        # particle initial positions: 0: a line along x1, 1: random
+
+# magnetic field
+bfield1         = 0.
+bfield1_type    = 1        # 1: constant, 2: varying linearly with x2
+bfield2         = 0.
+bfield2_type    = 1        # 1: constant, 2: varying linearly with x3
+bfield3         = 1.0
+bfield3_type    = 1        # 1: constant, 2: varying linearly with x1

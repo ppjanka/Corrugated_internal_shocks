@@ -308,6 +308,7 @@ void problem(DomainS *pDomain)
       pGrid->particle[pgrid].v3 = part_vel3;
       pGrid->particle[pgrid].pos = 1; /* grid particle */
       pGrid->particle[pgrid].my_id = p;
+      pGrid->particle[pgrid].injected = 1;
       #ifdef MPI_PARALLEL
       pGrid->particle[pgrid].init_id = myID_Comm_world;
       #endif

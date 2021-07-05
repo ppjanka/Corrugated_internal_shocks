@@ -4,6 +4,8 @@ reference =
 configure = --enable-mpi --enable-special-relativity --with-problem=IntSh2-part --with-gas=mhd --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-flux=hlld --with-integrator=vl --with-particles=passive # --enable-ghost
 flags = export LIBS="-lgsl -lgslcblas -lm"
 
+explanation = Unit test 6: Bfield on, instantaneous time injection + gaussian velocity, sinusoidal directions (shock-perp + shock-parallel)
+
 <job>
 problem_id      = IntSh2-part # problem ID: basename of output filenames
 maxout          = 4           # Output blocks number from 1 -> maxout
@@ -61,7 +63,7 @@ AutoWithNProc   = 4     # set to Nproc for auto domain decomposition
 
 <particle>
 partypes        = 1         # number of types of particles
-parnumgrid      = 1024      # number of particles for each type
+parnumgrid      = 128       # number of particles for each type
 integrator      = 4         # particle integrator
                             #   (1: explicit; 2: semi-implicit; 3: fully-implicit;
                             #    4: Boris with Lorentz force and SR particles)
@@ -72,7 +74,7 @@ tstop           = 10.       # stopping time
 
 tshuf           = -1        # number of time steps to shuffle the particles
 
-alpha           = 0.        # charge-to-mass ratio, q/mc
+alpha           = 1.        # charge-to-mass ratio, q/mc
                             #    see Mignone et al. (2018) eq. 18
 
 <problem>
@@ -118,7 +120,7 @@ corr_cos1_Lz = 0. # modulation wavelength parallel to the flow
 corr_cos2_A = 0.
 corr_cos2_L = 3.0
 corr_cos2_Lz = 0.
-corr_cos3_A = 0.2
+corr_cos3_A = 0.
 corr_cos3_L = 1.5
 corr_cos3_Lz = 4.5
 
@@ -132,7 +134,7 @@ fpart_shock2 = 0.5 # fraction of particles initialized at shock 2
 # particle injection setup
 
 # time dependence of the injection process
-injection_time_type = 2
+injection_time_type = 1
 # 1: all at once, shock by shock
 injection_time_sh1 = 3.0
 injection_time_sh2 = 12.0
@@ -146,7 +148,7 @@ injection_type = 1 # 1: separable energy / direction distributions
 injection_en_type = 2
 # 1: single velocity per shock
 injection_vel_sh1 = 0.5
-injection_vel_sh2 = 0.6
+injection_vel_sh2 = 0.8
 # 2: gaussian energy
 injection_gamma_sh1 = 1.2
 injection_gamma_sigma_sh1 = 0.5
@@ -157,7 +159,7 @@ injection_dir_type = 2
 # 1: random direction
 # 2: elongated in m directions, PDF ~ 1+A*sin(m*(phi-phi0)+pi/2)
 injection_A_sh1 = 0.5
-injection_m_sh1 = 1
+injection_m_sh1 = 2
 injection_phi0_sh1 = 0
 injection_A_sh2 = 0.75
 injection_m_sh2 = 2
