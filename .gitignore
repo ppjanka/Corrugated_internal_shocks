@@ -19,6 +19,8 @@ src/problem.c
 *__pycache__
 vis/particle/join_lis
 *temp*
-bin/test*
+bin_testing/test*
+bin_testing/unit_tests
+bin_paper1/test*
 *.mp4
 bin/unit_tests
