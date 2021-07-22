@@ -69,6 +69,10 @@ void problem(DomainS *pDomain)
     x2_sh[i] = xcen_sh[i] + 0.5*width_sh[i];
     gamma_sh[i] = v2gamma(vel_sh[i]);
   }
+  // corrugation
+  Real corr_ampl = par_getd_def("problem", "corr_ampl", 0.0);
+  int corr_nx = par_geti_def("problem", "corr_nx", 2);
+  int corr_ny = par_geti_def("problem", "corr_ny", 2);
 
   // set the initial conditions
   Real rho, press, vel, gamma, sqr_gamma, enthalpy;
@@ -95,9 +99,18 @@ void problem(DomainS *pDomain)
           #ifdef MHD
           B = 0.0;
           #endif
-          vel = sigmoid(z*(2*M_PI/(x1_sh[1]-x2_sh[0])))
+          /*vel = sigmoid(z*(2*M_PI/(x1_sh[1]-x2_sh[0])))
                       * (vel_sh[1]-vel_sh[0]) + vel_sh[0];
-          gamma = v2gamma(vel);
+          gamma = v2gamma(vel);*/
+          vel = 0.0;
+          gamma = 1.0;
+          if (corr_ampl > 0.0) { // apply corrugation
+            rho += (corr_ampl - rho_amb)
+                * 0.5 * ( cos( 2.*M_PI *
+                     (corr_nx * (z-x2_sh[0]) / (x1_sh[1]-x2_sh[0])
+                    + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
+                 - M_PI) +1 );
+          }
         } else if (z <= x2_sh[1]) { // inside second shell
           rho = rho_sh[1]; press = press_sh[1]; vel = vel_sh[1]; gamma = gamma_sh[1];
           #ifdef MHD
