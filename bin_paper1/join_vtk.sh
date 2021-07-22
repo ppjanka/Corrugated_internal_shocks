@@ -14,8 +14,9 @@ if [ ! -f ../vis/vtk/join_vtk ]; then
 fi
 
 # join the vtk files
-rm -r $1/joined_vtk
-mkdir $1/joined_vtk
+if [ ! -d $1/joined_vtk ]; then
+    mkdir $1/joined_vtk
+fi
 nlevels=$(ls -d $1/id0/lev* | wc -l)
 for filepath in $1/id0/*.vtk
 do
