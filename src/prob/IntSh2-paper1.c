@@ -58,8 +58,9 @@ void problem(DomainS *pDomain)
   Real press_sh [2] =
           {par_getd("problem", "press_sh1"), par_getd("problem", "press_sh2")};
   #ifdef MHD
-  Real bfield_sh [2] =
-          {par_getd("problem", "bfield_sh1"), par_getd("problem", "bfield_sh2")};
+  Real sigmaB_sh [2] =
+          {par_getd("problem", "sigmaB_sh1"), par_getd("problem", "sigmaB_sh2")};
+  Real bfield_sh [2];
   Real B, sqr_b;
   #endif
   // auxiliary variables
@@ -68,6 +69,9 @@ void problem(DomainS *pDomain)
     x1_sh[i] = xcen_sh[i] - 0.5*width_sh[i];
     x2_sh[i] = xcen_sh[i] + 0.5*width_sh[i];
     gamma_sh[i] = v2gamma(vel_sh[i]);
+    #ifdef MHD
+    bfield_sh[i] = sqrt(2.*rho_sh[i]*sigmaB_sh[i]) * gamma_sh[i];
+    #endif
   }
   // corrugation
   Real corr_ampl = par_getd_def("problem", "corr_ampl", 0.0);
@@ -89,6 +93,14 @@ void problem(DomainS *pDomain)
           #ifdef MHD
           B = 0.0;
           #endif
+          if (press < 0) { // ensure pressure equilibrium
+            press = press_sh[0]
+              #ifdef MHD
+                + 0.5 * (SQR(bfield_sh[0]) - SQR(B)) / SQR(gamma);
+              #else
+                ;
+              #endif
+          }
         } else if (z <= x2_sh[0]) { // inside first shell
           rho = rho_sh[0]; press = press_sh[0]; vel = vel_sh[0]; gamma = gamma_sh[0];
           #ifdef MHD
@@ -104,6 +116,19 @@ void problem(DomainS *pDomain)
           gamma = v2gamma(vel);*/
           vel = 0.0;
           gamma = 1.0;
+          if (press < 0) { // ensure pressure equilibrium
+            press = sigmoid(z*(2*M_PI/(x1_sh[1]-x2_sh[0])))
+                          * (press_sh[1]-press_sh[0]) + press_sh[0]
+            #ifdef MHD
+              + 0.5 * (SQR(
+                            sigmoid(z*(2*M_PI/(x1_sh[1]-x2_sh[0])))
+                              * (bfield_sh[1]-bfield_sh[0]) + bfield_sh[0]
+                         )
+                  - SQR(B)) / SQR(gamma);
+            #else
+              ;
+            #endif
+          }
           if (corr_ampl > 0.0) { // apply corrugation
             rho += (corr_ampl - rho_amb)
                 * 0.5 * ( cos( 2.*M_PI *
@@ -121,16 +146,25 @@ void problem(DomainS *pDomain)
           #ifdef MHD
           B = 0.0;
           #endif
+          if (press < 0) { // ensure pressure equilibrium
+            press = press_sh[1]
+              #ifdef MHD
+                + 0.5 * (SQR(bfield_sh[0]) - SQR(B)) / SQR(gamma);
+              #else
+                ;
+              #endif
+          }
         }
 
         // Set the hydro parameters
         // NOTE: rho and Pg are in the fluid frame, Beckwith & Stone 2011
+        sqr_gamma = SQR(gamma);
         enthalpy = 1. + adiab_idx * press / ((adiab_idx-1.)*rho);
         pGrid->U[k][j][i].d = gamma*rho;
-        pGrid->U[k][j][i].M1 = gamma*gamma*rho*enthalpy*vel;
+        pGrid->U[k][j][i].M1 = sqr_gamma*rho*enthalpy*vel;
         pGrid->U[k][j][i].M2 = 0.;
         pGrid->U[k][j][i].M3 = 0.;
-        pGrid->U[k][j][i].E = gamma*gamma*rho*enthalpy - press;
+        pGrid->U[k][j][i].E = sqr_gamma*rho*enthalpy - press;
 
         #ifdef MHD
         // set bfield in the y-direction
@@ -142,7 +176,6 @@ void problem(DomainS *pDomain)
         }
 
         // make adjustments due to bfield
-        sqr_gamma = SQR(gamma);
         sqr_b = SQR(pGrid->U[k][j][i].B1c) +
                  SQR(pGrid->U[k][j][i].B2c) +
                  SQR(pGrid->U[k][j][i].B3c);
@@ -171,6 +204,7 @@ void problem(DomainS *pDomain)
   }
   #endif MHD
 
+  //exit(0);
 }
 
 /*==============================================================================
