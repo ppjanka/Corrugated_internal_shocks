@@ -1,8 +1,12 @@
 <comment>
 problem   = Jet internal shock model 2: Paper 1
 reference = 
+
 configure_hydro = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hllc --with-gas=hydro # --enable-ghost
+
 configure_mhd = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd # --enable-ghost
+
+configure_mhd_beskow = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --ccmd="CC" # --enable-ghost
 
 <job>
 problem_id      = IntSh2-p1   # problem ID: basename of output filenames
@@ -27,14 +31,14 @@ dt         = 10.0
 <time>
 cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
 nlim       = -1         # cycle limit
-tlim       = 100.0      # time limit
+tlim       = 20.0       # time limit
 
 <domain1>
 level = 0
 
 Nx1        = 512        # Number of zones in X1-direction (x)
-x1min      = -25.0      # minimum value of X1
-x1max      = 25.0       # maximum value of X1
+x1min      = -20.0      # minimum value of X1
+x1max      = 20.0       # maximum value of X1
 bc_ix1     = 2          # (outflow) inner-X1 boundary flag
 bc_ox1     = 2          # (outflow) outer-X1 boundary flag
 
@@ -54,27 +58,35 @@ AutoWithNProc   = 8     # set to Nproc for auto domain decomposition
 
 <problem>
 
+# units: time [s], length [lt-s], density [10^-15 g/cm^3]
+
 gamma   = 1.33333333333  # gamma = C_p/C_v
+# dfloor  = 1.0e-9
+# pfloor  = 1.0e-9
+
+press_set_mode = 1 # 0: set pressure directly, 1: set plasma beta
 
 # ambient medium
 rho_amb     = 1.0e-6
 press_amb   = 1.0e-6  # if negative, ensure pressure equillibrium
-bfield_amb  = 0.
+bfield_amb  = 0.0
 
 # shell1
 xcen_sh1    = -3.
 width_sh1   = 1.
 vel_sh1     = 0.1
-rho_sh1     = 1.
-press_sh1   = 1.0e-6
+rho_sh1     = 1.0e2
+# press_sh1   = 1.0e-6
+beta_sh1    = 1.0
 sigmaB_sh1  = 0.1
 
 # shell2
 xcen_sh2    = 3.
 width_sh2   = 1.
 vel_sh2     = -0.1
-rho_sh2     = 1.
-press_sh2   = 1.0e-6
+rho_sh2     = 1.0e2
+# press_sh2   = 1.0e-6
+beta_sh2    = 1.0
 sigmaB_sh2  = 0.1
 
 # corrugation

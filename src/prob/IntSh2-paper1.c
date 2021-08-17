@@ -59,8 +59,6 @@ void problem(DomainS *pDomain)
   Real gamma_sh [2];
   Real rho_sh [2] =
           {par_getd("problem", "rho_sh1"), par_getd("problem", "rho_sh2")};
-  Real press_sh [2] =
-          {par_getd("problem", "press_sh1"), par_getd("problem", "press_sh2")};
   #ifdef MHD
   Real sigmaB_sh [2] =
           {par_getd("problem", "sigmaB_sh1"), par_getd("problem", "sigmaB_sh2")};
@@ -76,6 +74,16 @@ void problem(DomainS *pDomain)
     #ifdef MHD
     bfield_sh[i] = sqrt(2.*rho_sh[i]*sigmaB_sh[i]) * gamma_sh[i];
     #endif
+  }
+  // shell pressure
+  Real press_sh [2];
+  int press_set_mode = par_geti("problem", "press_set_mode");
+  if (press_set_mode == 0) { // set pressure directly
+    press_sh[0] = par_getd("problem", "press_sh1");
+    press_sh[1] = par_getd("problem", "press_sh2");
+  } else if (press_set_mode == 1) { // set plasma beta (requires bfield to be set!)
+    press_sh[0] = par_getd("problem", "beta_sh1") * 0.5*SQR(bfield_sh[0]);
+    press_sh[1] = par_getd("problem", "beta_sh2") * 0.5*SQR(bfield_sh[1]);
   }
   // corrugation
   Real corr_ampl = par_getd_def("problem", "corr_ampl", 0.0);
