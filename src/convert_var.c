@@ -765,8 +765,8 @@ Prim1DS Cons1D_to_Prim1D(const Cons1DS *U, const Real *Bx)
 
     tmp1 = 1.0 / Q;
     tmp2 = 1.0 / (Q + Bsq);
-    Prim1D.d = MAX(rho,1.0e-4);
-    Prim1D.P = MAX(pgas,1.0e-5);
+    Prim1D.d = MAX(rho,dfloor);
+    Prim1D.P = MAX(pgas,pfloor);
     Prim1D.Vx = (U->Mx + S*(*Bx)*tmp1)*tmp2;
     Prim1D.Vy = (U->My + S*U->By*tmp1)*tmp2;
     Prim1D.Vz = (U->Mz + S*U->Bz*tmp1)*tmp2;
@@ -794,8 +794,8 @@ Prim1DS Cons1D_to_Prim1D(const Cons1DS *U, const Real *Bx)
     rho = d / sqrt(fabs(Gsq));
     pgas = Gamma_1*Chi/Gamma;
 
-    Prim1D.d = MAX(rho,1.0e-4);
-    Prim1D.P = MAX(pgas,1.0e-5);
+    Prim1D.d = MAX(rho,dfloor);
+    Prim1D.P = MAX(pgas,pfloor);
     Prim1D.By = U->By;
     Prim1D.Bz = U->Bz;
 
@@ -813,8 +813,8 @@ Prim1DS Cons1D_to_Prim1D(const Cons1DS *U, const Real *Bx)
     /* It worked!!! Should have a valid solution, so now set up primitives */
     tmp1 = 1.0 / Q;
     tmp2 = 1.0 / (Q + Bsq);
-    Prim1D.d = MAX(rho,1.0e-4);
-    Prim1D.P = MAX(pgas,1.0e-5);
+    Prim1D.d = MAX(rho,dfloor);
+    Prim1D.P = MAX(pgas,pfloor);
     Prim1D.Vx = (U->Mx + S*(*Bx)*tmp1)*tmp2;
     Prim1D.Vy = (U->My + S*U->By*tmp1)*tmp2;
     Prim1D.Vz = (U->Mz + S*U->Bz*tmp1)*tmp2;

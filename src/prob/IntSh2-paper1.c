@@ -38,6 +38,10 @@ void problem(DomainS *pDomain)
   int k, ks = pGrid->ks, ke = pGrid->ke;
   Real z,r,x3;
 
+  // read out or default the floors
+  dfloor = par_getd_def("problem", "dfloor", TINY_NUMBER);
+  pfloor = par_getd_def("problem", "pfloor", TINY_NUMBER);
+
   // read out the initial conditions
 	Real adiab_idx = par_getd("problem", "gamma");
   // ambient medium
