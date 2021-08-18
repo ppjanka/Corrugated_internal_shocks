@@ -89,6 +89,18 @@ void problem(DomainS *pDomain)
   Real corr_ampl = par_getd_def("problem", "corr_ampl", 0.0);
   int corr_nx = par_geti_def("problem", "corr_nx", 2);
   int corr_ny = par_geti_def("problem", "corr_ny", 2);
+  // ensure fair comparison between corrugated and non-corrugated cases
+  //  - decrease mass of the shells by the mass of corrugation ridges (which will be swept into the shell)
+  //  - increase shell speeds to conserve the total kinetic energy (given that corr. ridges are immobile)
+  Real ridge_mass = corr_ampl * (x1_sh[1] - x2_sh[0]);
+  Real Ekin;
+  #pragma omp simd
+  for (i=0; i<2; i++) {
+    Ekin = gamma_sh[i] * rho_sh[i];
+    rho_sh[i] -= 0.5 * ridge_mass / (x2_sh[i] - x1_sh[i]); // each shell gets half of the mass
+    gamma_sh[i] = Ekin / rho_sh[i];
+    vel_sh[i] = (vel_sh[i]/fabs(vel_sh[i])) * gamma2v(gamma_sh[i]);
+  }
 
   // set the initial conditions
   Real rho, press, vel, gamma, sqr_gamma, enthalpy;
