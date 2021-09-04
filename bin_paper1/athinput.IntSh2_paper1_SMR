@@ -1,0 +1,130 @@
+<comment>
+problem   = Jet internal shock model 2: Paper 1
+reference = 
+
+configure_hydro = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hllc --with-gas=hydro --enable-smr # --enable-ghost
+
+configure_mhd = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --enable-smr # --enable-ghost
+
+configure_mhd_beskow = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --ccmd="CC" --enable-smr # --enable-ghost
+
+<job>
+problem_id      = IntSh2-p1   # problem ID: basename of output filenames
+maxout          = 3           # Output blocks number from 1 -> maxout
+num_domains     = 4           # number of Domains in Mesh
+
+<output1>
+out_fmt    = hst      # History data dump
+dt         = 0.1      # time increment between outputs
+
+<output2>
+out_fmt    = vtk      # Binary data dump
+out        = prim     # variables to be output
+id         = prim     # file id string
+dt         = 0.1      # time increment between outputs
+
+<output3>
+out_fmt    = rst
+id         = rst
+dt         = 10.0
+
+<time>
+cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = -1         # cycle limit
+tlim       = 20.0       # time limit
+
+<domain1>
+level = 0
+
+Nx1        = 256        # Number of zones in X1-direction (x)
+x1min      = -20.0      # minimum value of X1
+x1max      = 20.0       # maximum value of X1
+bc_ix1     = 2          # (outflow) inner-X1 boundary flag
+bc_ox1     = 2          # (outflow) outer-X1 boundary flag
+
+Nx2        = 32         # Number of zones in X2-direction (y)
+x2min      = -3.        # minimum value of X2
+x2max      = 3.         # maximum value of X2
+bc_ix2     = 4          # (periodic) inner-X2 boundary flag
+bc_ox2     = 4          # (periodic) outer-X2 boundary flag
+
+Nx3        = 1          # Number of zones in X3-direction (z)
+x3min      = -0.01      # minimum value of X3
+x3max      = 0.01       # maximum value of X3
+bc_ix3     = 1          # (reflecting) inner-X3 boundary flag
+bc_ox3     = 1          # (reflecting) outer-X3 boundary flag
+
+AutoWithNProc   = 8     # set to Nproc for auto domain decomposition
+
+<domain2>
+level = 1
+Nx1        = 256        # Number of zones in X1-direction (x)
+Nx2        = 64         # Number of zones in X2-direction (y)
+Nx3        = 1          # Number of zones in X3-direction (z)
+iDisp      = 128
+jDisp      = 0
+kDisp      = 0
+AutoWithNProc   = 8     # set to Nproc for auto domain decomposition
+
+<domain3>
+level = 2
+Nx1        = 256        # Number of zones in X1-direction (x)
+Nx2        = 128        # Number of zones in X2-direction (y)
+Nx3        = 1          # Number of zones in X3-direction (z)
+iDisp      = 384
+jDisp      = 0
+kDisp      = 0
+AutoWithNProc   = 8     # set to Nproc for auto domain decomposition
+
+<domain4>
+level = 3
+Nx1        = 256        # Number of zones in X1-direction (x)
+Nx2        = 256        # Number of zones in X2-direction (y)
+Nx3        = 1          # Number of zones in X3-direction (z)
+iDisp      = 896
+jDisp      = 0
+kDisp      = 0
+AutoWithNProc   = 8     # set to Nproc for auto domain decomposition
+
+<problem>
+
+# units: time [s], length [lt-s], density [10^-15 g/cm^3]
+
+gamma   = 1.33333333333  # gamma = C_p/C_v
+# dfloor  = 1.0e-4
+# pfloor  = 1.0e-9
+
+press_set_mode = 1 # 0: set pressure directly, 1: set plasma beta
+
+# ambient medium
+rho_amb     = 1.0e-1
+press_amb   = 1.0e-2  # if negative, ensure pressure equillibrium
+bfield_amb  = 0.0
+
+# shell1
+xcen_sh1    = -3.
+width_sh1   = 1.
+vel_sh1     = 0.1
+rho_sh1     = 1.0e2
+# press_sh1   = 1.0e-6
+beta_sh1    = 1.0
+sigmaB_sh1  = 0.1
+
+# shell2
+xcen_sh2    = 3.
+width_sh2   = 1.
+vel_sh2     = -0.1
+rho_sh2     = 1.0e2
+# press_sh2   = 1.0e-6
+beta_sh2    = 1.0
+sigmaB_sh2  = 0.1
+
+# corrugation
+corr_switch = 0        # 0: off, 1: on
+corr_ampl   = 20.      # amplitude of the density perturbation between shells
+                       #  NOTE: - this is absolute, not relative amplitude
+                       #        - rho_amb elsewhere will be increased to 
+                       #          0.5*corr_ampl+rho_amb, to ensure fair comparison,
+                       #          done regardless of corr_switch value
+corr_nx     = 2        # no of wavelengths between shells along x1
+corr_ny     = 2        # no of wavelengths along x2
