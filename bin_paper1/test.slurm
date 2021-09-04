@@ -40,4 +40,4 @@ export FC=ftn
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
 
 # launch job
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1_SMR -d $RUNDIR/beskow_test1_SMR
+srun $RUNDIR/athena_SMR -i $RUNDIR/athinput.IntSh2_paper1_SMR -d $RUNDIR/beskow_test1_SMR
