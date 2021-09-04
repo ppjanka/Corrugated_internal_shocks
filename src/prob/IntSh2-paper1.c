@@ -86,13 +86,14 @@ void problem(DomainS *pDomain)
     press_sh[1] = par_getd("problem", "beta_sh2") * 0.5*SQR(bfield_sh[1]);
   }
   // corrugation
+  int corr_switch = par_geti_def("problem", "corr_switch", 0);
   Real corr_ampl = par_getd_def("problem", "corr_ampl", 0.0);
   int corr_nx = par_geti_def("problem", "corr_nx", 2);
   int corr_ny = par_geti_def("problem", "corr_ny", 2);
   // ensure fair comparison between corrugated and non-corrugated cases
   //  - decrease mass of the shells by the mass of corrugation ridges (which will be swept into the shell)
   //  - increase shell speeds to conserve the total kinetic energy (given that corr. ridges are immobile)
-  Real ridge_mass = corr_ampl * (x1_sh[1] - x2_sh[0]);
+  /*Real ridge_mass = corr_ampl * (x1_sh[1] - x2_sh[0]);
   Real Ekin;
   #pragma omp simd
   for (i=0; i<2; i++) {
@@ -100,7 +101,7 @@ void problem(DomainS *pDomain)
     rho_sh[i] -= 0.5 * ridge_mass / (x2_sh[i] - x1_sh[i]); // each shell gets half of the mass
     gamma_sh[i] = Ekin / rho_sh[i];
     vel_sh[i] = (vel_sh[i]/fabs(vel_sh[i])) * gamma2v(gamma_sh[i]);
-  }
+  }*/
 
   // set the initial conditions
   Real rho, press, vel, gamma, sqr_gamma, enthalpy;
@@ -113,7 +114,9 @@ void problem(DomainS *pDomain)
         cc_pos(pGrid,i,j,k,&z,&r,&x3);
 
         if (z < x1_sh[0]) { // left of first shell
-          rho = rho_amb; press = press_amb; vel = vel_sh[0]; gamma = gamma_sh[0];
+          rho = rho_amb + 0.5*corr_ampl; // adjustment by corr_ampl to ensure fair comparison
+          press = press_amb * (rho/rho_amb); // keep the ambient temperature the same
+          vel = vel_sh[0]; gamma = gamma_sh[0];
           #ifdef MHD
           B = 0.0;
           #endif
@@ -153,12 +156,15 @@ void problem(DomainS *pDomain)
               ;
             #endif
           }
-          if (corr_ampl > 0.0) { // apply corrugation
+          if (corr_switch > 0) { // apply corrugation
             rho += (corr_ampl - rho_amb)
                 * 0.5 * ( cos( 2.*M_PI *
                      (corr_nx * (z-x2_sh[0]) / (x1_sh[1]-x2_sh[0])
                     + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
                  - M_PI) +1 );
+          } else {
+            rho += 0.5*corr_ampl; // ensure fair comparison
+            press *= (rho/rho_amb); // keep the ambient temperature the same
           }
         } else if (z <= x2_sh[1]) { // inside second shell
           rho = rho_sh[1]; press = press_sh[1]; vel = vel_sh[1]; gamma = gamma_sh[1];
@@ -166,7 +172,9 @@ void problem(DomainS *pDomain)
           B = bfield_sh[1];
           #endif
         } else { // right of second shell
-          rho = rho_amb; press = press_amb; vel = vel_sh[1]; gamma = gamma_sh[1];
+          rho = rho_amb + 0.5*corr_ampl; // adjustment by corr_ampl to ensure fair comparison
+          press = press_amb * (rho/rho_amb); // keep the ambient temperature the same
+          vel = vel_sh[1]; gamma = gamma_sh[1];
           #ifdef MHD
           B = 0.0;
           #endif
