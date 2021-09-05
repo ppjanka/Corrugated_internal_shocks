@@ -16,7 +16,7 @@
 # Use only Haswell nodes
 #SBATCH -C Haswell
 #SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 128
+#SBATCH -n 32
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
