@@ -54,7 +54,7 @@ x3max      = 0.01       # maximum value of X3
 bc_ix3     = 1          # (reflecting) inner-X3 boundary flag
 bc_ox3     = 1          # (reflecting) outer-X3 boundary flag
 
-AutoWithNProc = 128     # set to Nproc for auto domain decomposition
+AutoWithNProc = 32     # set to Nproc for auto domain decomposition
 
 <domain2>
 level = 1
@@ -64,7 +64,7 @@ Nx3        = 1          # Number of zones in X3-direction (z)
 iDisp      = 128
 jDisp      = 0
 kDisp      = 0
-AutoWithNProc = 128     # set to Nproc for auto domain decomposition
+AutoWithNProc = 32     # set to Nproc for auto domain decomposition
 
 <domain3>
 level = 2
@@ -74,7 +74,7 @@ Nx3        = 1          # Number of zones in X3-direction (z)
 iDisp      = 384
 jDisp      = 0
 kDisp      = 0
-AutoWithNProc = 128     # set to Nproc for auto domain decomposition
+AutoWithNProc = 32     # set to Nproc for auto domain decomposition
 
 <domain4>
 level = 3
@@ -84,7 +84,7 @@ Nx3        = 1          # Number of zones in X3-direction (z)
 iDisp      = 896
 jDisp      = 0
 kDisp      = 0
-AutoWithNProc = 128     # set to Nproc for auto domain decomposition
+AutoWithNProc = 32     # set to Nproc for auto domain decomposition
 
 <problem>
 
