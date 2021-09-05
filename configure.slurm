@@ -49,4 +49,4 @@ export LIBS="-lgsl"
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2
 
 # launch job
-srun -n 1 $RUNDIR/configure
+srun -n 1 $RUNDIR/configure CC="/opt/cray/pe/craype/2.6.1/bin/cc" CFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" CPP="/opt/cray/pe/craype/2.6.1/bin/CC" CPPFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" LDFLAGS="-L/pdc/vol/gsl/2.3/GNU/8.3/lib" LIBS="-lgsl"
