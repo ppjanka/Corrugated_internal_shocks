@@ -1,4 +1,4 @@
-#!/bin/bash -l
+#!/bin/bash
 # The -l above is required to get the full environment with modules
 
 # Set the allocation to be charged for this job
