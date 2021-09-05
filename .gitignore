@@ -9,7 +9,7 @@ config.status
 config.h
 defs.h
 autom4te.cache
-athena
+athena*
 *Makedepend
 *Makefile
 src/config.h

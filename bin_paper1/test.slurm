@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IntSh2             # job name
-#SBATCH -t 24:00:00           # time requested
+#SBATCH -t 00:10:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
@@ -22,23 +22,49 @@
 #SBATCH --mail-type=end
 #SBATCH --mail-user=patryk.pjanka@su.se
 
-# set up environment -- Intel compiler + Cray MPI + Cray HDF5
-#  -> 232 cycles / 5min on 4 Haswell nodes on Beskow with hugepages64M
-module swap PrgEnv-cray PrgEnv-intel/6.0.7
-module load intel/18.0.0.128
-module load cray-mpich/7.7.14
-module load cray-hdf5-parallel/1.10.6.1
-module load craype-hugepages64M
+# set up environment
+ENV_CONFIG=1
+
+if [ $ENV_CONFIG -eq 1 ]
+then
+    # set up environment -- Intel compiler + Cray MPI + Cray HDF5
+    #  -> 232 cycles / 5min on 4 Haswell nodes on Beskow with hugepages64M
+    module swap PrgEnv-cray PrgEnv-intel/6.0.7
+    module load intel/18.0.0.128
+    module load cray-mpich/7.7.14
+    module load cray-hdf5-parallel/1.10.6.1
+    module load craype-hugepages64M
+elif [ $ENV_CONFIG -eq 2 ]
+then
+    # set up environment -- GCC compiler + Cray MPI + Cray HDF5
+    module swap PrgEnv-cray PrgEnv-gnu/6.0.7
+    module swap gcc gcc/10.2.0
+    module load cray-mpich/7.7.14
+    module load cray-hdf5-parallel/1.10.6.1
+    module load craype-hugepages64M
+else
+    echo Incorrect ENV_CONFIG value. Aborting.
+    exit
+fi
 module load gsl/2.3
 
 # use the Cray wrappers
-export CXX=CC
-export CC=cc
-export FC=ftn
+#export CXX=CC
+#export CC=cc
+#export FC=ftn
+
+# set up Athena 4.2 environment variables
+export CC="/opt/cray/pe/craype/2.6.1/bin/cc"
+export CFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include"
+export CPP="/opt/cray/pe/craype/2.6.1/bin/CC"
+export CPPFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include"
+export LDFLAGS="-L/pdc/vol/gsl/2.3/GNU/8.3/lib"
+export LIBS="-lgsl"
 
 # export OMP_NUM_THREADS=1
 
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
 
 # launch job
+cd $RUNDIR
 srun $RUNDIR/athena_SMR -i $RUNDIR/athinput.IntSh2_paper1_SMR -d $RUNDIR/beskow_test1_SMR
