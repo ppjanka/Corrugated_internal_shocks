@@ -30,4 +30,10 @@ do
         ../vis/vtk/join_vtk -o $1/joined_vtk/lev$level/$filename $1/id*/lev$level/*$fileno.vtk
     done
 done
+
+# remove the fragmented data
 rm $1/id*/*.vtk
+for level in $(seq 1 $nlevels)
+do
+    rm $1/id*/lev$level/*.vtk
+done
