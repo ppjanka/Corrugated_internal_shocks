@@ -11,7 +11,7 @@ configure_mhd_beskow = --enable-mpi --enable-special-relativity --with-problem=I
 <job>
 problem_id      = IntSh2-p1   # problem ID: basename of output filenames
 maxout          = 3           # Output blocks number from 1 -> maxout
-num_domains     = 4           # number of Domains in Mesh
+num_domains     = 5           # number of Domains in Mesh
 
 <output1>
 out_fmt    = hst      # History data dump
@@ -82,6 +82,16 @@ Nx1        = 256        # Number of zones in X1-direction (x)
 Nx2        = 256        # Number of zones in X2-direction (y)
 Nx3        = 1          # Number of zones in X3-direction (z)
 iDisp      = 896
+jDisp      = 0
+kDisp      = 0
+AutoWithNProc = 32     # set to Nproc for auto domain decomposition
+
+<domain5>
+level = 4
+Nx1        = 256        # Number of zones in X1-direction (x)
+Nx2        = 512        # Number of zones in X2-direction (y)
+Nx3        = 1          # Number of zones in X3-direction (z)
+iDisp      = 1920
 jDisp      = 0
 kDisp      = 0
 AutoWithNProc = 32     # set to Nproc for auto domain decomposition
