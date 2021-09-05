@@ -49,4 +49,4 @@ export LIBS="-lgsl"
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
 
 # launch job
-srun $RUNDIR/configure
+srun -n 1 $RUNDIR/configure
