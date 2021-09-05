@@ -46,7 +46,7 @@ export LIBS="-lgsl"
 
 # export OMP_NUM_THREADS=1
 
-RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
+RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2
 
 # launch job
 srun -n 1 $RUNDIR/configure
