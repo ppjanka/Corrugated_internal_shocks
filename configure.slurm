@@ -22,13 +22,30 @@
 #SBATCH --mail-type=end
 #SBATCH --mail-user=patryk.pjanka@su.se
 
-# set up environment -- Intel compiler + Cray MPI + Cray HDF5
-#  -> 232 cycles / 5min on 4 Haswell nodes on Beskow with hugepages64M
-module swap PrgEnv-cray PrgEnv-intel/6.0.7
-module load intel/18.0.0.128
-module load cray-mpich/7.7.14
-module load cray-hdf5-parallel/1.10.6.1
-module load craype-hugepages64M
+# set up environment
+ENV_CONFIG=2
+
+if [ $ENV_CONFIG -eq 1 ]
+then
+    # set up environment -- Intel compiler + Cray MPI + Cray HDF5
+    #  -> 232 cycles / 5min on 4 Haswell nodes on Beskow with hugepages64M
+    module swap PrgEnv-cray PrgEnv-intel/6.0.7
+    module load intel/18.0.0.128
+    module load cray-mpich/7.7.14
+    module load cray-hdf5-parallel/1.10.6.1
+    module load craype-hugepages64M
+elif [ $ENV_CONFIG -eq 2 ]
+then
+    # set up environment -- GCC compiler + Cray MPI + Cray HDF5
+    module swap PrgEnv-cray PrgEnv-gnu/6.0.7
+    module swap gcc gcc/10.2.0
+    module load cray-mpich/7.7.14
+    module load cray-hdf5-parallel/1.10.6.1
+    module load craype-hugepages64M
+else
+    echo Incorrect ENV_CONFIG value. Aborting.
+    exit
+fi
 module load gsl/2.3
 
 # use the Cray wrappers
