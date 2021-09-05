@@ -108,6 +108,13 @@ ifeq ($(MACHINE),macosx)
   OPT = -O3 
   FFTWLIB = -L/opt/local/lib -lfftw3
   FFTWINC = -I/opt/local/include
+else
+ifeq($(MACHINE),beskow)
+  CC = /opt/cray/pe/craype/2.6.1/bin/cc
+  LDR = /opt/cray/pe/craype/2.6.1/bin/cc
+  MPIINC = -I/pdc/vol/gsl/2.3/GNU/8.3/include
+  MPILIB = -L/pdc/vol/gsl/2.3/GNU/8.3/lib
+endif
 endif
 endif
 endif

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 # The -l above is required to get the full environment with modules
 
 # Set the allocation to be charged for this job
@@ -69,4 +69,4 @@ RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2
 cd $RUNDIR
 srun make clean
 srun -n 1 $RUNDIR/configure --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --enable-smr CC="/opt/cray/pe/craype/2.6.1/bin/cc" CFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" CPP="/opt/cray/pe/craype/2.6.1/bin/CC" CPPFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" LDFLAGS="-L/pdc/vol/gsl/2.3/GNU/8.3/lib" LIBS="-lgsl"
-srun -n 1 make -j all
+srun -n 1 make -j all MACHINE=beskow
