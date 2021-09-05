@@ -23,7 +23,7 @@
 #SBATCH --mail-user=patryk.pjanka@su.se
 
 # set up environment
-ENV_CONFIG=2
+ENV_CONFIG=1
 
 if [ $ENV_CONFIG -eq 1 ]
 then

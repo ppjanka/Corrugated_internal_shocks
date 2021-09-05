@@ -3694,7 +3694,7 @@ fi
 # check for various library functions
 
 
-if false; then
+if false; then # [P. Pjanka] This doesn't seem to work on newer compilers (2021), perhaps the -E option is deprecated?
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -3827,7 +3827,7 @@ as_fn_error $? "C preprocessor \"$CPP\" fails sanity check
 See \`config.log' for more details" "$LINENO" 5; }
 fi
 
-fi
+fi # [P. Pjanka] End switch.
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
