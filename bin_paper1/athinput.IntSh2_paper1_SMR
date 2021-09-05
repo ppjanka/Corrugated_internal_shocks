@@ -6,7 +6,7 @@ configure_hydro = --enable-mpi --enable-special-relativity --with-problem=IntSh2
 
 configure_mhd = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --enable-smr # --enable-ghost
 
-configure_mhd_beskow = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --ccmd="CC" --enable-smr # --enable-ghost
+configure_mhd_beskow = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --enable-smr # --enable-ghost
 
 <job>
 problem_id      = IntSh2-p1   # problem ID: basename of output filenames

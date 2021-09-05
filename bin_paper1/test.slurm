@@ -29,6 +29,7 @@ module load intel/18.0.0.128
 module load cray-mpich/7.7.14
 module load cray-hdf5-parallel/1.10.6.1
 module load craype-hugepages64M
+module load gsl/2.3
 
 # use the Cray wrappers
 export CXX=CC
