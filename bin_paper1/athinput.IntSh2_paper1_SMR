@@ -29,7 +29,7 @@ id         = rst
 dt         = 10.0
 
 <time>
-cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
+cour_no    = 0.01       # The Courant, Friedrichs, & Lewy (CFL) Number
 nlim       = -1         # cycle limit
 tlim       = 20.0       # time limit
 
