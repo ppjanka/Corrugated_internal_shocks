@@ -15,23 +15,23 @@ num_domains     = 5           # number of Domains in Mesh
 
 <output1>
 out_fmt    = hst      # History data dump
-dt         = 0.1      # time increment between outputs
+dt         = 0.0025      # time increment between outputs
 
 <output2>
 out_fmt    = vtk      # Binary data dump
 out        = prim     # variables to be output
 id         = prim     # file id string
-dt         = 0.1      # time increment between outputs
+dt         = 0.0025      # time increment between outputs
 
 <output3>
 out_fmt    = rst
 id         = rst
-dt         = 10.0
+dt         = 1.0
 
 <time>
-cour_no    = 0.01       # The Courant, Friedrichs, & Lewy (CFL) Number
+cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
 nlim       = -1         # cycle limit
-tlim       = 20.0       # time limit
+tlim       = 5.0 # 20.0       # time limit
 
 <domain1>
 level = 0
