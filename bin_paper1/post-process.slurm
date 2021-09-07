@@ -21,7 +21,8 @@ RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
 
 #datafolder=beskow_test1_SMR
 #datafolder=beskow_test2_noSMR_hitres
-datafolder=beskow_test2_noSMR
+#datafolder=beskow_test2_noSMR
+datafolder=beskow_test2_noSMR_cont
 
 # launch job
 cd $RUNDIR

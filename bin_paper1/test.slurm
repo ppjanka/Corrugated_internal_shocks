@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IntSh2             # job name
-#SBATCH -t 03:00:00           # time requested
+#SBATCH -t 09:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
@@ -70,4 +70,5 @@ cd $RUNDIR
 #srun $RUNDIR/athena_SMR -i $RUNDIR/athinput.IntSh2_paper1_SMR -d $RUNDIR/beskow_test1_SMR
 #srun $RUNDIR/athena_SMR -r $RUNDIR/beskow_test1_SMR/joined_rst/IntSh2-p1.0001.rst -i $RUNDIR/athinput.IntSh2_paper1_SMR output2/dt=0.01 output3/dt=1.0 time/tlim=10.0 -d $RUNDIR/beskow_test1_SMR_hitres
 
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 -d $RUNDIR/beskow_test2_noSMR
+#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 -d $RUNDIR/beskow_test2_noSMR
+srun $RUNDIR/athena -r $RUNDIR/beskow_test2_noSMR/joined_rst/IntSh2-p1.0002.rst -i $RUNDIR/athinput.IntSh2_paper1 -d $RUNDIR/beskow_test2_noSMR_cont
