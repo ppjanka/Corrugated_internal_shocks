@@ -19,7 +19,10 @@
 
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
 
+#datafolder=beskow_test1_SMR
+datafolder=beskow_test1_SMR_hitres
+
 # launch job
 cd $RUNDIR
-srun join_rst.sh beskow_test1_SMR
-srun join_vtk.sh beskow_test1_SMR
+srun join_rst.sh $datafolder
+srun join_vtk.sh $datafolder
