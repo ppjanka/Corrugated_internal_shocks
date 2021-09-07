@@ -67,7 +67,15 @@ RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2
 
 # launch job
 cd $RUNDIR
+
+# prepare the SMR version
+#srun make clean
+#srun -n 1 $RUNDIR/configure --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --enable-smr CC="/opt/cray/pe/craype/2.6.1/bin/cc" CFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" CPP="/opt/cray/pe/craype/2.6.1/bin/CC" CPPFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" LDFLAGS="-L/pdc/vol/gsl/2.3/GNU/8.3/lib" LIBS="-lgsl"
+#srun -n 1 make -j all MACHINE=beskow
+#mv $RUNDIR/bin/athena $RUNDIR/bin_paper1/athena_SMR
+
+# prepare the noSMR version
 srun make clean
-srun -n 1 $RUNDIR/configure --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --enable-smr CC="/opt/cray/pe/craype/2.6.1/bin/cc" CFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" CPP="/opt/cray/pe/craype/2.6.1/bin/CC" CPPFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" LDFLAGS="-L/pdc/vol/gsl/2.3/GNU/8.3/lib" LIBS="-lgsl"
+srun -n 1 $RUNDIR/configure --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd CC="/opt/cray/pe/craype/2.6.1/bin/cc" CFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" CPP="/opt/cray/pe/craype/2.6.1/bin/CC" CPPFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" LDFLAGS="-L/pdc/vol/gsl/2.3/GNU/8.3/lib" LIBS="-lgsl"
 srun -n 1 make -j all MACHINE=beskow
-mv $RUNDIR/bin/athena $RUNDIR/bin_paper1/athena_SMR
+mv $RUNDIR/bin/athena $RUNDIR/bin_paper1/

@@ -6,7 +6,7 @@ configure_hydro = --enable-mpi --enable-special-relativity --with-problem=IntSh2
 
 configure_mhd = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd # --enable-ghost
 
-configure_mhd_beskow = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --ccmd="CC" # --enable-ghost
+configure_mhd_beskow = --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd # --enable-ghost
 
 <job>
 problem_id      = IntSh2-p1   # problem ID: basename of output filenames
@@ -26,7 +26,7 @@ dt         = 0.1      # time increment between outputs
 <output3>
 out_fmt    = rst
 id         = rst
-dt         = 10.0
+dt         = 5.0
 
 <time>
 cour_no    = 0.025      # The Courant, Friedrichs, & Lewy (CFL) Number
@@ -36,13 +36,13 @@ tlim       = 20.0       # time limit
 <domain1>
 level = 0
 
-Nx1        = 512        # Number of zones in X1-direction (x)
+Nx1        = 4096       # Number of zones in X1-direction (x)
 x1min      = -20.0      # minimum value of X1
 x1max      = 20.0       # maximum value of X1
 bc_ix1     = 2          # (outflow) inner-X1 boundary flag
 bc_ox1     = 2          # (outflow) outer-X1 boundary flag
 
-Nx2        = 2 # 64         # Number of zones in X2-direction (y)
+Nx2        = 512        # Number of zones in X2-direction (y)
 x2min      = -3.        # minimum value of X2
 x2max      = 3.         # maximum value of X2
 bc_ix2     = 4          # (periodic) inner-X2 boundary flag
@@ -54,7 +54,7 @@ x3max      = 0.01       # maximum value of X3
 bc_ix3     = 1          # (reflecting) inner-X3 boundary flag
 bc_ox3     = 1          # (reflecting) outer-X3 boundary flag
 
-AutoWithNProc   = 8     # set to Nproc for auto domain decomposition
+AutoWithNProc   = 32    # set to Nproc for auto domain decomposition
 
 <problem>
 
@@ -72,8 +72,8 @@ press_amb   = 1.0e-2  # if negative, ensure pressure equillibrium
 bfield_amb  = 0.0
 
 # shell1
-xcen_sh1    = -5.
-width_sh1   = 5.
+xcen_sh1    = -3.
+width_sh1   = 1.
 vel_sh1     = 0.1
 rho_sh1     = 1.0e2
 # press_sh1   = 1.0e-6
@@ -81,8 +81,8 @@ beta_sh1    = 1.0
 sigmaB_sh1  = 0.1
 
 # shell2
-xcen_sh2    = 5.
-width_sh2   = 5.
+xcen_sh2    = 3.
+width_sh2   = 1.
 vel_sh2     = -0.1
 rho_sh2     = 1.0e2
 # press_sh2   = 1.0e-6
@@ -90,7 +90,7 @@ beta_sh2    = 1.0
 sigmaB_sh2  = 0.1
 
 # corrugation
-corr_switch = 0        # 0: off, 1: on
+corr_switch = 1        # 0: off, 1: on
 corr_ampl   = 20.      # amplitude of the density perturbation between shells
                        #  NOTE: - this is absolute, not relative amplitude
                        #        - rho_amb elsewhere will be increased to 
