@@ -36,13 +36,13 @@ tlim       = 20.0       # time limit
 <domain1>
 level = 0
 
-Nx1        = 4096       # Number of zones in X1-direction (x)
+Nx1        = 8192       # Number of zones in X1-direction (x)
 x1min      = -20.0      # minimum value of X1
 x1max      = 20.0       # maximum value of X1
 bc_ix1     = 2          # (outflow) inner-X1 boundary flag
 bc_ox1     = 2          # (outflow) outer-X1 boundary flag
 
-Nx2        = 512        # Number of zones in X2-direction (y)
+Nx2        = 1024       # Number of zones in X2-direction (y)
 x2min      = -3.        # minimum value of X2
 x2max      = 3.         # maximum value of X2
 bc_ix2     = 4          # (periodic) inner-X2 boundary flag
@@ -54,7 +54,7 @@ x3max      = 0.01       # maximum value of X3
 bc_ix3     = 1          # (reflecting) inner-X3 boundary flag
 bc_ox3     = 1          # (reflecting) outer-X3 boundary flag
 
-AutoWithNProc   = 32    # set to Nproc for auto domain decomposition
+AutoWithNProc   = 256   # set to Nproc for auto domain decomposition
 
 <problem>
 
@@ -91,7 +91,7 @@ sigmaB_sh2  = 0.1
 
 # corrugation
 corr_switch = 1        # 0: off, 1: on
-corr_ampl   = 20.      # amplitude of the density perturbation between shells
+corr_ampl   = 5.       # amplitude of the density perturbation between shells
                        #  NOTE: - this is absolute, not relative amplitude
                        #        - rho_amb elsewhere will be increased to 
                        #          0.5*corr_ampl+rho_amb, to ensure fair comparison,

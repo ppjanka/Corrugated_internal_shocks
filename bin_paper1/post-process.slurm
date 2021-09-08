@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2-PP             # job name
-#SBATCH -t 00:30:00           # time requested
+#SBATCH -t 01:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
@@ -22,7 +22,8 @@ RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
 #datafolder=beskow_test1_SMR
 #datafolder=beskow_test2_noSMR_hitres
 #datafolder=beskow_test2_noSMR
-datafolder=beskow_test2_noSMR_cont
+#datafolder=beskow_test2_noSMR_cont
+datafolder=beskow_test3_ampl5
 
 # launch job
 cd $RUNDIR

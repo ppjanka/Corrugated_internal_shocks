@@ -6,9 +6,9 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IntSh2             # job name
-#SBATCH -t 09:00:00           # time requested
+#SBATCH -t 12:00:00           # time requested
 
-#SBATCH --nodes=1             # number of nodes
+#SBATCH --nodes=8             # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
@@ -16,7 +16,7 @@
 # Use only Haswell nodes
 #SBATCH -C Haswell
 #SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 32
+#SBATCH -n 256
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -71,4 +71,6 @@ cd $RUNDIR
 #srun $RUNDIR/athena_SMR -r $RUNDIR/beskow_test1_SMR/joined_rst/IntSh2-p1.0001.rst -i $RUNDIR/athinput.IntSh2_paper1_SMR output2/dt=0.01 output3/dt=1.0 time/tlim=10.0 -d $RUNDIR/beskow_test1_SMR_hitres
 
 #srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 -d $RUNDIR/beskow_test2_noSMR
-srun $RUNDIR/athena -r $RUNDIR/beskow_test2_noSMR/joined_rst/IntSh2-p1.0002.rst -i $RUNDIR/athinput.IntSh2_paper1 -d $RUNDIR/beskow_test2_noSMR_cont
+#srun $RUNDIR/athena -r $RUNDIR/beskow_test2_noSMR/joined_rst/IntSh2-p1.0002.rst -i $RUNDIR/athinput.IntSh2_paper1 -d $RUNDIR/beskow_test2_noSMR_cont
+
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 -d $RUNDIR/beskow_test3_ampl5
