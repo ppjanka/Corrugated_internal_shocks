@@ -91,7 +91,7 @@ sigmaB_sh2  = 0.1
 
 # corrugation
 corr_switch = 1        # 0: off, 1: on
-corr_ampl   = 5.       # amplitude of the density perturbation between shells
+corr_ampl   = 1.       # amplitude of the density perturbation between shells
                        #  NOTE: - this is absolute, not relative amplitude
                        #        - rho_amb elsewhere will be increased to 
                        #          0.5*corr_ampl+rho_amb, to ensure fair comparison,
