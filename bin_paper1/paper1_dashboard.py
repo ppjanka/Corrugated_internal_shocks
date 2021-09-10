@@ -4,7 +4,7 @@
 # ------------------------
 # **COMMAND LINE PROCESSING**
 
-# In[5]:
+# In[9]:
 
 
 # check whether we're running in Jupyter or from a script file
@@ -29,6 +29,10 @@ if in_script:
                 -force_recalc <0/1> - force recalculation from .vtk files even if suitable pre-calculated .pkl files are present''')
         sys.exit()
     cmd_args = sys.argv[1:]
+    
+# cast anything to bool, including strings
+def boolean (x):
+    return bool(int(x))
     
 def get_arg (argname, n_read=1, default=None, val_type=str):
     try:
@@ -71,10 +75,10 @@ else:
 
 # MAIN EXECUTION PARAMETERS
 unit_check = False # turns off optimization but allows to use astropy to check the units
-opt_tf = get_arg('opt_tf', default=False, val_type=bool) # use tensorflow instead of numpy for GPU acceleration, x5 speedup
-opt_numba = get_arg('opt_numba', default=True, val_type=bool) # use numba to pre-compile some of the functions, about 3x speedup (turned off if opt_tf is on and GPU available)
-convert_vtk = get_arg('convert_vtk', default=True, val_type=bool) # saves vtk and processing data as pkl -- needed to use tensorflow, but also prevents from recalculating the same data
-force_recalc = get_arg('force_recalc', default=False, val_type=bool) # force recalculation of augmented data, even if present in the pkl files
+opt_tf = get_arg('opt_tf', default=False, val_type=boolean) # use tensorflow instead of numpy for GPU acceleration, x5 speedup
+opt_numba = get_arg('opt_numba', default=True, val_type=boolean) # use numba to pre-compile some of the functions, about 3x speedup (turned off if opt_tf is on and GPU available)
+convert_vtk = get_arg('convert_vtk', default=True, val_type=boolean) # saves vtk and processing data as pkl -- needed to use tensorflow, but also prevents from recalculating the same data
+force_recalc = get_arg('force_recalc', default=False, val_type=boolean) # force recalculation of augmented data, even if present in the pkl files
 
 nproc = get_arg('nproc', default=8, val_type=int)
 
