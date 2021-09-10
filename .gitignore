@@ -21,5 +21,7 @@ vis/particle/join_lis
 bin_testing/test*
 bin_testing/unit_tests
 bin_paper1/test*
+bin_paper1/beskow_test*
+bin_paper1/prod1_corr_ampl/results*
 *.mp4
 bin/unit_tests
