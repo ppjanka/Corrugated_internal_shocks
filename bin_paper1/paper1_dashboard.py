@@ -38,7 +38,6 @@ def get_arg (argname, n_read=1, default=None, val_type=str):
         else:
             return [val_type[i](cmd_args[idx+1+i]) for i in range(n_read)]
     except Exception as e:
-        print(e)
         if default != None:
             return default
         else:
@@ -60,7 +59,7 @@ if '-dashboard' in cmd_args:
     datapath = get_arg('dashboard')
 elif '-comparison' in cmd_args:
     processing_type = 'comparison'
-    datapaths_comp = list(get_arg('comparison', n_read=2), val_type=[str,str])
+    datapaths_comp = list(get_arg('comparison', n_read=2, val_type=[str,str]))
 else:
     if True:
         processing_type = 'dashboard'
