@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2-PP             # job name
-#SBATCH -t 00:10:00           # time requested
+#SBATCH -t 03:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
@@ -16,12 +16,25 @@
 
 # Use a light-GPU Tegner thin node
 #SBATCH --gres=gpu:K420:1
+nproc=24
 
+# module setup
+module load anaconda
+conda activate intsh2
+
+# environment vars
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
-
-datafolder=prod1_corr_ampl/results_corr0ampl1
+datafolder=prod1_corr_ampl
 
 # launch job
 cd $RUNDIR
-srun join_rst.sh $datafolder
-srun join_vtk.sh $datafolder
+
+# join the files from different processors
+for corr in 0 1
+do
+    srun join_rst.sh $datafolder/results_corr${corr}ampl1
+    srun join_vtk.sh $datafolder/results_corr${corr}ampl1
+done
+
+# process diagnostics
+python paper1_dashboard.py -comparison $datafolder/results_corr0ampl1 $datafolder/results_corr1ampl1 -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 0 -force_recalc 0
