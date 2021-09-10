@@ -18,9 +18,9 @@ if in_script:
     if len(sys.argv) == 1: # print usage instructions
         print('''Usage of paper1_dashboard:
             > to process a dashboard for a single file:
-                python paper1_dashboard -dashboard <datapath with joined_vtk folder>
+                python paper1_dashboard.py -dashboard <datapath with joined_vtk folder>
             > to process a comparison dashboard:
-                python paper1_dashboard -comparison <datapath with joined_vtk folder> <datapath with joined_vtk folder>
+                python paper1_dashboard.py -comparison <datapath with joined_vtk folder> <datapath with joined_vtk folder>
             > other options
                 -nproc - number of threads for parallel processing
                 -opt_tf <0/1> - turn off/on tensorflow parallelization
