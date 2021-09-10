@@ -61,9 +61,14 @@ def get_arg (argname, n_read=1, default=None, val_type=str):
 if '-dashboard' in cmd_args:
     processing_type = 'dashboard'
     datapath = get_arg('dashboard')
+    if datapath[-1] != '/':
+        datapath += '/'
 elif '-comparison' in cmd_args:
     processing_type = 'comparison'
     datapaths_comp = list(get_arg('comparison', n_read=2, val_type=[str,str]))
+    for i in range(2):
+        if datapaths_comp[i][-1] != '/':
+            datapaths_comp[i] += '/'
 else:
     if True:
         processing_type = 'dashboard'
