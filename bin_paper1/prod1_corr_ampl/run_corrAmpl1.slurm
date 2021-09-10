@@ -75,4 +75,4 @@ cd $RUNDIR
 #srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=1 -d $RUNDIR/results_corr1ampl1
 
 # non-corrugated, 1D
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=0 domain1/Nx2=1 domain1/AutoWithNProc=32 -d $RUNDIR/results_corr0ampl1
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=0 domain1/Nx2=1 domain1/bc_ix2=1 domain1/bc_ox2=1 domain1/AutoWithNProc=32 -d $RUNDIR/results_corr0ampl1
