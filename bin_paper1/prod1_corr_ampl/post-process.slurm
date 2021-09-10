@@ -21,6 +21,7 @@ nproc=24
 # module setup
 module load anaconda
 source activate intsh2
+module load ffmpeg
 
 # environment vars
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
@@ -38,4 +39,4 @@ do
 done
 
 # process diagnostics
-python paper1_dashboard.py -comparison $datafolder/results_corr0ampl${corr_ampl} $datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 0 -force_recalc 1
+python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl} $RUNDIR/$datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 0 -force_recalc 1
