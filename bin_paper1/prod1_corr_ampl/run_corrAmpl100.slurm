@@ -23,7 +23,7 @@
 #SBATCH --mail-user=patryk.pjanka@su.se
 
 # corrugation amplitude for this script
-CORR_AMPL=1.0
+CORR_AMPL=100.0
 
 # set up environment
 ENV_CONFIG=2
