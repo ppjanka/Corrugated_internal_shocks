@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2-PP             # job name
-#SBATCH -t 00:05:00           # time requested
+#SBATCH -t 03:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
