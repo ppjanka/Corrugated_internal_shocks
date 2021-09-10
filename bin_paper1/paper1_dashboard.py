@@ -29,6 +29,7 @@ if in_script:
                 -force_recalc <0/1> - force recalculation from .vtk files even if suitable pre-calculated .pkl files are present''')
         sys.exit()
     cmd_args = sys.argv[1:]
+    print(sys.argv)
     
 def get_arg (argname, n_read=1, default=None, val_type=str):
     try:
