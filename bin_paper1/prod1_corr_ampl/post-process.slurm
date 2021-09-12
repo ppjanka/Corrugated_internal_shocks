@@ -6,13 +6,13 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2-PP             # job name
-#SBATCH -t 03:00:00           # time requested
+#SBATCH -t 00:30:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
-#SBATCH --mail-type=begin
-#SBATCH --mail-type=end
-#SBATCH --mail-user=patryk.pjanka@su.se
+# SBATCH --mail-type=begin
+# SBATCH --mail-type=end
+# SBATCH --mail-user=patryk.pjanka@su.se
 
 # Use a light-GPU Tegner thin node
 #SBATCH --gres=gpu:K420:1
@@ -39,4 +39,4 @@ do
 done
 
 # process diagnostics
-python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl} $RUNDIR/$datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 0 -force_recalc 1
+srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl} $RUNDIR/$datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 0 -force_recalc 1
