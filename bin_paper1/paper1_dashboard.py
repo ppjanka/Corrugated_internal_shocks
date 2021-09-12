@@ -475,6 +475,8 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     
     ''' calculate auxiliary data '''
     
+    print('  - augmenting vtk data', flush=True)
+    
     xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
     yrange = (data_vtk['x2v'][1] - data_vtk['x2v'][0]) * len(data_vtk['x2v'])
     
@@ -485,6 +487,8 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     gam = vsqr2gamma(vel_tot_sqr)
     data_vtk['gamma'] = tf_deconvert(gam)
     del vel_tot_sqr
+    
+    print('  - SR done', flush=True)
 
     # total Bcc in observer frame
     data_vtk['Bcc_tot'] = tf_deconvert(norm_vec_l2(data_vtk['Bcc1'], data_vtk['Bcc2'], data_vtk['Bcc3']))
@@ -518,10 +522,14 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     data_vtk['Bcc_fluid_3'] = tf_deconvert(Bfl3)
     data_vtk['Bcc_fluid_tot'] = tf_deconvert(Bcc_fluid_tot)
     do_vertical_avg(data_vtk, 'Bcc_fluid_tot')
+    
+    print('  - Bfield done', flush=True)
 
     # plasma parameters
     data_vtk['plasma_beta'] = tf_deconvert(plasma_beta(data_vtk['press'], Bcc_fluid_tot_sqr))
     data_vtk['magnetization'] = tf_deconvert(magnetization(Bcc_fluid_tot_sqr, data_vtk['rho']))
+    
+    print('  - plasma pars done', flush=True)
     
     # internal energy in the fluid frame
     # see Beckwith & Stone (2011), https://github.com/PrincetonUniversity/athena/wiki/Special-Relativity
@@ -529,6 +537,8 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     data_vtk['enthalpy'] = tf_deconvert(enth)
     data_vtk['internal_energy'] = tf_deconvert(internal_energy(data_vtk['rho'], enth, gam, data_vtk['press'], Bcc_fluid_tot_sqr)) # warning!: includes rest mass
     do_vertical_avg(data_vtk, 'internal_energy')
+    
+    print('  - internal energy done', flush=True)
     
     del Bcc_fluid_tot_sqr, enth
     
@@ -556,10 +566,16 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
         tf_deconvert(nansum(flux_nu_per_dS(nu=nu_grid, B=B_grid, R=R_selection, filling_factor=filling_factor)*dS, axis=-1) / (xrange*yrange))
     ]
     
+    print('  - synchrotron done', flush=True)
+    
     # time derivatives
     if type(previous_data_vtk) is dict:
         for quantity in ['internal_energy','internal_energy_vsZ']:
             data_vtk['ddt_'+quantity] = (data_vtk[quantity]-previous_data_vtk[quantity]) / (data_vtk['Time']-previous_data_vtk['Time'])
+    
+    print('  - d/dt\'s done', flush=True)
+    
+    print('  - vtk data augmentation done.', flush=True)
     
     return data_vtk
 
@@ -569,7 +585,9 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
 
 def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs):
     '''read and augment the data'''
+    print(' - reading vtk file %s' % vtk_filename, flush=True)
     if os.path.isfile(vtk_filename + '.pkl'):
+        print(' - will use pkl file', flush=True)
         with open(vtk_filename + '.pkl', 'rb') as f:
             data_vtk, augment_kwargs_loaded = pkl.load(f)
         # recalculate augmentation if needed
@@ -579,10 +597,15 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
                 with open(vtk_filename + '.pkl','wb') as f:
                     pkl.dump((data_vtk, augment_kwargs), f)
     else:
+        print(' - reading directly from vtk', flush=True)
         data_vtk = augment_vtk_data(vtk(vtk_filename, out_dt=out_dt_vtk), previous_data_vtk=previous_data_vtk, **augment_kwargs)
+        print(' - data augmented', flush=True)
         if convert_vtk:
+            print(' - converting to pkl', flush=True)
             with open(vtk_filename + '.pkl','wb') as f:
                 pkl.dump((data_vtk, augment_kwargs), f)
+            print(' - conversion done.', flush=True)
+        print(' - read_vtk_file done.', flush=True)
     return data_vtk
 
 
