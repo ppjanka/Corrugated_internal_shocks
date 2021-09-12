@@ -595,23 +595,29 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
     quantities = ['times', 'internal_energy', 'flux_density']
     for quantity in quantities:
         history[quantity] = []
-    for vtk_filename in tqdm(vtk_filenames):
+    for vtk_filename in vtk_filenames:# tqdm(vtk_filenames):
         fileno = int(vtk_filename.split('/')[-1].split('.')[-2])
+        print(fileno, flush=True)
         # read and augment the data
         data_vtk = read_vtk_file(vtk_filename, previous_data_vtk, out_dt=out_dt, augment_kwargs=augment_kwargs)
+        print('data_vtk read.', flush=True)
         # calculate history variables
         xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
         history['times'].append(fileno*out_dt)
         dl = (data_vtk['x1v'][1] - data_vtk['x1v'][0])
         history['internal_energy'].append(np.sum(data_vtk['internal_energy_vsZ']*dl)/xrange)
         history['flux_density'].append(get_cgs_value(np.sum(data_vtk['flux_density_vsZ']*dl))/xrange)
+        print('history calculated.', flush=True)
         # move on
         del previous_data_vtk
         previous_data_vtk = data_vtk
+        print('cleanup done.', flush=True)
+    print('main loop done.', flush=True)
     for quantity in quantities:
         history[quantity] = np.array(history[quantity])
     history['ddt_internal_energy'] = (history['internal_energy'][1:] - history['internal_energy'][:-1]) / (history['times'][1:] - history['times'][:-1])
     history['ddt_internal_energy'] = np.insert(history['ddt_internal_energy'], 0, np.nan)
+    print('history calculated.', flush=True)
     return history
 
 
