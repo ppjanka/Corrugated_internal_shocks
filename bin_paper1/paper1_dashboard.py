@@ -321,7 +321,7 @@ def _flux_total_integrate (nu_grid,B_grid,R,dlognu_grid, filling_factor=1.0):
     integrand = nu_grid*Hz * get_cgs(flux_nu_per_dS(nu_grid,B_grid,R,filling_factor))
     return npsum(integrand*dlognu_grid, axis=-1)
 # Do NOT use numba for flux_total. It does not understand np.meshgrid, and alternative implementations cause the code to be extremely slow.
-def flux_total_per_dS (B,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=1024, filling_factor=1.0):
+def flux_total_per_dS (B,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
     '''Total observer-frame flux from dS within the IR-opt range: 300GHz - 3PHz.
     Unit: erg/(cm**2*sec)'''
     B,R, nu_min,nu_max = tf_convert(B,R, nu_min,nu_max)
