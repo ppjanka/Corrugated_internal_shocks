@@ -475,8 +475,6 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     
     ''' calculate auxiliary data '''
     
-    print('  - augmenting vtk data', flush=True)
-    
     xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
     yrange = (data_vtk['x2v'][1] - data_vtk['x2v'][0]) * len(data_vtk['x2v'])
     
@@ -487,8 +485,6 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     gam = vsqr2gamma(vel_tot_sqr)
     data_vtk['gamma'] = tf_deconvert(gam)
     del vel_tot_sqr
-    
-    print('  - SR done', flush=True)
 
     # total Bcc in observer frame
     data_vtk['Bcc_tot'] = tf_deconvert(norm_vec_l2(data_vtk['Bcc1'], data_vtk['Bcc2'], data_vtk['Bcc3']))
@@ -522,14 +518,10 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     data_vtk['Bcc_fluid_3'] = tf_deconvert(Bfl3)
     data_vtk['Bcc_fluid_tot'] = tf_deconvert(Bcc_fluid_tot)
     do_vertical_avg(data_vtk, 'Bcc_fluid_tot')
-    
-    print('  - Bfield done', flush=True)
 
     # plasma parameters
     data_vtk['plasma_beta'] = tf_deconvert(plasma_beta(data_vtk['press'], Bcc_fluid_tot_sqr))
     data_vtk['magnetization'] = tf_deconvert(magnetization(Bcc_fluid_tot_sqr, data_vtk['rho']))
-    
-    print('  - plasma pars done', flush=True)
     
     # internal energy in the fluid frame
     # see Beckwith & Stone (2011), https://github.com/PrincetonUniversity/athena/wiki/Special-Relativity
@@ -538,54 +530,36 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     data_vtk['internal_energy'] = tf_deconvert(internal_energy(data_vtk['rho'], enth, gam, data_vtk['press'], Bcc_fluid_tot_sqr)) # warning!: includes rest mass
     do_vertical_avg(data_vtk, 'internal_energy')
     
-    print('  - internal energy done', flush=True)
-    
     del Bcc_fluid_tot_sqr, enth
     
     # synchrotron emission diagnostics
     jnu = j_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
     data_vtk['j_nu'] = tf_deconvert(jnu)
-    print('    - j_nu done', flush=True)
     do_vertical_avg(data_vtk, 'j_nu')
-    print('    - j_nu avg', flush=True)
     alphanu = alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
     data_vtk['alpha_nu'] = tf_deconvert(alphanu)
-    print('    - alpha_nu done', flush=True)
     do_vertical_avg(data_vtk, 'alpha_nu')
-    print('    - alpha_nu avg', flush=True)
     janu = j_over_alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
     data_vtk['j_over_alpha_nu'] = tf_deconvert(janu)
-    print('    - j/alpha_nu done', flush=True)
     do_vertical_avg(data_vtk, 'j_over_alpha_nu')
-    print('    - j/alpha_nu avg', flush=True)
     flux_tot = flux_total_per_dS(B=Bcc_fluid_tot, R=R_selection, nu_min=nu_int_min, nu_max=nu_int_max)
     data_vtk['flux_density'] = tf_deconvert(flux_tot)
-    print('    - flux_total done', flush=True)
     do_vertical_avg(data_vtk, 'flux_density')
-    print('    - flux_total avg', flush=True)
     
     nu_min, nu_max = tf_convert(nu_min, nu_max)
     freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
     
     dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
     nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
-    print('    - spectrum prep done', flush=True)
     data_vtk['spectrum'] = [
         tf_deconvert(freqs),
         tf_deconvert(nansum(flux_nu_per_dS(nu=nu_grid, B=B_grid, R=R_selection, filling_factor=filling_factor)*dS, axis=-1) / (xrange*yrange))
     ]
-    print('    - spectrum done', flush=True)
-    
-    print('  - synchrotron done', flush=True)
     
     # time derivatives
     if type(previous_data_vtk) is dict:
         for quantity in ['internal_energy','internal_energy_vsZ']:
             data_vtk['ddt_'+quantity] = (data_vtk[quantity]-previous_data_vtk[quantity]) / (data_vtk['Time']-previous_data_vtk['Time'])
-    
-    print('  - d/dt\'s done', flush=True)
-    
-    print('  - vtk data augmentation done.', flush=True)
     
     return data_vtk
 
@@ -595,9 +569,7 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
 
 def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs):
     '''read and augment the data'''
-    print(' - reading vtk file %s' % vtk_filename, flush=True)
     if os.path.isfile(vtk_filename + '.pkl'):
-        print(' - will use pkl file', flush=True)
         with open(vtk_filename + '.pkl', 'rb') as f:
             data_vtk, augment_kwargs_loaded = pkl.load(f)
         # recalculate augmentation if needed
@@ -607,15 +579,10 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
                 with open(vtk_filename + '.pkl','wb') as f:
                     pkl.dump((data_vtk, augment_kwargs), f)
     else:
-        print(' - reading directly from vtk', flush=True)
         data_vtk = augment_vtk_data(vtk(vtk_filename, out_dt=out_dt_vtk), previous_data_vtk=previous_data_vtk, **augment_kwargs)
-        print(' - data augmented', flush=True)
         if convert_vtk:
-            print(' - converting to pkl', flush=True)
             with open(vtk_filename + '.pkl','wb') as f:
                 pkl.dump((data_vtk, augment_kwargs), f)
-            print(' - conversion done.', flush=True)
-        print(' - read_vtk_file done.', flush=True)
     return data_vtk
 
 
@@ -628,29 +595,23 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
     quantities = ['times', 'internal_energy', 'flux_density']
     for quantity in quantities:
         history[quantity] = []
-    for vtk_filename in vtk_filenames:# tqdm(vtk_filenames):
+    for vtk_filename in tqdm(vtk_filenames):
         fileno = int(vtk_filename.split('/')[-1].split('.')[-2])
-        print(fileno, flush=True)
         # read and augment the data
         data_vtk = read_vtk_file(vtk_filename, previous_data_vtk, out_dt=out_dt, augment_kwargs=augment_kwargs)
-        print('data_vtk read.', flush=True)
         # calculate history variables
         xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
         history['times'].append(fileno*out_dt)
         dl = (data_vtk['x1v'][1] - data_vtk['x1v'][0])
         history['internal_energy'].append(np.sum(data_vtk['internal_energy_vsZ']*dl)/xrange)
         history['flux_density'].append(get_cgs_value(np.sum(data_vtk['flux_density_vsZ']*dl))/xrange)
-        print('history calculated.', flush=True)
         # move on
         del previous_data_vtk
         previous_data_vtk = data_vtk
-        print('cleanup done.', flush=True)
-    print('main loop done.', flush=True)
     for quantity in quantities:
         history[quantity] = np.array(history[quantity])
     history['ddt_internal_energy'] = (history['internal_energy'][1:] - history['internal_energy'][:-1]) / (history['times'][1:] - history['times'][:-1])
     history['ddt_internal_energy'] = np.insert(history['ddt_internal_energy'], 0, np.nan)
-    print('history calculated.', flush=True)
     return history
 
 
