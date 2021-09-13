@@ -545,26 +545,36 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     # synchrotron emission diagnostics
     jnu = j_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
     data_vtk['j_nu'] = tf_deconvert(jnu)
+    print('    - j_nu done', flush=True)
     do_vertical_avg(data_vtk, 'j_nu')
+    print('    - j_nu avg', flush=True)
     alphanu = alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
     data_vtk['alpha_nu'] = tf_deconvert(alphanu)
+    print('    - alpha_nu done', flush=True)
     do_vertical_avg(data_vtk, 'alpha_nu')
+    print('    - alpha_nu avg', flush=True)
     janu = j_over_alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
     data_vtk['j_over_alpha_nu'] = tf_deconvert(janu)
+    print('    - j/alpha_nu done', flush=True)
     do_vertical_avg(data_vtk, 'j_over_alpha_nu')
+    print('    - j/alpha_nu avg', flush=True)
     flux_tot = flux_total_per_dS(B=Bcc_fluid_tot, R=R_selection, nu_min=nu_int_min, nu_max=nu_int_max)
     data_vtk['flux_density'] = tf_deconvert(flux_tot)
+    print('    - flux_total done', flush=True)
     do_vertical_avg(data_vtk, 'flux_density')
+    print('    - flux_total avg', flush=True)
     
     nu_min, nu_max = tf_convert(nu_min, nu_max)
     freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
     
     dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
     nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
+    print('    - spectrum prep done', flush=True)
     data_vtk['spectrum'] = [
         tf_deconvert(freqs),
         tf_deconvert(nansum(flux_nu_per_dS(nu=nu_grid, B=B_grid, R=R_selection, filling_factor=filling_factor)*dS, axis=-1) / (xrange*yrange))
     ]
+    print('    - spectrum done', flush=True)
     
     print('  - synchrotron done', flush=True)
     
