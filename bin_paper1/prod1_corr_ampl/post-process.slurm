@@ -10,9 +10,9 @@
 
 #SBATCH --nodes=1             # number of nodes
 
-# SBATCH --mail-type=begin
-# SBATCH --mail-type=end
-# SBATCH --mail-user=patryk.pjanka@su.se
+#SBATCH --mail-type=begin
+#SBATCH --mail-type=end
+#SBATCH --mail-user=patryk.pjanka@su.se
 
 # Use a light-GPU Tegner thin node
 #SBATCH --gres=gpu:K420:1
