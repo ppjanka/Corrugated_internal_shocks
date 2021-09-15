@@ -889,6 +889,7 @@ if processing_type == 'dashboard' and not in_script:
 
 
 if processing_type == 'dashboard':
+    print("DASHBOARD PROCESSING DONE.", flush=True)
     sys.exit()
 
 
@@ -899,6 +900,18 @@ if processing_type == 'dashboard':
 
 
 if processing_type == 'comparison':
+    
+    def diff_name(a,b):
+        """Returns a comparison-style name based on two strings"""
+        # first, read from the front
+        idxl = 0
+        while a[:idxl] == b[:idxl]:
+            idxl += 1
+        # then, read from the back
+        idxr = 1
+        while a[-idxr:] == b[-idxr:]:
+            idxr += 1
+        return a[:(idxl-1)] + '-' + a[(idxl-1):(-idxr+1)] + '-vs-' + b[(idxl-1):(-idxr+1)] + '-' + b[(-idxr+1):]
 
     # create lists of vtk files to be compared
     linestyles_comp = ['k-', 'b-']
@@ -920,7 +933,9 @@ if processing_type == 'comparison':
                 history_comp.append(pkl.load(f))
     force_recalc = False # recalc done
 
-    outpath = './temp_comparison/'
+    comp_name = diff_name(datapaths_comp[0], datapaths_comp[1])[:-1]
+    outpath = comp_name + '_temp_comparison/'
+    outfile = comp_name + '_comparison.mp4'
     if not os.path.exists(outpath):
         os.makedirs(outpath)
 
@@ -1107,11 +1122,12 @@ if processing_type == 'comparison':
     # render the movie
     try:
         print("Rendering the movie..", flush=True)
-        command = ("ffmpeg -threads %i -y -r 20 -f image2 -i \"%scomparison_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 comparison.mp4" % (nproc, outpath,))
+        command = ("ffmpeg -threads %i -y -r 20 -f image2 -i \"%scomparison_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 %s" % (nproc, outpath, outfile))
         print(command, flush=True)
         os.system(command)
     except Exception as e:
         print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, tempdir), flush=True)
+    print("COMPARISON PROCESSING DONE.", flush=True)
 
 
 # In[ ]:
