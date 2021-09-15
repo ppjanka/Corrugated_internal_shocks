@@ -1081,7 +1081,7 @@ if processing_type == 'comparison':
                 plt.ylabel('Avg. syn. flux / dS [${\\rm erg}/({\\rm cm}^2{\\rm s}) / {\\rm cm}^2$]')
 
                 # set up limits
-                ax_Fsyn.set_ylim(0.,1.5e-28)
+                #ax_Fsyn.set_ylim(0.,0.125e-28)
 
             # clean up
             del data_vtk
