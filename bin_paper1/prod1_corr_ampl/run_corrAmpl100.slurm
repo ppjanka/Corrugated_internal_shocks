@@ -6,9 +6,9 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2ca100           # job name
-#SBATCH -t 16:00:00           # time requested
+#SBATCH -t 02:00:00 # 16:00:00           # time requested
 
-#SBATCH --nodes=8             # number of nodes
+#SBATCH --nodes=4 # 8             # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
@@ -72,7 +72,7 @@ RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/prod1
 cd $RUNDIR
 
 # corrugated, 2D
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=1 -d $RUNDIR/results_corr1ampl$CORR_AMPL
+#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=1 -d $RUNDIR/results_corr1ampl$CORR_AMPL
 
 # non-corrugated, 1D
 srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=0 domain1/Nx2=2 -d $RUNDIR/results_corr0ampl$CORR_AMPL
