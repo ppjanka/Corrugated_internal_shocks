@@ -6,9 +6,9 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2ca50            # job name
-#SBATCH -t 16:00:00           # time requested
+#SBATCH -t 2:00:00 # 16:00:00           # time requested
 
-#SBATCH --nodes=8             # number of nodes
+#SBATCH --nodes=4 # 8             # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
