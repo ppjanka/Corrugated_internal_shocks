@@ -164,8 +164,8 @@ void problem(DomainS *pDomain)
                  - M_PI) +1 );
           } else {
             rho += 0.5*corr_ampl; // ensure fair comparison
-            press *= (rho/rho_amb); // keep the ambient temperature the same
           }
+          press *= (rho/rho_amb); // keep the ambient temperature the same
         } else if (z <= x2_sh[1]) { // inside second shell
           rho = rho_sh[1]; press = press_sh[1]; vel = vel_sh[1]; gamma = gamma_sh[1];
           #ifdef MHD
