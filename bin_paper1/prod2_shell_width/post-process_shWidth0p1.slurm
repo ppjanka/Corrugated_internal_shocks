@@ -5,7 +5,7 @@
 # not required if you have set a default allocation
 #SBATCH -A 2020-3-30
 
-#SBATCH -J IS2-PP             # job name
+#SBATCH -J IS2-PP-sw0p1       # job name
 #SBATCH -t 06:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
@@ -23,10 +23,15 @@ module load anaconda
 source activate intsh2
 module load ffmpeg
 
+# shell width for this script
+SHELL_WIDTH_FRAC=0.1 # shell width as a fraction of the gap size (5 lt-s)
+SHELL_WIDTH_LABEL=`echo $SHELL_WIDTH_FRAC | sed -r 's/[.]+/p/g'`
+SHELL_WIDTH=`awk -v s=$SHELL_WIDTH_FRAC 'BEGIN {print s*5.0}'`
+XCEN=`awk -v s=$SHELL_WIDTH 'BEGIN {print 2.5 + 0.5*s}'`
+
 # environment vars
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1
-datafolder=prod1_corr_ampl
-corr_ampl=20
+datafolder=prod2_shell_width
 
 # launch job
 cd $RUNDIR
@@ -34,9 +39,9 @@ cd $RUNDIR
 # join the files from different processors
 for corr in 0 1
 do
-    srun join_rst.sh $datafolder/results_corr${corr}ampl${corr_ampl}
-    srun join_vtk.sh $datafolder/results_corr${corr}ampl${corr_ampl}
+    srun join_rst.sh $datafolder/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+    srun join_vtk.sh $datafolder/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 done
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl} $RUNDIR/$datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0
+srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0shWidth$SHELL_WIDTH_LABEL $RUNDIR/$datafolder/results_corr1shWidth$SHELL_WIDTH_LABEL -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0
