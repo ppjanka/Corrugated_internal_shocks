@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2-PP             # job name
-#SBATCH -t 06:00:00           # time requested
+#SBATCH -t 01:00:00 # 06:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
@@ -39,4 +39,4 @@ do
 done
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl} $RUNDIR/$datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0
+#srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl} $RUNDIR/$datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0
