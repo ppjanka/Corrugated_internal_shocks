@@ -4,13 +4,14 @@
 # ------------------------
 # **COMMAND LINE PROCESSING**
 
-# In[9]:
+# In[1]:
 
 
 # check whether we're running in Jupyter or from a script file
 cmd_args = []
 
 import sys
+import os
 import __main__
 in_script = hasattr(__main__, '__file__')
 if in_script:
@@ -52,7 +53,7 @@ def get_arg (argname, n_read=1, default=None, val_type=str):
 # ------------------------
 # **EXECUTION SETUP**
 
-# In[6]:
+# In[2]:
 
 
 # NOTE: Throughout this work, Bfield is defined such that U_B = B**2/2, unless stated otherwise
@@ -70,12 +71,12 @@ elif '-comparison' in cmd_args:
         if datapaths_comp[i][-1] != '/':
             datapaths_comp[i] += '/'
 else:
-    if True:
+    if False:
         processing_type = 'dashboard'
         datapath = '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test14a_wide/'
     else:
         processing_type = 'comparison'
-        datapaths_comp = [ '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test14a_wide/', '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test14b_wide_corr/'
+        datapaths_comp = [ '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/prod1_corr_ampl/results_corr0ampl20/', '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/prod1_corr_ampl/results_corr1ampl20/'
 ]
 
 # MAIN EXECUTION PARAMETERS
@@ -119,7 +120,7 @@ except ImportError:
         sys.exit()
 
 
-# In[ ]:
+# In[3]:
 
 
 # tensorflow optimization wrappers
@@ -167,7 +168,7 @@ else:
     nansum = np.nansum
 
 
-# In[ ]:
+# In[4]:
 
 
 # constants
@@ -221,14 +222,14 @@ simu_B_8piCorr = np.sqrt(8.*np.pi*simu_press) # sqrt( erg / cm^3 )
 # --------------------
 # **PHYSICS**
 
-# In[ ]:
+# In[5]:
 
 
 out_dt_vtk = 0.1
 adiab_idx = 1.33333333333
 
 
-# In[ ]:
+# In[6]:
 
 
 # sychrotron emission treatment
@@ -336,7 +337,7 @@ def flux_total_per_dS (B,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128
     return get_cgs(reshape(_flux_total_integrate(nu_grid,B_grid,R, dlognu_grid, filling_factor), Bshape))
 
 
-# In[ ]:
+# In[7]:
 
 
 if unit_check:
@@ -350,7 +351,7 @@ if unit_check:
           get_cgs(flux_total(np.array([12.,]),12.,0.5)) / get_cgs(erg/(cm**2*sec)))
 
 
-# In[ ]:
+# In[8]:
 
 
 # other frequently used functions, moved here to enable numba optimization
@@ -410,7 +411,7 @@ def internal_energy (rho, enthalpy, gamma, press, Bflsqr):
     return rho * enthalpy * gamma**2 - press + 0.5 * Bflsqr # warning!: includes rest mass
 
 
-# In[ ]:
+# In[9]:
 
 
 sim2phys = {
@@ -452,7 +453,7 @@ sim2phys = {
 }
 
 
-# In[ ]:
+# In[10]:
 
 
 def do_vertical_avg (data_vtk, quantity):
@@ -564,7 +565,7 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     return data_vtk
 
 
-# In[ ]:
+# In[11]:
 
 
 def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs):
@@ -583,10 +584,17 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
         if convert_vtk:
             with open(vtk_filename + '.pkl','wb') as f:
                 pkl.dump((data_vtk, augment_kwargs), f)
+            try: # if successful, remove the original vtk file
+                with open(vtk_filename + '.pkl','rb') as f:
+                    _ = pkl.load(f)
+                del _
+                os.remove(vtk_filename)
+            except Exception as e:
+                print(' - could not save a pkl from %s\n%s' % (vtk_filename, e))
     return data_vtk
 
 
-# In[ ]:
+# In[12]:
 
 
 def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs):
@@ -624,7 +632,9 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
 
 if processing_type == 'dashboard':
 
-    vtk_filenames = sorted(glob.glob(datapath + 'joined_vtk/*.vtk'))
+    vtk_filenames = sorted(list(set(
+        glob.glob(datapath + 'joined_vtk/*.vtk') + [x[:-4] for x in glob.glob(datapath + 'joined_vtk/*.vtk.pkl')]
+    )))
 
     outpath = './temp_dashboard/'
     if not os.path.exists(outpath):
@@ -874,6 +884,10 @@ if processing_type == 'dashboard':
         command = ("ffmpeg -threads %i -y -r 20 -f image2 -i \"%sdashboard_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 dashboard.mp4" % (nproc, outpath,))
         print(command, flush=True)
         os.system(command)
+        if os.path.isfile('dashboard.mp4'):
+            os.rmdir(outpath)
+        else:
+            raise
     except Exception as e:
         print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, tempdir), flush=True)
 
@@ -896,7 +910,7 @@ if processing_type == 'dashboard':
 # -----------
 # **Two-dataset comparison**
 
-# In[ ]:
+# In[13]:
 
 
 if processing_type == 'comparison':
@@ -920,7 +934,11 @@ if processing_type == 'comparison':
     history_outfile_comp = []
     history_comp = []
     for idx in range(2):
-        vtk_filenames_comp.append(sorted(glob.glob(datapaths_comp[idx] + 'joined_vtk/*.vtk')))
+        vtk_filenames_comp.append(
+            sorted(list(set(
+                glob.glob(datapaths_comp[idx] + 'joined_vtk/*.vtk') + [x[:-4] for x in glob.glob(datapaths_comp[idx] + 'joined_vtk/*.vtk.pkl')]
+            )))
+        )
         history_outfile_comp.append(datapaths_comp[idx] + 'history.pkl')
 
         # precalculate histories if needed
@@ -1081,8 +1099,8 @@ if processing_type == 'comparison':
                 plt.ylabel('Avg. syn. flux / dS [${\\rm erg}/({\\rm cm}^2{\\rm s}) / {\\rm cm}^2$]')
 
                 # set up limits
-                ax_Fsyn.set_ylim(0.,1.0e-29)
-                ax_Udot.set_ylim(0., None)
+                ax_Fsyn.set_ylim(0.,5.5e-30)
+                ax_Udot.set_ylim(5.0e4, None)
 
             # clean up
             del data_vtk
@@ -1100,7 +1118,7 @@ if processing_type == 'comparison':
         print(' - frame done.', flush=True)
 
 
-# In[ ]:
+# In[14]:
 
 
 if processing_type == 'comparison':
@@ -1116,7 +1134,7 @@ if processing_type == 'comparison':
         _ = pool.map(worker, list(range(nproc)))
 
 
-# In[ ]:
+# In[15]:
 
 
 if processing_type == 'comparison':
@@ -1126,12 +1144,16 @@ if processing_type == 'comparison':
         command = ("ffmpeg -threads %i -y -r 20 -f image2 -i \"%scomparison_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 %s" % (nproc, outpath, outfile))
         print(command, flush=True)
         os.system(command)
+        if os.path.isfile(outfile):
+            os.rmdir(outpath)
+        else:
+            raise
     except Exception as e:
         print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, tempdir), flush=True)
     print("COMPARISON PROCESSING DONE.", flush=True)
 
 
-# In[ ]:
+# In[16]:
 
 
 if processing_type == 'comparison' and not in_script:
