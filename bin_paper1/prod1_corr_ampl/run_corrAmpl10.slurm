@@ -6,9 +6,9 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2ca10            # job name
-#SBATCH -t 24:00:00 # 16:00:00           # time requested
+#SBATCH -t 06:00:00 # 16:00:00           # time requested
 
-#SBATCH --nodes=2 # 8             # number of nodes
+#SBATCH --nodes=8             # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
@@ -16,7 +16,7 @@
 # Use only Haswell nodes
 #SBATCH -C Haswell
 #SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 64 # 256
+#SBATCH -n 256
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
