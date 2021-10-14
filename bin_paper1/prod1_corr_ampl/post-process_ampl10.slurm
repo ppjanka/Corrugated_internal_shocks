@@ -34,7 +34,7 @@ cd $RUNDIR
 # join the files from different processors
 for corr in 0 1
 do
-    srun join_rst.sh $datafolder/results_corr${corr}ampl${corr_ampl}
+    #srun join_rst.sh $datafolder/results_corr${corr}ampl${corr_ampl}
     srun join_vtk.sh $datafolder/results_corr${corr}ampl${corr_ampl}
 done
 
