@@ -885,7 +885,7 @@ if processing_type == 'dashboard':
         print(command, flush=True)
         os.system(command)
         if os.path.isfile('dashboard.mp4'):
-            os.rmdir(outpath)
+            os.system('rm -r ' + outpath)
         else:
             raise
     except Exception as e:
@@ -1145,7 +1145,7 @@ if processing_type == 'comparison':
         print(command, flush=True)
         os.system(command)
         if os.path.isfile(outfile):
-            os.rmdir(outpath)
+            os.system('rm -r ' + outpath)
         else:
             raise
     except Exception as e:
