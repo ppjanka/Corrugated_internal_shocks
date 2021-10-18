@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2sw01            # job name
-#SBATCH -t 16:00:00           # time requested
+#SBATCH -t 01:00:00 # 16:00:00           # time requested
 
 #SBATCH --nodes=8             # number of nodes
 
@@ -75,22 +75,29 @@ RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/prod2
 cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
-corr=1
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
-# remove all restart files but the last one, tar the latter to save file no
-echo Cleaning up restart files..
-srun ../join_rst.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
-final_rst_no=`ls $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
-final_to_rm=`printf %04d $(($final_rst_no-1))`
-rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.{0000..${final_to_rm}}.rst`
-tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-echo  - restart files cleaning done.
+corr=1
+
+if false
+then
+
+    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+
+    # remove all restart files but the last one, tar the latter to save file no
+    echo Cleaning up restart files..
+    srun ../join_rst.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+    final_rst_no=`ls $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
+    final_to_rm=`printf %04d $(($final_rst_no-1))`
+    rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.{0000..${final_to_rm}}.rst`
+    tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+    rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+    echo  - restart files cleaning done.
+
+fi
 
 # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
 echo Cleaning up vtk files...
-srun ../join_vtk $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun ../join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 echo  - vtk files cleaning done.
 
 # non-corrugated, 1D --------------------------------------------------------------
@@ -109,5 +116,5 @@ echo  - restart files cleaning done.
 
 # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
 echo Cleaning up vtk files...
-srun ../join_vtk $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun ../join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 echo  - vtk files cleaning done.
