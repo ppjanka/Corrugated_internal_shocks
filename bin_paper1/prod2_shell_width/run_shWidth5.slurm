@@ -90,7 +90,7 @@ echo  - restart files cleaning done.
 
 # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
 echo Cleaning up vtk files...
-srun ../join_vtk $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun ../join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 echo  - vtk files cleaning done.
 
 # non-corrugated, 1D --------------------------------------------------------------
@@ -109,5 +109,5 @@ echo  - restart files cleaning done.
 
 # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
 echo Cleaning up vtk files...
-srun ../join_vtk $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun ../join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 echo  - vtk files cleaning done.
