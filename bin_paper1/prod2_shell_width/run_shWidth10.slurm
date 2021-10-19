@@ -8,7 +8,7 @@
 #SBATCH -J IS2sw10            # job name
 #SBATCH -t 16:00:00           # time requested
 
-#SBATCH --nodes=64            # number of nodes
+#SBATCH --nodes=32            # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
@@ -16,8 +16,8 @@
 # Use only Haswell nodes
 #SBATCH -C Haswell
 #SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 2048
-NPROC=2048
+#SBATCH -n 1024
+NPROC=1024
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -35,7 +35,7 @@ XCEN=`awk -v s=$SHELL_WIDTH 'BEGIN {print 2.5 + 0.5*s}'`
 BOX_SIZE=`awk -v s=$SHELL_WIDTH -v c=$XCEN 'BEGIN {print c+0.5*s+16.5}'`
 
 # ensure that resolution is comparable between runs and always a power of 2
-X1_RES=`awk -v bs=$BOX_SIZE 'BEGIN {print 1+int(log(bs*8192.0/20.0)/log(2.0))}'`
+X1_RES=`awk -v bs=$BOX_SIZE 'BEGIN {print 2.0^(1+int(log(bs*8192.0/20.0)/log(2.0)))}'`
 
 # set up environment
 ENV_CONFIG=2
