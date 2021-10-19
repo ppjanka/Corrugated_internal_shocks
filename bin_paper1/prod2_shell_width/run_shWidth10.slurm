@@ -6,9 +6,9 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2sw10            # job name
-#SBATCH -t 01:00:00 # 16:00:00           # time requested
+#SBATCH -t 16:00:00           # time requested
 
-#SBATCH --nodes=8             # number of nodes
+#SBATCH --nodes=64            # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
@@ -16,7 +16,8 @@
 # Use only Haswell nodes
 #SBATCH -C Haswell
 #SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 256
+#SBATCH -n 2048
+NPROC=2048
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -84,7 +85,7 @@ cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
 corr=1
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain/Nx1=$X1_RES problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Cleaning up restart files..
@@ -104,7 +105,7 @@ echo  - vtk files cleaning done.
 
 # non-corrugated, 1D --------------------------------------------------------------
 corr=0
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain/Nx1=$X1_RES problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} domain1/Nx2=2 -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} domain1/Nx2=2 -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Cleaning up restart files..
