@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2-PP-sw0p2       # job name
-#SBATCH -t 06:00:00           # time requested
+#SBATCH -t 01:00:00 # 06:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
@@ -37,7 +37,7 @@ datafolder=prod2_shell_width
 cd $RUNDIR
 
 # join the files from different processors
-if false # these are done in run*.slurm script, to limit the number of files stored
+if true # these are done in run*.slurm script, to limit the number of files stored
 then
     for corr in 0 1
     do
@@ -47,4 +47,4 @@ then
 fi
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0shWidth$SHELL_WIDTH_LABEL $RUNDIR/$datafolder/results_corr1shWidth$SHELL_WIDTH_LABEL -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0
+#srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0shWidth$SHELL_WIDTH_LABEL $RUNDIR/$datafolder/results_corr1shWidth$SHELL_WIDTH_LABEL -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0
