@@ -47,4 +47,4 @@ then
 fi
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0shWidth$SHELL_WIDTH_LABEL $RUNDIR/$datafolder/results_corr1shWidth$SHELL_WIDTH_LABEL -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 1
+srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0shWidth$SHELL_WIDTH_LABEL $RUNDIR/$datafolder/results_corr1shWidth$SHELL_WIDTH_LABEL -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0
