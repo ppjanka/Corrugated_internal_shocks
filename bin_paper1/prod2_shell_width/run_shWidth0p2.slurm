@@ -93,7 +93,10 @@ echo Cleaning up restart files..
 srun ../join_rst.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 final_rst_no=`ls $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
 final_to_rm=`printf %04d $(($final_rst_no-1))`
-rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.{0000..${final_to_rm}}.rst`
+for i in {0000..${final_to_rm}}
+do
+    rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*$i.rst`
+done
 tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
 rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
 echo  - restart files cleaning done.
@@ -113,7 +116,10 @@ echo Cleaning up restart files..
 srun ../join_rst.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 final_rst_no=`ls $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
 final_to_rm=`printf %04d $(($final_rst_no-1))`
-rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.{0000..${final_to_rm}}.rst`
+for i in {0000..${final_to_rm}}
+do
+    rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*$i.rst`
+done
 tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
 rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
 echo  - restart files cleaning done.
