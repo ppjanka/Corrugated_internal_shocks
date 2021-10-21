@@ -25,17 +25,19 @@ do
         fileno=$(echo $filename | awk '{split($0,words,"."); print words[2];}')
         echo $fileno
         ../vis/vtk/join_vtk -o $1/joined_vtk/$filename $1/id*/*$fileno.vtk
+        rm $1/id*/*$fileno.vtk
         for level in $(seq 1 $nlevels)
         do
             mkdir $1/joined_vtk/lev$level
             ../vis/vtk/join_vtk -o $1/joined_vtk/lev$level/$filename $1/id*/lev$level/*$fileno.vtk
+            rm $1/id*/lev$level/*$fileno.vtk
         done
     fi
 done
 
 # remove the fragmented data
-rm $1/id*/*.vtk
-for level in $(seq 1 $nlevels)
-do
-    rm $1/id*/lev$level/*.vtk
-done
+#rm $1/id*/*.vtk
+#for level in $(seq 1 $nlevels)
+#do
+#    rm $1/id*/lev$level/*.vtk
+#done
