@@ -6,9 +6,9 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2sw10            # job name
-#SBATCH -t 16:00:00           # time requested
+#SBATCH -t 24:00:00           # time requested
 
-#SBATCH --nodes=32            # number of nodes
+#SBATCH --nodes=64            # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
@@ -16,8 +16,8 @@
 # Use only Haswell nodes
 #SBATCH -C Haswell
 #SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 1024
-NPROC=1024
+#SBATCH -n 2048
+NPROC=2048
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -31,8 +31,11 @@ SHELL_WIDTH=`awk -v s=$SHELL_WIDTH_FRAC 'BEGIN {print s*5.0}'`
 # keep the distance between shells constant (at 5 lt-s)
 XCEN=`awk -v s=$SHELL_WIDTH 'BEGIN {print 2.5 + 0.5*s}'`
 
-# keep the distance between each shell and the simulation boundary constant (at 16.5 lt-s)
-BOX_SIZE=`awk -v s=$SHELL_WIDTH -v c=$XCEN 'BEGIN {print c+0.5*s+16.5}'`
+# keep the distance between each shell and the simulation boundary wide enough (16.5 lt-s or a single shell width, whichever larger)
+BOX_SIZE=`awk -v s=$SHELL_WIDTH -v c=$XCEN 'BEGIN {if (s < 16.5) {print c+0.5*s+16.5} else {print c+1.5*s}}'`
+
+# run for as long as it takes for light to cross the box, or 20, whichever longer
+TLIM=`awk -v b=$BOX_SIZE 'BEGIN {if (b < 21) {print 20.0} else {print b}}'`
 
 # ensure that resolution is comparable between runs and always a power of 2
 X1_RES=`awk -v bs=$BOX_SIZE 'BEGIN {print 2.0^(1+int(log(bs*8192.0/20.0)/log(2.0)))}'`
@@ -85,8 +88,7 @@ cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
 corr=1
-#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
-srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0004.rst -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Cleaning up restart files..
@@ -109,7 +111,7 @@ echo  - vtk files cleaning done.
 
 # non-corrugated, 1D --------------------------------------------------------------
 corr=0
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} domain1/Nx2=2 -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} domain1/Nx2=2 -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Cleaning up restart files..
