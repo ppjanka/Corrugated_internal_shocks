@@ -5,8 +5,8 @@
 # not required if you have set a default allocation
 #SBATCH -A 2020-3-30
 
-#SBATCH -J IS2sw0p5           # job name
-#SBATCH -t 16:00:00           # time requested
+#SBATCH -J IS2sw10            # job name
+#SBATCH -t 24:00:00           # time requested
 
 #SBATCH --nodes=16            # number of nodes
 
@@ -31,8 +31,11 @@ SHELL_WIDTH=`awk -v s=$SHELL_WIDTH_FRAC 'BEGIN {print s*5.0}'`
 # keep the distance between shells constant (at 5 lt-s)
 XCEN=`awk -v s=$SHELL_WIDTH 'BEGIN {print 2.5 + 0.5*s}'`
 
-# keep the distance between each shell and the simulation boundary constant (at 16.5 lt-s)
-BOX_SIZE=`awk -v s=$SHELL_WIDTH -v c=$XCEN 'BEGIN {print c+0.5*s+16.5}'`
+# keep the distance between each shell and the simulation boundary wide enough (16.5 lt-s or a single shell width, whichever larger)
+BOX_SIZE=`awk -v s=$SHELL_WIDTH -v c=$XCEN 'BEGIN {if (s < 16.5) {print c+0.5*s+16.5} else {print c+1.5*s}}'`
+
+# run for as long as it takes for light to cross the box, or 20, whichever longer
+TLIM=`awk -v b=$BOX_SIZE 'BEGIN {if (b < 21) {print 20.0} else {print b}}'`
 
 # ensure that resolution is comparable between runs and always a power of 2
 X1_RES=`awk -v bs=$BOX_SIZE 'BEGIN {print 2.0^(1+int(log(bs*8192.0/20.0)/log(2.0)))}'`
@@ -85,14 +88,17 @@ cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
 corr=1
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Cleaning up restart files..
 srun ../join_rst.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 final_rst_no=`ls $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
 final_to_rm=`printf %04d $(($final_rst_no-1))`
-rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.{0000..${final_to_rm}}.rst`
+for i in {0000..${final_to_rm}}
+do
+    rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*$i.rst`
+done
 tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
 rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
 echo  - restart files cleaning done.
@@ -105,14 +111,17 @@ echo  - vtk files cleaning done.
 
 # non-corrugated, 1D --------------------------------------------------------------
 corr=0
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} domain1/Nx2=2 -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} domain1/Nx2=2 -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Cleaning up restart files..
 srun ../join_rst.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 final_rst_no=`ls $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
 final_to_rm=`printf %04d $(($final_rst_no-1))`
-rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.{0000..${final_to_rm}}.rst`
+for i in {0000..${final_to_rm}}
+do
+    rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*$i.rst`
+done
 tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
 rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
 echo  - restart files cleaning done.
