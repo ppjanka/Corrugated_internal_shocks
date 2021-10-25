@@ -37,7 +37,7 @@ datafolder=prod2_shell_width
 cd $RUNDIR
 
 # join the files from different processors
-if true # these are done in run*.slurm script, to limit the number of files stored
+if false # these are done in run*.slurm script, to limit the number of files stored
 then
     for corr in 0 # 1 0
     do
