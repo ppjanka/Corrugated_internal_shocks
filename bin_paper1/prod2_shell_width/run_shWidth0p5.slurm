@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2sw0p5           # job name
-#SBATCH -t 24:00:00           # time requested
+#SBATCH -t 12:00:00           # time requested
 
 #SBATCH --nodes=16            # number of nodes
 
@@ -88,7 +88,8 @@ cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
 corr=1
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0004.rst -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Cleaning up restart files..
