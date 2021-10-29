@@ -37,9 +37,9 @@ datafolder=prod2_shell_width
 cd $RUNDIR
 
 # join the files from different processors
-if false # these are done in run*.slurm script, to limit the number of files stored
+if true # these are done in run*.slurm script, to limit the number of files stored
 then
-    for corr in 0 1
+    for corr in 1 # 0
     do
         srun join_rst.sh $datafolder/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
         srun join_vtk.sh $datafolder/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
@@ -47,4 +47,4 @@ then
 fi
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0shWidth$SHELL_WIDTH_LABEL $RUNDIR/$datafolder/results_corr1shWidth$SHELL_WIDTH_LABEL -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0
+#srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0shWidth$SHELL_WIDTH_LABEL $RUNDIR/$datafolder/results_corr1shWidth$SHELL_WIDTH_LABEL -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0
