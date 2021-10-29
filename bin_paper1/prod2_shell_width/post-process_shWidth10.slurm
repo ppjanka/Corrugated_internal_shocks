@@ -39,7 +39,7 @@ cd $RUNDIR
 # join the files from different processors
 if true # these are done in run*.slurm script, to limit the number of files stored
 then
-    for corr in 1 0
+    for corr in 1 # 0
     do
         srun join_rst.sh $datafolder/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
         srun join_vtk.sh $datafolder/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
