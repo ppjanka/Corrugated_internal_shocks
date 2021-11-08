@@ -6,9 +6,9 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2sw10            # job name
-#SBATCH -t 12:00:00           # time requested
+#SBATCH -t 24:00:00           # time requested
 
-#SBATCH --nodes=8 # 64            # number of nodes
+#SBATCH --nodes=64            # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
@@ -16,8 +16,8 @@
 # Use only Haswell nodes
 #SBATCH -C Haswell
 #SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 256 # 2048
-NPROC=256 # 2048
+#SBATCH -n 2048
+NPROC=2048
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -88,11 +88,12 @@ cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
 
-if false
+if true
 then
 
     corr=1
-    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+    #srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+    srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0005.rst -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
     # remove all restart files but the last one, tar the latter to save file no
     echo Cleaning up restart files..
@@ -103,40 +104,45 @@ then
     do
         rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*$i.rst`
     done
-    tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-    rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-    echo  - restart files cleaning done.
+    if false
+    then
+        tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+        rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+        echo  - restart files cleaning done.
 
-    # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
-    echo Cleaning up vtk files...
-    cd ..
-    srun join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
-    echo  - vtk files cleaning done.
+        # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
+        echo Cleaning up vtk files...
+        cd ..
+        srun join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+        echo  - vtk files cleaning done.
+    fi
 
 fi
 
 # non-corrugated, 1D --------------------------------------------------------------
-corr=0
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} domain1/Nx2=2 -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
-
 if false
 then
-    # remove all restart files but the last one, tar the latter to save file no
-    echo Cleaning up restart files..
-    srun ../join_rst.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
-    final_rst_no=`ls $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
-    final_to_rm=`printf %04d $(($final_rst_no-1))`
-    for i in {0000..${final_to_rm}}
-    do
-        rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*$i.rst`
-    done
-    tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-    rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-    echo  - restart files cleaning done.
 
-    # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
-    echo Cleaning up vtk files...
-    cd ..
-    srun join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
-    echo  - vtk files cleaning done.
+    corr=0
+    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} domain1/Nx2=2 -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+
+        # remove all restart files but the last one, tar the latter to save file no
+        echo Cleaning up restart files..
+        srun ../join_rst.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+        final_rst_no=`ls $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
+        final_to_rm=`printf %04d $(($final_rst_no-1))`
+        for i in {0000..${final_to_rm}}
+        do
+            rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*$i.rst`
+        done
+        tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+        rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+        echo  - restart files cleaning done.
+
+        # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
+        echo Cleaning up vtk files...
+        cd ..
+        srun join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+        echo  - vtk files cleaning done.
+
 fi
