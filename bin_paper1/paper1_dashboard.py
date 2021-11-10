@@ -606,7 +606,13 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
     for vtk_filename in tqdm(vtk_filenames):
         fileno = int(vtk_filename.split('/')[-1].split('.')[-2])
         # read and augment the data
-        data_vtk = read_vtk_file(vtk_filename, previous_data_vtk, out_dt=out_dt, augment_kwargs=augment_kwargs)
+        try:
+            data_vtk = read_vtk_file(vtk_filename, previous_data_vtk, out_dt=out_dt, augment_kwargs=augment_kwargs)
+        except Exception as e:
+            print('[precalc_history] Could not read vtk file %s, error occured:' % vtk_filename)
+            print(e)
+            print(' - the file will be ignored.')
+            continue
         # calculate history variables
         xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
         history['times'].append(fileno*out_dt)
