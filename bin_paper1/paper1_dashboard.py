@@ -1002,7 +1002,11 @@ if processing_type == 'comparison':
         data_vtk = []
         for idx in range(2):
             # load, process, and plot the vtk file (mhd quantities)
-            data_vtk = read_vtk_file(vtk_filenames_comp[idx][i_vtk], previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=augment_kwargs)
+            try:
+                data_vtk = read_vtk_file(vtk_filenames_comp[idx][i_vtk], previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=augment_kwargs)
+            except Exception as e:
+                print('Could not reat vtk file ', vtk_filenames_comp[idx][i_vtk], 'continuiung..')
+                continue
 
             # plot
 
