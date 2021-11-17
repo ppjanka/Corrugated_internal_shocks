@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # coding: utf-8
 
 # ------------------------
@@ -12,6 +12,9 @@ cmd_args = []
 
 import sys
 import os
+from copy import copy
+from shutil import rmtree # remove a directory recursively
+import tarfile
 import __main__
 in_script = hasattr(__main__, '__file__')
 if in_script:
@@ -27,6 +30,7 @@ if in_script:
                 -opt_tf <0/1> - turn off/on tensorflow parallelization
                 -opt_numba <0/1> - turn off/on numba optimization
                 -convert_vtk <0/1> - convert vtk files to .pkl
+                -tar_when_done <0/1> - if not already tarfiles, the datapath folders will be turned into *.tgz after the analysis is done
                 -force_recalc <0/1> - force recalculation from .vtk files even if suitable pre-calculated .pkl files are present''')
         sys.exit()
     cmd_args = sys.argv[1:]
@@ -73,15 +77,19 @@ elif '-comparison' in cmd_args:
 else:
     if False:
         processing_type = 'dashboard'
-        datapath = '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test14a_wide/'
+        datapath = '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test_tf.tgz'
     else:
         processing_type = 'comparison'
-        datapaths_comp = [ '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/prod1_corr_ampl/results_corr0ampl20/', '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/prod1_corr_ampl/results_corr1ampl20/'
+        datapaths_comp = [ '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test_tf.tgz', '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test_tf2.tgz'
 ]
+        for i in range(2):
+            if datapaths_comp[i][-4:] != '.tgz' and datapaths_comp[i][-1] != '/':
+                datapaths_comp[i] += '/'
 
 # MAIN EXECUTION PARAMETERS
 unit_check = False # turns off optimization but allows to use astropy to check the units
-opt_tf = get_arg('opt_tf', default=False, val_type=boolean) # use tensorflow instead of numpy for GPU acceleration, x5 speedup
+tar_when_done = get_arg('tar_when_done', default=True, val_type=boolean) # if not already a tarfile, datapath will be turned into .tgz at the end of analysis
+opt_tf = get_arg('opt_tf', default=True, val_type=boolean) # use tensorflow instead of numpy for GPU acceleration, x5 speedup
 opt_numba = get_arg('opt_numba', default=True, val_type=boolean) # use numba to pre-compile some of the functions, about 3x speedup (turned off if opt_tf is on and GPU available)
 convert_vtk = get_arg('convert_vtk', default=True, val_type=boolean) # saves vtk and processing data as pkl -- needed to use tensorflow, but also prevents from recalculating the same data
 force_recalc = get_arg('force_recalc', default=False, val_type=boolean) # force recalculation of augmented data, even if present in the pkl files
@@ -568,46 +576,71 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
 # In[11]:
 
 
-def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs):
+def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
     '''read and augment the data'''
-    if os.path.isfile(vtk_filename + '.pkl'):
-        with open(vtk_filename + '.pkl', 'rb') as f:
-            data_vtk, augment_kwargs_loaded = pkl.load(f)
+    # check if tarpath has been extracted
+    if tarpath != None and os.path.isdir('.'.join(tarpath.split('.')[:-1])):
+        print('[read_vtk_file(%s)] tarpath already extracted. Using the extracted version.' % tarpath)
+        vtk_filename = '.'.join(tarpath.split('.')[:-1]) + '/' + '/'.join(vtk_filename.split('/')[1:])
+        tarpath = None
+    if os.path.isfile(vtk_filename + '.pkl') or (tarpath != None and (vtk_filename+'.pkl' in [x.path for x in tarfile.open(tarpath).getmembers()])):
+        vtk_filename += '.pkl'
+    if '.pkl' in vtk_filename:
+        if tarpath == None:
+            with open(vtk_filename, 'rb') as f:
+                data_vtk, augment_kwargs_loaded = pkl.load(f)
+        else:
+            tar = tarfile.open(tarpath)
+            data_vtk = tar.extractfile(vtk_filename)
+            data_vtk, augment_kwargs_loaded = pkl.load(data_vtk)
+            tar.close()
         # recalculate augmentation if needed
         if force_recalc or augment_kwargs_loaded != augment_kwargs:
             data_vtk = augment_vtk_data(data_vtk, previous_data_vtk=previous_data_vtk, **augment_kwargs)
             if convert_vtk:
+                if tarpath == None:
+                    with open(vtk_filename,'wb') as f:
+                        pkl.dump((data_vtk, augment_kwargs), f)
+                else:
+                    print('[read_vtk_file(%s)]: cannot edit tar archives to save *.pkl files, please extract the archive first. Continuing without saving the *.pkl file.' % vtk_filename)
+    else:
+        if tarpath == None:
+            data_vtk = augment_vtk_data(vtk(vtk_filename, out_dt=out_dt_vtk), previous_data_vtk=previous_data_vtk, **augment_kwargs)
+        else:
+            tar = tarfile.open(tarpath, 'r')
+            data_vtk = tar.extractfile(vtk_filename).read()
+            data_vtk = augment_vtk_data(vtk(filename=vtk_filename, out_dt=1.0, input_string=data_vtk))
+            tar.close()
+        if convert_vtk:
+            if tarpath == None:
                 with open(vtk_filename + '.pkl','wb') as f:
                     pkl.dump((data_vtk, augment_kwargs), f)
-    else:
-        data_vtk = augment_vtk_data(vtk(vtk_filename, out_dt=out_dt_vtk), previous_data_vtk=previous_data_vtk, **augment_kwargs)
-        if convert_vtk:
-            with open(vtk_filename + '.pkl','wb') as f:
-                pkl.dump((data_vtk, augment_kwargs), f)
-            try: # if successful, remove the original vtk file
-                with open(vtk_filename + '.pkl','rb') as f:
-                    _ = pkl.load(f)
-                del _
-                os.remove(vtk_filename)
-            except Exception as e:
-                print(' - could not save a pkl from %s\n%s' % (vtk_filename, e))
+                try: # if successful, remove the original vtk file
+                    with open(vtk_filename + '.pkl','rb') as f:
+                        _ = pkl.load(f)
+                    del _
+                    os.remove(vtk_filename)
+                except Exception as e:
+                    print(' - could not save a pkl from %s\n%s' % (vtk_filename, e))
+            else:
+                print('[read_vtk_file(%s)]: cannot edit tar archives to save *.pkl files, please extract the archive first. Continuing without saving the *.pkl file.' % vtk_filename)
     return data_vtk
 
 
 # In[12]:
 
 
-def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs):
+def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
     previous_data_vtk = None
     history = {}
     quantities = ['times', 'internal_energy', 'flux_density']
     for quantity in quantities:
         history[quantity] = []
     for vtk_filename in tqdm(vtk_filenames):
-        fileno = int(vtk_filename.split('/')[-1].split('.')[-2])
+        fileno = int(vtk_filename.split('/')[-1].split('.')[1])
         # read and augment the data
         try:
-            data_vtk = read_vtk_file(vtk_filename, previous_data_vtk, out_dt=out_dt, augment_kwargs=augment_kwargs)
+            data_vtk = read_vtk_file(vtk_filename, previous_data_vtk, out_dt=out_dt, augment_kwargs=augment_kwargs, tarpath=tarpath)
         except Exception as e:
             print('[precalc_history] Could not read vtk file %s, error occured:' % vtk_filename)
             print(e)
@@ -632,15 +665,28 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
 # --------------
 # **Single-dataset dashboard**
 
-# In[ ]:
+# In[13]:
 
 
 
 if processing_type == 'dashboard':
+    
+    # check if we are reading from a folder or from a tarfile
+    if ('.tgz' in datapath) and os.path.isdir(datapath[:-4]):
+        print('Tarfile %s has already been extracted, using the extracted version.' % datapath)
+        datapath = datapath[:-4]+'/'
+    using_tarfile = ('.tgz' in datapath)
 
-    vtk_filenames = sorted(list(set(
-        glob.glob(datapath + 'joined_vtk/*.vtk') + [x[:-4] for x in glob.glob(datapath + 'joined_vtk/*.vtk.pkl')]
-    )))
+    if not using_tarfile:
+        vtk_filenames = sorted(list(set(
+            glob.glob(datapath + 'joined_vtk/*.vtk') + [x[:-4] for x in glob.glob(datapath + 'joined_vtk/*.vtk.pkl')]
+        )))
+    else:
+        tar = tarfile.open(datapath)
+        vtk_filenames = sorted(
+            [x.path for x in tar.getmembers() if (x.path[-4:] == '.vtk')] + [x.path[:-4] for x in tar.getmembers() if (x.path[-8:] == '.vtk.pkl')]
+        )
+        tar.close()
 
     outpath = './temp_dashboard/'
     if not os.path.exists(outpath):
@@ -652,7 +698,7 @@ if processing_type == 'dashboard':
     }
 
     # WARNING: add_snapshot_FIFO below is NOT embarassingly parallelizable, but does significantly save memory
-    def dashboard_frame (i_vtk, verbose=False, save=True, recalculate=False, previous_data_vtk=None, history=None, augment_kwargs=default_augment_kwargs):
+    def dashboard_frame (i_vtk, verbose=False, save=True, recalculate=False, previous_data_vtk=None, history=None, augment_kwargs=default_augment_kwargs, tarpath=None):
 
         import numpy as np
         import matplotlib.pyplot as plt
@@ -660,7 +706,7 @@ if processing_type == 'dashboard':
 
         from read_vtk import vtk
 
-        fileno = int(vtk_filenames[i_vtk].split('/')[-1].split('.')[-2])
+        fileno = int(vtk_filenames[i_vtk].split('/')[-1].split('.')[1])
         vtk_time = fileno * out_dt_vtk # presumably we can trust this..
 
         print('Processing vtk no %i, vtk_time = %.2e..' % (i_vtk, vtk_time), flush=True)
@@ -684,9 +730,9 @@ if processing_type == 'dashboard':
         # load, process, and plot the vtk file (mhd quantities)
 
         if previous_data_vtk == None and i_vtk > 0:
-            previous_data_vtk = read_vtk_file(vtk_filenames[i_vtk-1], previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=augment_kwargs)
+            previous_data_vtk = read_vtk_file(vtk_filenames[i_vtk-1], previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=augment_kwargs, tarpath=tarpath)
 
-        data_vtk = read_vtk_file(vtk_filenames[i_vtk], previous_data_vtk=previous_data_vtk, out_dt=out_dt_vtk, augment_kwargs=augment_kwargs)
+        data_vtk = read_vtk_file(vtk_filenames[i_vtk], previous_data_vtk=previous_data_vtk, out_dt=out_dt_vtk, augment_kwargs=augment_kwargs, tarpath=tarpath)
 
         # plot
 
@@ -849,25 +895,78 @@ if processing_type == 'dashboard':
         print(' - frame done.', flush=True)
 
 
-# In[ ]:
+# In[14]:
 
 
 if processing_type == 'dashboard':
-    history_outfile = datapath+'history.pkl'
-    if force_recalc or not os.path.exists(history_outfile):
-        history = precalc_history(vtk_filenames, out_dt=out_dt_vtk)
-        with open(history_outfile, 'wb') as f:
-            pkl.dump(history, f)
-        force_recalc = False # recalc done
+    if '.tgz' not in datapath:
+        history_outfile = datapath+'history.pkl'
+        if force_recalc or not os.path.exists(history_outfile):
+            history = precalc_history(vtk_filenames, out_dt=out_dt_vtk)
+            with open(history_outfile, 'wb') as f:
+                pkl.dump(history, f)
+            force_recalc = False # recalc done
+        else:
+            with open(history_outfile, 'rb') as f:
+                history = pkl.load(f)
     else:
-        with open(history_outfile, 'rb') as f:
-            history = pkl.load(f)
+        tar = tarfile.open(datapath)
+        extract = False
+        history_outfile = ''.join([x.path if ('history.pkl' in x.path) else '' for x in tar.getmembers()])
+        if history_outfile == '': # create the history file
+            
+            # is we need to save *.pkl files and we are using tarfile, it needs to be extracted to be edited
+            print('Extracting tarfile %s to add history.pkl.. ' % datapath, end='')
+            extract = True
+            tar.extractall(path = '/'.join(datapath.split('/')[:-1]))
+            datapath = datapath[:-4]+'/'
+            vtk_filenames = [datapath+'/'.join(x.split('/')[1:]) for x in vtk_filenames]
+            print('done.')
+        
+            # calculate the history
+            history = precalc_history(vtk_filenames, out_dt=out_dt_vtk)
+            # save the history
+            history_outfile = datapath+'history.pkl'
+            with open(history_outfile, 'wb') as f:
+                pkl.dump(history, f)
+            force_recalc = False # recalc done
+        else:
+            history = pkl.load(tar.extractfile(history_outfile))
+        tar.close()
+        
+        # remove the tarfile if extracted
+        if extract:
+            os.remove(datapath[:-1]+'.tgz')
+            datapath = datapath
 
 
-# In[ ]:
+# In[15]:
 
 
 if processing_type == 'dashboard':
+    # is we need to save *.pkl files and we are using tarfile, it needs to be extracted to be edited
+    extract = False
+    tarpath = None
+    if '.tgz' in datapath:
+        if os.path.isdir('.'.join(datapath.split('.')[:-1])): # already extracted
+            datapath = '.'.join(datapath.split('.')[:-1])
+            tarpath = None
+        elif convert_vtk: # check if we need to extract to convert vtk to pkl
+            contents = [(1 if x.path[:-4] == '.vtk' else 0) for x in tarfile.open(datapath).getmembers()]
+            extract = (np.sum(contents) > 0)
+            if extract:
+                print('Extracting tarfile %s.. ' % datapath, end='')
+                tar = tarfile.open(datapath)
+                tar.extractall(path = '.'.join(datapath.split['.'][:-1]))
+                datapath = datapath[:-4]+'/'
+                vtk_filenames = [datapath+'/'.join(x.split('/')[1:]) for x in vtk_filenames]
+                tar.close()
+                tarpath = None
+                print('done.')
+            else:
+                tarpath = datapath
+        else: # keep reading from the compressed tarfile
+            tarpath = datapath
     # now, parallelize the frame generation
     from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
     chunks = np.array_split(range(len(vtk_filenames)), nproc)
@@ -875,12 +974,24 @@ if processing_type == 'dashboard':
         indices = chunks[ichunk]
         data_vtk = None
         for i in indices:
-            data_vtk = dashboard_frame(i_vtk=i, recalculate=force_recalc, previous_data_vtk=data_vtk, history=history, augment_kwargs=default_augment_kwargs, verbose=False)
+            data_vtk = dashboard_frame(i_vtk=i, recalculate=force_recalc, previous_data_vtk=data_vtk, history=history, augment_kwargs=default_augment_kwargs, verbose=False, tarpath=tarpath)
     with ProcessPool(nproc) as pool:
         _ = pool.map(worker, list(range(nproc)))
+    # tar when done and clean up
+    if extract or (tar_when_done and '.tgz' not in datapath):
+            print('Archiving into tarfile %s.. ' % datapath, end='')
+            workdir = os.getcwd()
+            os.chdir('/'.join(datapath.split('/')[:-2]))
+            os.system('tar -cvzf %s %s' % (datapath.split('/')[-2] + '.tgz',datapath.split('/')[-2]))
+            if os.path.isfile(datapath[:-1] + '.tgz'):
+                rmtree(datapath)
+                datapath = datapath[:-1] + '.tgz'
+                tarpath = datapath
+            os.chdir(workdir)
+            print('done.')
 
 
-# In[ ]:
+# In[16]:
 
 
 if processing_type == 'dashboard':
@@ -898,14 +1009,14 @@ if processing_type == 'dashboard':
         print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, tempdir), flush=True)
 
 
-# In[ ]:
+# In[17]:
 
 
-if processing_type == 'dashboard' and not in_script:
-    dashboard_frame(80, save=False, recalculate=False, history=history)
+if False and processing_type == 'dashboard' and not in_script:
+    dashboard_frame(80, save=False, recalculate=False, history=history, tarpath=tarpath)
 
 
-# In[ ]:
+# In[18]:
 
 
 if processing_type == 'dashboard':
@@ -916,13 +1027,21 @@ if processing_type == 'dashboard':
 # -----------
 # **Two-dataset comparison**
 
-# In[13]:
+# In[19]:
 
 
 if processing_type == 'comparison':
     
     def diff_name(a,b):
         """Returns a comparison-style name based on two strings"""
+        # don't edit the original paths
+        a,b = copy(a), copy(b)
+        # strip the .tgz, if needed
+        if a[-4:] == '.tgz': a = a[:-4]
+        if b[-4:] == '.tgz': b = b[:-4]
+        # strip the trailing /
+        if a[-1] == '/': a = a[:-1]
+        if b[-1] == '/': b = b[:-1]
         # first, read from the front
         idxl = 0
         while a[:idxl] == b[:idxl]:
@@ -931,7 +1050,8 @@ if processing_type == 'comparison':
         idxr = 1
         while a[-idxr:] == b[-idxr:]:
             idxr += 1
-        return a[:(idxl-1)] + '-' + a[(idxl-1):(-idxr+1)] + '-vs-' + b[(idxl-1):(-idxr+1)] + '-' + b[(-idxr+1):]
+        na, nb = len(a), len(b)
+        return a[:(idxl-1)] + '-' + a[(idxl-1):(na-idxr+1)] + '-vs-' + b[(idxl-1):(nb-idxr+1)] + '-' + b[(nb-idxr+1):]
 
     # create lists of vtk files to be compared
     linestyles_comp = ['k-', 'b-']
@@ -940,21 +1060,59 @@ if processing_type == 'comparison':
     history_outfile_comp = []
     history_comp = []
     for idx in range(2):
-        vtk_filenames_comp.append(
-            sorted(list(set(
-                glob.glob(datapaths_comp[idx] + 'joined_vtk/*.vtk') + [x[:-4] for x in glob.glob(datapaths_comp[idx] + 'joined_vtk/*.vtk.pkl')]
-            )))
-        )
-        history_outfile_comp.append(datapaths_comp[idx] + 'history.pkl')
+        if datapaths_comp[idx][-4:] == '.tgz':
+            vtk_filenames_comp.append(sorted(
+                [x.path for x in tarfile.open(datapaths_comp[idx]).getmembers() if x.path[-4:] == '.vtk'] + [x.path[:-4] for x in tarfile.open(datapaths_comp[idx]).getmembers() if x.path[-8:] == '.vtk.pkl']
+            ))
+            history_outfile_comp.append(
+                ''.join([(x.path if 'history.pkl' in x.path else '') for x in tarfile.open(datapaths_comp[idx]).getmembers()])
+            )
+        else:
+            vtk_filenames_comp.append(
+                sorted(list(set(
+                    glob.glob(datapaths_comp[idx] + 'joined_vtk/*.vtk') + [x[:-4] for x in glob.glob(datapaths_comp[idx] + 'joined_vtk/*.vtk.pkl')]
+                )))
+            )
+            history_outfile_comp.append(datapaths_comp[idx] + 'history.pkl')
 
         # precalculate histories if needed
-        if force_recalc or not os.path.exists(history_outfile_comp[idx]):
-            history_comp.append(precalc_history(vtk_filenames_comp[idx], out_dt=out_dt_vtk))
-            with open(history_outfile_comp[idx], 'wb') as f:
-                pkl.dump(history_comp[idx], f)
+        # uncompressed datapath
+        if datapaths_comp[idx][-4:] != '.tgz':
+            if force_recalc or not os.path.exists(history_outfile_comp[idx]):
+                history_comp.append(precalc_history(vtk_filenames_comp[idx], out_dt=out_dt_vtk))
+                with open(history_outfile_comp[idx], 'wb') as f:
+                    pkl.dump(history_comp[idx], f)
+            else:
+                with open(history_outfile_comp[idx], 'rb') as f:
+                    history_comp.append(pkl.load(f))
+        # tar'red datapath
         else:
-            with open(history_outfile_comp[idx], 'rb') as f:
-                history_comp.append(pkl.load(f))
+            extract = False
+            tar = tarfile.open(datapaths_comp[idx])
+            if force_recalc or history_outfile_comp[idx] not in [x.path for x in tar.getmembers()]:
+                # is we need to save *.pkl files and we are using tarfile, it needs to be extracted to be edited
+                print('Extracting tarfile %s to add history.pkl.. ' % datapaths_comp[idx], end='')
+                extract = True
+                tar.extractall(path = '/'.join(datapaths_comp[idx].split('/')[:-1]))
+                datapaths_comp[idx] = datapaths_comp[idx][:-4]+'/'
+                vtk_filenames_comp[idx] = [datapaths_comp[idx]+'/'.join(x.split('/')[1:]) for x in vtk_filenames_comp[idx]]
+                print('done.')
+
+                # calculate the history
+                history_comp.append(precalc_history(vtk_filenames_comp[idx], out_dt=out_dt_vtk))
+                # save the history
+                history_outfile = datapaths_comp[idx]+'history.pkl'
+                with open(history_outfile, 'wb') as f:
+                    pkl.dump(history_comp[idx], f)
+            else:
+                history_comp.append(pkl.load(tar.extractfile(history_outfile_comp[idx])))
+            tar.close()
+
+            # remove the tarfile if extracted
+            if extract:
+                os.remove(datapaths_comp[idx][:-1]+'.tgz')
+            
+                
     force_recalc = False # recalc done
 
     comp_name = diff_name(datapaths_comp[0], datapaths_comp[1])[:-1]
@@ -966,7 +1124,7 @@ if processing_type == 'comparison':
     n_levels = 64
 
     # WARNING: add_snapshot_FIFO below is NOT embarassingly parallelizable, but does significantly save memory
-    def comparison_frame (i_vtk, verbose=False, save=True, recalculate=False, history_comp=None, augment_kwargs=default_augment_kwargs):
+    def comparison_frame (i_vtk, verbose=False, save=True, recalculate=False, history_comp=None, augment_kwargs=default_augment_kwargs, tarpaths=[None,None]):
 
         import numpy as np
         import matplotlib.pyplot as plt
@@ -974,8 +1132,8 @@ if processing_type == 'comparison':
 
         from read_vtk import vtk
 
-        fileno = int(vtk_filenames_comp[0][i_vtk].split('/')[-1].split('.')[-2])
-        if fileno != int(vtk_filenames_comp[1][i_vtk].split('/')[-1].split('.')[-2]):
+        fileno = int(vtk_filenames_comp[0][i_vtk].split('/')[-1].split('.')[1])
+        if fileno != int(vtk_filenames_comp[1][i_vtk].split('/')[-1].split('.')[1]):
             print('[comparison_frame] file lists not aligned. Aborting.')
             sys.exit()
 
@@ -1003,7 +1161,7 @@ if processing_type == 'comparison':
         for idx in range(2):
             # load, process, and plot the vtk file (mhd quantities)
             try:
-                data_vtk = read_vtk_file(vtk_filenames_comp[idx][i_vtk], previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=augment_kwargs)
+                data_vtk = read_vtk_file(vtk_filenames_comp[idx][i_vtk], previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=augment_kwargs, tarpath=tarpaths[idx])
             except Exception as e:
                 print('Could not reat vtk file ', vtk_filenames_comp[idx][i_vtk], 'continuiung..')
                 continue
@@ -1128,10 +1286,38 @@ if processing_type == 'comparison':
         print(' - frame done.', flush=True)
 
 
-# In[14]:
+# In[20]:
 
 
 if processing_type == 'comparison':
+    # is we need to save *.pkl files and we are using tarfile, it needs to be extracted to be edited
+    tarpaths = [None, None]
+    extract = [False, False]
+    for idx in range(2):
+        if '.tgz' in datapaths_comp[idx]:
+            if os.path.isdir('.'.join(datapaths_comp[idx].split('.')[:-1])):
+                # tar already extracted
+                datapaths_comp[idx] = os.path.isdir('.'.join(datapaths_comp[idx].split('.')[:-1]))
+                tarpaths[idx] = None
+            elif convert_vtk:
+                # do we need to extract to convert vtk to pkl?
+                contents = [(1 if x.path[:-4] == '.vtk' else 0) for x in tarfile.open(datapaths_comp[idx]).getmembers()]
+                extract[idx] = (np.sum(contents) > 0)
+                if extract[idx]:
+                    print('Extracting tarfile %s.. ' % datapaths_comp[idx], end='')
+                    tar = tarfile.open(datapaths_comp[idx])
+                    tar.extractall(path = '.'.join(datapaths_comp[idx].split['.'][:-1]))
+                    datapaths_comp[idx] = datapaths_comp[idx][:-4]+'/'
+                    vtk_filenames_comp[idx] = [datapaths_comp[idx]+'/'.join(x.split('/')[1:]) for x in vtk_filenames_comp[idx]]
+                    tar.close()
+                    tarpaths[idx] = None
+                    print('done.')
+                else:
+                    # otherwise keep the tar and read files directly from there
+                    tarpaths[idx] = datapaths_comp[idx]
+            else:
+                tarpaths[idx] = datapaths_comp[idx]
+    
     # now, parallelize the frame generation
     from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
     chunks = np.array_split(range(len(vtk_filenames_comp[0])), nproc)
@@ -1139,12 +1325,25 @@ if processing_type == 'comparison':
         indices = chunks[ichunk]
         data_vtk = None
         for i in indices:
-            data_vtk = comparison_frame(i_vtk=i, recalculate=force_recalc, history_comp=history_comp, augment_kwargs=default_augment_kwargs, verbose=False)
+            data_vtk = comparison_frame(i_vtk=i, recalculate=force_recalc, history_comp=history_comp, augment_kwargs=default_augment_kwargs, verbose=False, tarpaths=tarpaths)
     with ProcessPool(nproc) as pool:
         _ = pool.map(worker, list(range(nproc)))
+    # tar when done and clean up
+    for idx in range(2):
+        if extract[idx] or (tar_when_done and '.tgz' not in datapaths_comp[idx]):
+            print('Archiving into tarfile %s.. ' % datapaths_comp[idx], end='')
+            workdir = os.getcwd()
+            os.chdir('/'.join(datapaths_comp[idx].split('/')[:-2]))
+            os.system('tar -cvzf %s %s' % (datapaths_comp[idx].split('/')[-2] + '.tgz',datapaths_comp[idx].split('/')[-2]))
+            if os.path.isfile(datapaths_comp[idx][:-1] + '.tgz'):
+                rmtree(datapaths_comp[idx])
+                datapaths_comp[idx] = datapaths_comp[idx][:-1] + '.tgz'
+                tarpaths[idx] = datapaths_comp[idx]
+            os.chdir(workdir)
+            print('done.')
 
 
-# In[15]:
+# In[21]:
 
 
 if processing_type == 'comparison':
@@ -1163,11 +1362,11 @@ if processing_type == 'comparison':
     print("COMPARISON PROCESSING DONE.", flush=True)
 
 
-# In[16]:
+# In[22]:
 
 
 if processing_type == 'comparison' and not in_script:
-    comparison_frame(80, history_comp=history_comp, save=False)
+    comparison_frame(80, history_comp=history_comp, save=False, tarpaths=tarpaths)
 
 
 # In[ ]:
