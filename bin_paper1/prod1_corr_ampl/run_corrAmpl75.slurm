@@ -5,8 +5,8 @@
 # not required if you have set a default allocation
 #SBATCH -A 2020-3-30
 
-#SBATCH -J IS2ca75             # job name
-#SBATCH -t 10:00:00 # 16:00:00           # time requested
+#SBATCH -J IS2ca75            # job name
+#SBATCH -t 16:00:00           # time requested
 
 #SBATCH --nodes=8             # number of nodes
 
@@ -72,26 +72,26 @@ RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/prod1
 cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
-corr=1
-#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=1 -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
-srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/IntSh2-p1.0002.rst -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
-
 if false
 then
+    corr=1
+    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=1 -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
 
-# remove all restart files but the last one, tar the latter to save file no
-echo Cleaning up restart files..
-srun ../join_rst.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL
-final_rst_no=`ls $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
-final_to_rm=`printf %04d $(($final_rst_no-1))`
-rm `eval echo $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.{0000..${final_to_rm}}.rst`
-tar -cvzf $RUNDIR/results_corr${corr}ampl$CORR_AMPL/final_rst.tgz $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
-rm -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
-echo  - restart files cleaning done.
+    # remove all restart files but the last one, tar the latter to save file no
+    echo Cleaning up restart files..
+    srun ../join_rst.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+    final_rst_no=`ls $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
+    final_to_rm=`printf %04d $(($final_rst_no-1))`
+    rm `eval echo $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.{0000..${final_to_rm}}.rst`
+    #tar -cvzf $RUNDIR/results_corr${corr}ampl$CORR_AMPL/final_rst.tgz $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
+    #rm -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
+    echo  - restart files cleaning done.
+fi
 
 # non-corrugated, 1D --------------------------------------------------------------
 corr=0
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=0 domain1/Nx2=2 -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=0 domain1/Nx2=2 -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/IntSh2-p1.0001.rst -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Cleaning up restart files..
@@ -99,8 +99,6 @@ srun ../join_rst.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL
 final_rst_no=`ls $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
 final_to_rm=`printf %04d $(($final_rst_no-1))`
 rm `eval echo $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.{0000..${final_to_rm}}.rst`
-tar -cvzf $RUNDIR/results_corr${corr}ampl$CORR_AMPL/final_rst.tgz $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
-rm -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
+#tar -cvzf $RUNDIR/results_corr${corr}ampl$CORR_AMPL/final_rst.tgz $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
+#rm -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
 echo  - restart files cleaning done.
-
-fi

@@ -5,8 +5,8 @@
 # not required if you have set a default allocation
 #SBATCH -A 2020-3-30
 
-#SBATCH -J IS2-PP-ca75        # job name
-#SBATCH -t 06:00:00           # time requested
+#SBATCH -J IS2ppCA75          # job name
+#SBATCH -t 24:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
@@ -34,9 +34,9 @@ cd $RUNDIR
 # join the files from different processors
 for corr in 0 1
 do
-    #srun join_rst.sh $datafolder/results_corr${corr}ampl${corr_ampl}
+    srun join_rst.sh $datafolder/results_corr${corr}ampl${corr_ampl}
     srun join_vtk.sh $datafolder/results_corr${corr}ampl${corr_ampl}
 done
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl} $RUNDIR/$datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 1
+srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl} $RUNDIR/$datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -force_recalc 0 # -tar_when_done 1
