@@ -1,4 +1,4 @@
-def vtk (filename, out_dt):
+def vtk (filename, out_dt, input_string=None):
     
     # based on code by: Guillaume Jacquenot
     #  - https://stackoverflow.com/questions/11727822/reading-a-vtk-file-with-python
@@ -10,7 +10,7 @@ def vtk (filename, out_dt):
     in2out = {'density':'rho', 'velocity':'vel', 'pressure':'press', 'cell_centered_B':'Bcc'}
     
     # get time from the filename and out_dt
-    time = int(filename.split('.')[-2]) * out_dt
+    time = int(filename.split('/')[-1].split('.')[1]) * out_dt
     result['Time'] = time
 
     import numpy as np
@@ -18,7 +18,11 @@ def vtk (filename, out_dt):
     from vtk.util import numpy_support as VN
 
     reader = vtkStructuredPointsReader()
-    reader.SetFileName(filename)
+    if input_string == None: # read from file
+        reader.SetFileName(filename)
+    else: # read from input string (supplied by argument)
+        reader.ReadFromInputStringOn()
+        reader.SetInputString(input_string)
     reader.ReadAllVectorsOn()
     reader.ReadAllScalarsOn()
     reader.Update()
