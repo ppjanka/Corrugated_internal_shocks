@@ -9,6 +9,9 @@
 
 # check whether we're running in Jupyter or from a script file
 cmd_args = []
+import socket
+machine = socket.gethostname()
+print('Running on machine %s' % machine)
 
 import sys
 import os
@@ -66,13 +69,13 @@ def get_arg (argname, n_read=1, default=None, val_type=str):
 if '-dashboard' in cmd_args:
     processing_type = 'dashboard'
     datapath = get_arg('dashboard')
-    if datapath[-1] != '/':
+    if '.tgz' not in datapath and datapath[-1] != '/':
         datapath += '/'
 elif '-comparison' in cmd_args:
     processing_type = 'comparison'
     datapaths_comp = list(get_arg('comparison', n_read=2, val_type=[str,str]))
     for i in range(2):
-        if datapaths_comp[i][-1] != '/':
+        if '.tgz' not in datapaths_comp[i] and datapaths_comp[i][-1] != '/':
             datapaths_comp[i] += '/'
 else:
     if False:
@@ -94,7 +97,12 @@ opt_numba = get_arg('opt_numba', default=True, val_type=boolean) # use numba to 
 convert_vtk = get_arg('convert_vtk', default=True, val_type=boolean) # saves vtk and processing data as pkl -- needed to use tensorflow, but also prevents from recalculating the same data
 force_recalc = get_arg('force_recalc', default=False, val_type=boolean) # force recalculation of augmented data, even if present in the pkl files
 
-nproc = get_arg('nproc', default=8, val_type=int)
+import multiprocessing
+cpu_avail = multiprocessing.cpu_count()
+nproc = get_arg('nproc', default=int(0.5*cpu_avail), val_type=int)
+if nproc < 0:
+    nproc = cpu_avail
+print('Using nproc = %i' % nproc, flush=True)
 
 #---------------------------------------------------------------
 
@@ -102,9 +110,15 @@ nproc = get_arg('nproc', default=8, val_type=int)
 opt_tf = (not unit_check and opt_tf)
 if opt_tf:
     import tensorflow as tf
+    # do not use tensorflow if no or insufficient GPU detected (tf requires compute capability > 3.5), use numba instead
     gpu_list = tf.config.list_physical_devices('GPU')
-    # do not use tensorflow if no GPU detected, use numba instead
-    opt_tf = (len(gpu_list) > 0)
+    # if running on tegner
+    if machine[0] == 't' and machine[-11:] == '.pdc.kth.se':
+        # only the double-GPU nodes on tegner have sufficient compute capability to use tensorflow
+        opt_tf = (len(gpu_list) > 1)
+    else:
+        # otherwise use tf if any gpu available
+        opt_tf = (len(gpu_list) > 0)
 
 opt_numba = (not unit_check and not opt_tf and opt_numba)
 opt_fastmath = (opt_numba and True) # 20% speedup, but less precision
@@ -981,7 +995,9 @@ if processing_type == 'dashboard':
     if extract or (tar_when_done and '.tgz' not in datapath):
             print('Archiving into tarfile %s.. ' % datapath, end='')
             workdir = os.getcwd()
-            os.chdir('/'.join(datapath.split('/')[:-2]))
+            tar_location = '/'.join(datapath.split('/')[:-2])
+            if tar_location != '':
+                os.chdir(tar_location)
             os.system('tar -cvzf %s %s' % (datapath.split('/')[-2] + '.tgz',datapath.split('/')[-2]))
             if os.path.isfile(datapath[:-1] + '.tgz'):
                 rmtree(datapath)
@@ -1333,7 +1349,9 @@ if processing_type == 'comparison':
         if extract[idx] or (tar_when_done and '.tgz' not in datapaths_comp[idx]):
             print('Archiving into tarfile %s.. ' % datapaths_comp[idx], end='')
             workdir = os.getcwd()
-            os.chdir('/'.join(datapaths_comp[idx].split('/')[:-2]))
+            tar_location = '/'.join(datapaths_comp[idx].split('/')[:-2])
+            if tar_location != '':
+                os.chdir(tar_location)
             os.system('tar -cvzf %s %s' % (datapaths_comp[idx].split('/')[-2] + '.tgz',datapaths_comp[idx].split('/')[-2]))
             if os.path.isfile(datapaths_comp[idx][:-1] + '.tgz'):
                 rmtree(datapaths_comp[idx])
