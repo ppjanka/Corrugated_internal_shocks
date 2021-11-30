@@ -6,7 +6,7 @@
 #SBATCH -A 2020-3-30
 
 #SBATCH -J IS2-PP-sw1         # job name
-#SBATCH -t 06:00:00           # time requested
+#SBATCH -t 24:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 
@@ -37,9 +37,9 @@ datafolder=prod2_shell_width
 cd $RUNDIR
 
 # join the files from different processors
-if false # these are done in run*.slurm script, to limit the number of files stored
+if true # these are done in run*.slurm script, to limit the number of files stored
 then
-    for corr in 0 1
+    for corr in 1 0
     do
         srun join_rst.sh $datafolder/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
         srun join_vtk.sh $datafolder/results_corr${corr}shWidth$SHELL_WIDTH_LABEL

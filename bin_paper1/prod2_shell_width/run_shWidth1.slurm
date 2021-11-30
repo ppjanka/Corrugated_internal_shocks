@@ -88,7 +88,8 @@ cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
 corr=1
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 time/tlim=$TLIM domain1/x1min=-$BOX_SIZE domain1/x1max=$BOX_SIZE domain1/Nx1=$X1_RES domain1/AutoWithNProc=$NPROC problem/xcen_sh1=-$XCEN problem/width_sh1=$SHELL_WIDTH problem/xcen_sh2=$XCEN problem/width_sh2=$SHELL_WIDTH problem/corr_switch=${corr} -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0004.rst -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Cleaning up restart files..
@@ -99,15 +100,18 @@ for i in {0000..${final_to_rm}}
 do
     rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*$i.rst`
 done
-tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-echo  - restart files cleaning done.
+if false
+then
+    tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+    rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+    echo  - restart files cleaning done.
 
-# the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
-echo Cleaning up vtk files...
-cd ..
-srun join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
-echo  - vtk files cleaning done.
+    # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
+    echo Cleaning up vtk files...
+    cd ..
+    srun join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+    echo  - vtk files cleaning done.
+fi
 
 # non-corrugated, 1D --------------------------------------------------------------
 corr=0
@@ -122,12 +126,15 @@ for i in {0000..${final_to_rm}}
 do
     rm `eval echo $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/*$i.rst`
 done
-tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
-echo  - restart files cleaning done.
+if false
+then
+    tar -cvzf $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/final_rst.tgz $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+    rm -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst
+    echo  - restart files cleaning done.
 
-# the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
-echo Cleaning up vtk files...
-cd ..
-srun join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
-echo  - vtk files cleaning done.
+    # the following really should be done in post-processing (it's serial), but given file number constraints, we may not have a choice...
+    echo Cleaning up vtk files...
+    cd ..
+    srun join_vtk.sh $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+    echo  - vtk files cleaning done.
+fi
