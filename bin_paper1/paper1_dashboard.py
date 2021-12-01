@@ -1043,7 +1043,7 @@ if processing_type == 'dashboard':
 # -----------
 # **Two-dataset comparison**
 
-# In[19]:
+# In[23]:
 
 
 if processing_type == 'comparison':
@@ -1283,8 +1283,8 @@ if processing_type == 'comparison':
                 plt.ylabel('Avg. syn. flux / dS [${\\rm erg}/({\\rm cm}^2{\\rm s}) / {\\rm cm}^2$]')
 
                 # set up limits
-                ax_Fsyn.set_ylim(0.,5.5e-30)
-                ax_Udot.set_ylim(5.0e4, None)
+                #ax_Fsyn.set_ylim(0.,5.5e-30)
+                #ax_Udot.set_ylim(5.0e4, None)
 
             # clean up
             del data_vtk
@@ -1302,7 +1302,7 @@ if processing_type == 'comparison':
         print(' - frame done.', flush=True)
 
 
-# In[20]:
+# In[25]:
 
 
 if processing_type == 'comparison':
@@ -1361,7 +1361,7 @@ if processing_type == 'comparison':
             print('done.')
 
 
-# In[21]:
+# In[26]:
 
 
 if processing_type == 'comparison':
@@ -1380,11 +1380,11 @@ if processing_type == 'comparison':
     print("COMPARISON PROCESSING DONE.", flush=True)
 
 
-# In[22]:
+# In[24]:
 
 
 if processing_type == 'comparison' and not in_script:
-    comparison_frame(80, history_comp=history_comp, save=False, tarpaths=tarpaths)
+    comparison_frame(80, history_comp=history_comp, save=False)
 
 
 # In[ ]:
