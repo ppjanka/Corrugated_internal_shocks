@@ -45,4 +45,4 @@ then
 fi
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl} $RUNDIR/$datafolder/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 1 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0
+srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0ampl${corr_ampl}.tgz $RUNDIR/$datafolder/results_corr1ampl${corr_ampl}.tgz -nproc $nproc -opt_tf 1 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0
