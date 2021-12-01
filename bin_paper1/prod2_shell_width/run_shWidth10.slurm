@@ -97,7 +97,8 @@ then
     #srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0007.rst -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
     #srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0011.rst -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
     #srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0012.rst -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
-    srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0014.rst -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+    #srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0014.rst -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
+    srun $RUNDIR/athena -r $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL/joined_rst/IntSh2-p1.0017.rst -d $RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL
 
     # remove all restart files but the last one, tar the latter to save file no
     echo Cleaning up restart files..
