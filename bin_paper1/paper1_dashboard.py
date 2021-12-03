@@ -1131,7 +1131,7 @@ if processing_type == 'comparison':
                 
     force_recalc = False # recalc done
 
-    comp_name = diff_name(datapaths_comp[0], datapaths_comp[1])[:-1]
+    comp_name = diff_name(datapaths_comp[0], datapaths_comp[1])
     outpath = comp_name + '_temp_comparison/'
     outfile = comp_name + '_comparison.mp4'
     if not os.path.exists(outpath):
