@@ -163,6 +163,7 @@ if opt_tf:
     log = tf.math.log
     reshape = tf.reshape
     sqrt = tf.math.sqrt
+    npmax = tf.reduce_max
     def logspace (xmin,xmax,n):
         return 10.**tf.linspace(xmin,xmax,n)
     def log10 (x):
@@ -185,6 +186,7 @@ else:
     log = np.log
     reshape = np.reshape
     sqrt = np.sqrt
+    npmax = np.max
     logspace = np.logspace
     log10 = np.log10
     nansum = np.nansum
@@ -1283,8 +1285,14 @@ if processing_type == 'comparison':
                 plt.ylabel('Avg. syn. flux / dS [${\\rm erg}/({\\rm cm}^2{\\rm s}) / {\\rm cm}^2$]')
 
                 # set up limits
-                #ax_Fsyn.set_ylim(0.,5.5e-30)
-                #ax_Udot.set_ylim(5.0e4, None)
+                mask = (history_comp[idx]['times'] * sim2phys['Time'] > 4.0)
+                ax_Fsyn.set_ylim(
+                    None,
+                    npmax([
+                        npmax(history_comp[0]['flux_density'][mask]) * sim2phys['flux_density'],
+                        npmax(history_comp[1]['flux_density'][mask]) * sim2phys['flux_density']
+                    ])
+                )
 
             # clean up
             del data_vtk
