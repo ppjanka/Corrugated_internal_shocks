@@ -1285,12 +1285,15 @@ if processing_type == 'comparison':
                 plt.ylabel('Avg. syn. flux / dS [${\\rm erg}/({\\rm cm}^2{\\rm s}) / {\\rm cm}^2$]')
 
                 # set up limits
-                mask = (history_comp[idx]['times'] * sim2phys['Time'] > 4.0)
+                mask = [
+                    (history_comp[0]['times'] * sim2phys['Time'] > 4.0),
+                    (history_comp[1]['times'] * sim2phys['Time'] > 4.0)
+                ]
                 ax_Fsyn.set_ylim(
                     None,
                     npmax([
-                        npmax(history_comp[0]['flux_density'][mask]) * sim2phys['flux_density'],
-                        npmax(history_comp[1]['flux_density'][mask]) * sim2phys['flux_density']
+                        npmax(history_comp[0]['flux_density'][mask[0]]) * sim2phys['flux_density'],
+                        npmax(history_comp[1]['flux_density'][mask[1]]) * sim2phys['flux_density']
                     ])
                 )
 
