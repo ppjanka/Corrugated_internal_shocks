@@ -1,12 +1,10 @@
 #include "copyright.h"
 /*============================================================================*/
-/*! \file current_sheet.c
- *  \brief Problem generator for current sheet test. 
+/*! \file IntSh2-paper1.c
+ *  \brief Problem generator for a corrugated shell collision problem
+ *  , in context of the internal shock model in microquasars
  *
- * PURPOSE: Problem generator for current sheet test.  This version only allows
- *   current sheet in X-Y plane, with Bz=0.  
- *
- * REFERENCE: */
+ * REFERENCE: Pjanka, Demidem, Veledina (2022), in prep. */
 /*============================================================================*/
 
 #include <math.h>
@@ -90,18 +88,6 @@ void problem(DomainS *pDomain)
   Real corr_ampl = par_getd_def("problem", "corr_ampl", 0.0);
   int corr_nx = par_geti_def("problem", "corr_nx", 2);
   int corr_ny = par_geti_def("problem", "corr_ny", 2);
-  // ensure fair comparison between corrugated and non-corrugated cases
-  //  - decrease mass of the shells by the mass of corrugation ridges (which will be swept into the shell)
-  //  - increase shell speeds to conserve the total kinetic energy (given that corr. ridges are immobile)
-  /*Real ridge_mass = corr_ampl * (x1_sh[1] - x2_sh[0]);
-  Real Ekin;
-  #pragma omp simd
-  for (i=0; i<2; i++) {
-    Ekin = gamma_sh[i] * rho_sh[i];
-    rho_sh[i] -= 0.5 * ridge_mass / (x2_sh[i] - x1_sh[i]); // each shell gets half of the mass
-    gamma_sh[i] = Ekin / rho_sh[i];
-    vel_sh[i] = (vel_sh[i]/fabs(vel_sh[i])) * gamma2v(gamma_sh[i]);
-  }*/
 
   // set the initial conditions
   Real rho, press, vel, gamma, sqr_gamma, enthalpy;
@@ -113,7 +99,8 @@ void problem(DomainS *pDomain)
         // read the current location
         cc_pos(pGrid,i,j,k,&z,&r,&x3);
 
-        if (z < x1_sh[0]) { // left of first shell
+        if (z < x1_sh[0]) {
+          // left of first shell ---------------------------------
           rho = rho_amb + 0.5*corr_ampl; // adjustment by corr_ampl to ensure fair comparison
           press = press_amb * (rho/rho_amb); // keep the ambient temperature the same
           vel = vel_sh[0]; gamma = gamma_sh[0];
@@ -128,12 +115,14 @@ void problem(DomainS *pDomain)
                 ;
               #endif
           }
-        } else if (z <= x2_sh[0]) { // inside first shell
+        } else if (z <= x2_sh[0]) {
+          // inside first shell ---------------------------------
           rho = rho_sh[0]; press = press_sh[0]; vel = vel_sh[0]; gamma = gamma_sh[0];
           #ifdef MHD
           B = bfield_sh[0];
           #endif
-        } else if (z < x1_sh[1]) { // between shells
+        } else if (z < x1_sh[1]) {
+          // between shells -------------------------------------
           rho = rho_amb; press = press_amb;
           #ifdef MHD
           B = 0.0;
@@ -166,12 +155,14 @@ void problem(DomainS *pDomain)
             rho += 0.5*corr_ampl; // ensure fair comparison
           }
           press *= (rho/rho_amb); // keep the ambient temperature the same
-        } else if (z <= x2_sh[1]) { // inside second shell
+        } else if (z <= x2_sh[1]) {
+          // inside second shell -----------------------------
           rho = rho_sh[1]; press = press_sh[1]; vel = vel_sh[1]; gamma = gamma_sh[1];
           #ifdef MHD
           B = bfield_sh[1];
           #endif
-        } else { // right of second shell
+        } else {
+          // right of second shell ---------------------------
           rho = rho_amb + 0.5*corr_ampl; // adjustment by corr_ampl to ensure fair comparison
           press = press_amb * (rho/rho_amb); // keep the ambient temperature the same
           vel = vel_sh[1]; gamma = gamma_sh[1];
@@ -189,7 +180,7 @@ void problem(DomainS *pDomain)
         }
 
         // Set the hydro parameters
-        // NOTE: rho and Pg are in the fluid frame, Beckwith & Stone 2011
+        // NOTE: rho and Pg are in the fluid frame, see Beckwith & Stone 2011
         sqr_gamma = SQR(gamma);
         enthalpy = 1. + adiab_idx * press / ((adiab_idx-1.)*rho);
         pGrid->U[k][j][i].d = gamma*rho;
@@ -207,7 +198,7 @@ void problem(DomainS *pDomain)
           pGrid->B2i[k][j][i] = B;
         }
 
-        // make adjustments due to bfield
+        // make Special-Relativity adjustments due to bfield
         sqr_b = SQR(pGrid->U[k][j][i].B1c) +
                  SQR(pGrid->U[k][j][i].B2c) +
                  SQR(pGrid->U[k][j][i].B3c);
