@@ -85,6 +85,7 @@ void problem(DomainS *pDomain)
   }
   // corrugation
   int corr_switch = par_geti_def("problem", "corr_switch", 0);
+  int corr_type = par_geti_def("problem", "corr_type", 0);
   Real corr_ampl = par_getd_def("problem", "corr_ampl", 0.0);
   int corr_nx = par_geti_def("problem", "corr_nx", 2);
   int corr_ny = par_geti_def("problem", "corr_ny", 2);
@@ -121,6 +122,29 @@ void problem(DomainS *pDomain)
           #ifdef MHD
           B = bfield_sh[0];
           #endif
+          if (corr_type == 2) { // pressure perturbations inside shells
+            if (corr_switch == 1) {
+              press += corr_ampl * (press - press_amb)
+                  * 0.5 * cos( 2.*M_PI *
+                  (corr_nx * (z-x1_sh[0]) / (x2_sh[0]-x1_sh[0])
+                 + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
+              - M_PI);
+            } else { // ensure fair comparison
+              ;
+            }
+          } else if (corr_type == 3) { // velocity perturbations inside shells
+            if (corr_switch == 1) {
+              // varying gamma^2 gives us conserved total energy
+              gamma = sqrt(SQR(gamma) + corr_ampl * (SQR(gamma) - 1.0)
+                  * 0.5 * cos( 2.*M_PI *
+                  (corr_nx * (z-x1_sh[0]) / (x2_sh[0]-x1_sh[0])
+                 + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
+              - M_PI));
+              vel = (vel/fabs(vel)) * gamma2v(gamma);
+            } else { // ensure fair comparison
+              ;
+            }
+          }
         } else if (z < x1_sh[1]) {
           // between shells -------------------------------------
           rho = rho_amb; press = press_amb;
@@ -145,22 +169,47 @@ void problem(DomainS *pDomain)
               ;
             #endif
           }
-          if (corr_switch > 0) { // apply corrugation
-            rho += (corr_ampl - rho_amb)
-                * 0.5 * ( cos( 2.*M_PI *
-                     (corr_nx * (z-x2_sh[0]) / (x1_sh[1]-x2_sh[0])
-                    + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
-                 - M_PI) +1 );
-          } else {
-            rho += 0.5*corr_ampl; // ensure fair comparison
+          if (corr_type == 1) { // density perturbations between shells
+            if (corr_switch > 0) { // apply corrugation
+              rho += (corr_ampl - rho_amb)
+                  * 0.5 * ( cos( 2.*M_PI *
+                       (corr_nx * (z-x2_sh[0]) / (x1_sh[1]-x2_sh[0])
+                      + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
+                   - M_PI) +1 );
+            } else {
+              rho += 0.5*corr_ampl; // ensure fair comparison
+            }
+            press *= (rho/rho_amb); // keep the ambient temperature the same
           }
-          press *= (rho/rho_amb); // keep the ambient temperature the same
         } else if (z <= x2_sh[1]) {
           // inside second shell -----------------------------
           rho = rho_sh[1]; press = press_sh[1]; vel = vel_sh[1]; gamma = gamma_sh[1];
           #ifdef MHD
           B = bfield_sh[1];
           #endif
+          if (corr_type == 2) { // pressure perturbations inside shells
+            if (corr_switch == 1) {
+              press += corr_ampl * (press - press_amb)
+                  * 0.5 * cos( 2.*M_PI *
+                  (corr_nx * (z-x1_sh[1]) / (x2_sh[1]-x1_sh[1])
+                 + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
+              - M_PI);
+            } else { // ensure fair comparison
+              ;
+            }
+          } else if (corr_type == 3) { // velocity perturbations inside shells
+            if (corr_switch == 1) {
+              // varying gamma^2 gives us conserved total energy
+              gamma = sqrt(SQR(gamma) + corr_ampl * (SQR(gamma) - 1.0)
+                  * 0.5 * cos( 2.*M_PI *
+                  (corr_nx * (z-x1_sh[1]) / (x2_sh[1]-x1_sh[1])
+                 + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
+              - M_PI));
+              vel = (vel/fabs(vel)) * gamma2v(gamma);
+            } else { // ensure fair comparison
+              ;
+            }
+          }
         } else {
           // right of second shell ---------------------------
           rho = rho_amb + 0.5*corr_ampl; // adjustment by corr_ampl to ensure fair comparison
@@ -225,7 +274,7 @@ void problem(DomainS *pDomain)
       }
     }
   }
-  #endif MHD
+  #endif // MHD
 
   //exit(0);
 }
