@@ -85,7 +85,7 @@ void problem(DomainS *pDomain)
   }
   // corrugation
   int corr_switch = par_geti_def("problem", "corr_switch", 0);
-  int corr_type = par_geti_def("problem", "corr_type", 0);
+  int corr_type = par_geti_def("problem", "corr_type", 1); // default=1 for backward compatibility
   Real corr_ampl = par_getd_def("problem", "corr_ampl", 0.0);
   int corr_nx = par_geti_def("problem", "corr_nx", 2);
   int corr_ny = par_geti_def("problem", "corr_ny", 2);
