@@ -45,51 +45,54 @@ static Real try_bfield (GridS *pGrid, Real corr_ampl, int n, Real x1, Real x2, R
   Real y1 = par_getd("domain1", "x2min");
   Real y2 = par_getd("domain1", "x2max");
   Real x,y,x3;
-  Real Benergy_tot = 0.;
-  Real norm = corr_ampl * bfield_sh;
+  Real Benergy_tot = 0., surface_tot = 0.;
+  Real norm = sqrt(corr_ampl) * bfield_sh * (x2-x1)/M_PI; // dx since Az is an integral quantity
   for (k = ks; k <= ke; k++) {
     for (j = js; j <= je+1; j++) {
       #pragma omp simd
       for (i = is; i <= ie+1; i++) {
-        // test whether we are in the appropriate shell
         cc_pos(pGrid,i,j,k,&x,&y,&x3);
-        if (x < x1) continue;
-        if (x > x2) break;
         // set Bz
         pGrid->B3i[k][j][i] = 0.;
         pGrid->U[k][j][i].B3c = 0.;
         // set bfield using the vector potential and centered finite difference derivatives
-        pGrid->U[k][j][i].B1c = // Bx = dyAz
-            (  vecPotLoops(x,y+0.5*dy, norm, n, x1,x2, y1,y2)
-             - vecPotLoops(x,y-0.5*dy, norm, n, x1,x2, y1,y2))
-            / dy;
-        pGrid->U[k][j][i].B2c = // By = -dxAz + B0
-          - (  vecPotLoops(x+0.5*dx,y, norm, n, x1,x2, y1,y2)
-             - vecPotLoops(x-0.5*dx,y, norm, n, x1,x2, y1,y2))
-            / dx
-            + bfield_sh;
-        Benergy_tot +=
-            0.5 * ( SQR(pGrid->U[k][j][i].B1c) + SQR(pGrid->U[k][j][i].B2c))
-            * dx*dy;
-        if (i >= is) {
-          fc_pos(pGrid,i,j,k,&x,&y,&x3);
-          pGrid->B1i[k][j][i] = // Bx = dyAz
+        if (x > x1 && x < x2) {
+          pGrid->U[k][j][i].B1c = // Bx = dyAz
               (  vecPotLoops(x,y+0.5*dy, norm, n, x1,x2, y1,y2)
                - vecPotLoops(x,y-0.5*dy, norm, n, x1,x2, y1,y2))
               / dy;
-          pGrid->B2i[k][j][i] = // By = -dxAz
-              - (  vecPotLoops(x+0.5*dx,y, norm, n, x1,x2, y1,y2)
-                 - vecPotLoops(x-0.5*dx,y, norm, n, x1,x2, y1,y2))
-                / dx;
+          pGrid->U[k][j][i].B2c = // By = -dxAz + B0
+            - (  vecPotLoops(x+0.5*dx,y, norm, n, x1,x2, y1,y2)
+               - vecPotLoops(x-0.5*dx,y, norm, n, x1,x2, y1,y2))
+              / dx
+              + bfield_sh;
+          Benergy_tot +=
+              0.5 * ( SQR(pGrid->U[k][j][i].B1c) + SQR(pGrid->U[k][j][i].B2c));
+          surface_tot += dx*dy;
+        }
+        if (i >= is) {
+          fc_pos(pGrid,i,j,k,&x,&y,&x3);
+          // test whether we are in the appropriate shell
+          if (x > x1 && x < x2) {
+            pGrid->B1i[k][j][i] = // Bx = dyAz
+                (  vecPotLoops(x,y+0.5*dy, norm, n, x1,x2, y1,y2)
+                 - vecPotLoops(x,y-0.5*dy, norm, n, x1,x2, y1,y2))
+                / dy;
+            pGrid->B2i[k][j][i] = // By = -dxAz
+                - (  vecPotLoops(x+0.5*dx,y, norm, n, x1,x2, y1,y2)
+                   - vecPotLoops(x-0.5*dx,y, norm, n, x1,x2, y1,y2))
+                  / dx;
+          }
         }
       }
     }
   }
   // total magnetic energy needs to be summed accross processors
   #ifdef MPI_PARALLEL
-  MPI_Reduce(&Benergy_tot, &Benergy_tot , 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Allreduce(&Benergy_tot, &Benergy_tot, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(&surface_tot, &surface_tot, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   #endif
-  Benergy_tot /= (y2-y1)*(x2-x1); // gives energy density, to be compared with pressure / plasma_beta
+  Benergy_tot *= dx*dy / surface_tot; // gives energy density, to be compared with pressure / plasma_beta
   return Benergy_tot;
 }
 
@@ -164,44 +167,86 @@ void problem(DomainS *pDomain)
   int corr_nx = par_geti_def("problem", "corr_nx", 2);
   int corr_ny = par_geti_def("problem", "corr_ny", 2);
   // if corr_type == 4 (magnetic field varies within shells), pre-compute the magnetic fields first, in order to properly adjust pressures for fair comparison
-  if (corr_type == 4) { // 4: magnetic field strength perturbations inside shells
+  if (corr_type == 4 && corr_switch == 1) { // 4: magnetic field strength perturbations inside shells
     #ifdef MHD
+    printf("Setting up magnetic field perturbations inside shells..\n");
     Real dx = pGrid->dx1, dy = pGrid->dx2;
     Real y1 = par_getd("domain1", "x2min");
     Real y2 = par_getd("domain1", "x2max");
-    Real norm, x1, x2, beta;
-    Real Benergy_tot, Benergy_tot_old, bfield_sh_old;
-    int n = 2; // generates two loops
-    Real precision = 1.0e-6; // desired precision for mean Bfield energy vs plasma_beta matching
+    Real norm, x1, x2, beta, Benergy_tot, buff;
+    Real bfield_sh_old [2], Benergy_tot_old [2];
+    int n = corr_ny; // number of loops in the vertical direction
+    Real precision = 1.0e-9; // desired precision for mean Bfield energy vs plasma_beta matching
     int safety_counter;
     for(int sh=0; sh < 2; sh++) {
+      printf(" -- SHELL %i\n", sh);
+      printf("     original bfield_sh = %.2e\n", bfield_sh[sh]);
       x1 = x1_sh[sh]; x2 = x2_sh[sh];
       if (sh == 0) {
         beta = par_getd("problem", "beta_sh1");
       } else {
         beta = par_getd("problem", "beta_sh2");
       }
+      // initialize the parameter search
+      bfield_sh_old[0] = 0.9 * bfield_sh[sh];
+      Benergy_tot_old[0] = try_bfield(pGrid, corr_ampl, n, x1, x2, bfield_sh_old[0]);
+      for (
+            ;
+            Benergy_tot_old[0] - (press_sh[sh] / beta) > 0.;
+            bfield_sh_old[0] *= 0.9) {
+        Benergy_tot_old[0] = try_bfield(pGrid, corr_ampl, n, x1, x2, bfield_sh_old[0]);
+      }
+      bfield_sh_old[1] = bfield_sh_old[0] + 0.1 * bfield_sh[sh];
+      Benergy_tot_old[1] = try_bfield(pGrid, corr_ampl, n, x1, x2, bfield_sh_old[1]);
+      for (
+            ;
+            Benergy_tot_old[1] - (press_sh[sh] / beta) < 0.;
+            bfield_sh_old[1] *= 1.1) {
+        Benergy_tot_old[1] = try_bfield(pGrid, corr_ampl, n, x1, x2, bfield_sh_old[1]);
+      }
+      if ( (Benergy_tot_old[0]-(press_sh[sh] / beta)) * (Benergy_tot_old[1]-(press_sh[sh] / beta)) > 0) {
+        printf("   Bfield fitting failed to initialize for shell %i, aborting.\n", sh);
+        exit(1);
+      }
+      bfield_sh[sh] = 0.5 * (bfield_sh_old[0] + bfield_sh_old[1]);
+      // perform fitting
       safety_counter = 0;
-      bfield_sh_old = 0.; Benergy_tot_old = 0.;
-      while ( safety_counter < 1e3 ) { // 1000 iterations max
+      while ( (safety_counter++) < 1e3 ) { // 1000 iterations max
+        printf("  - Iteration %i\n", safety_counter);
+        printf("   bfield_sh_old = [%.2e,%.2e], bfield_sh = %.2e\n", bfield_sh_old[0], bfield_sh_old[1], bfield_sh[sh]);
         Benergy_tot = try_bfield (pGrid, corr_ampl, n, x1, x2, bfield_sh[sh]);
+        printf("   Benergy_tot_old = [%.2e,%.2e], Benergy_tot = %.2e\n", Benergy_tot_old[0], Benergy_tot_old[1], Benergy_tot);
+        printf("   fabs(Benergy_tot / (press_sh[sh] / beta) - 1.0) = %.2e VS precision = %.2e\n", fabs(Benergy_tot / (press_sh[sh] / beta) - 1.0), precision);
         // decide what to do to converge
-        if (fabs(Benergy_tot / (beta / press_sh[sh]) - 1.0) < precision) {
+        if (fabs(Benergy_tot / (press_sh[sh] / beta) - 1.0) <= precision) {
+          printf("    Converged, calling break.\n");
           break;
         } else {
-          Benergy_tot_old = Benergy_tot;
-          bfield_sh_old = bfield_sh[sh];
-          if ( (Benergy_tot-(beta / press_sh[sh])) * (Benergy_tot_old-(beta / press_sh[sh])) < 0 ) {
-            bfield_sh[sh] = 0.5 * (bfield_sh_old + bfield_sh[sh]);
-          } else if ( (Benergy_tot-(beta / press_sh[sh])) < 0 && (Benergy_tot_old-(beta / press_sh[sh])) < 0 ) {
-            bfield_sh[sh] = 2.0 * fmax(bfield_sh_old, bfield_sh[sh]);
-          } else if ( (Benergy_tot-(beta / press_sh[sh])) > 0 && (Benergy_tot_old-(beta / press_sh[sh])) > 0 ) {
-            bfield_sh[sh] = 0.5 * fmin(bfield_sh_old, bfield_sh[sh]);
+          printf("    (Benergy_tot-(press_sh[sh] / beta)) = %.2e\n", (Benergy_tot-(press_sh[sh] / beta)));
+          printf("    (Benergy_tot_old[0]-(press_sh[sh] / beta)) %.2e\n", (Benergy_tot_old[0]-(press_sh[sh] / beta)));
+          printf("    (Benergy_tot_old[1]-(press_sh[sh] / beta)) %.2e\n", (Benergy_tot_old[1]-(press_sh[sh] / beta)));
+          if ( (Benergy_tot-(press_sh[sh] / beta)) * (Benergy_tot_old[0]-(press_sh[sh] / beta)) < 0 ) {
+            buff = bfield_sh[sh];
+            bfield_sh[sh] = 0.5 * (bfield_sh_old[0] + bfield_sh[sh]);
+            bfield_sh_old[1] = buff;
+            Benergy_tot_old[1] = Benergy_tot;
+            printf("    - bfield_sh set to mean with left boundary bfields, i.e., %.2e\n", bfield_sh[sh]);
+          } else {
+            buff = bfield_sh[sh];
+            bfield_sh[sh] = 0.5 * (bfield_sh_old[1] + bfield_sh[sh]);
+            bfield_sh_old[0] = buff;
+            Benergy_tot_old[0] = Benergy_tot;
+            printf("    - bfield_sh set to mean with right boundary bfields, i.e., %.2e\n", bfield_sh[sh]);
           }
         }
-        safety_counter += 1;
       }
+      if (safety_counter > 999) {
+        printf("   Bfield fitting failed to converge for shell %i, aborting.\n", sh);
+        exit(1);
+      }
+      printf(" -- SHELL %i done.\n\n", sh);
     }
+    printf("Magnetic field perturbations inside shells set.\n\n");
     #else
     printf("[IntSh2-paper1.c] ERROR: corr_type==4 requires MHD to take effect. Please reconfigure Athena --with-mhd and try again.\n");
     exit(1);
@@ -359,7 +404,7 @@ void problem(DomainS *pDomain)
         pGrid->U[k][j][i].E = sqr_gamma*rho*enthalpy - press;
 
         #ifdef MHD
-        if (corr_type != 4) {
+        if (corr_type != 4 ||  corr_switch == 0) {
           // set bfield in the y-direction
           pGrid->U[k][j][i].B1c = 0.;
           pGrid->U[k][j][i].B2c = B;
