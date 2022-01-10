@@ -88,8 +88,8 @@ static Real try_bfield (GridS *pGrid, Real corr_ampl, int n, Real x1, Real x2, R
   }
   // total magnetic energy needs to be summed accross processors
   #ifdef MPI_PARALLEL
-  MPI_Allreduce(&Benergy_tot, &Benergy_tot, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  MPI_Allreduce(&surface_tot, &surface_tot, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, &Benergy_tot, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, &surface_tot, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   #endif
   Benergy_tot *= dx*dy / surface_tot; // gives energy density, to be compared with pressure / plasma_beta
   return Benergy_tot;
