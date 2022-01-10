@@ -7,6 +7,8 @@
  * REFERENCE: Pjanka, Demidem, Veledina (2022), in prep. */
 /*============================================================================*/
 
+// #define DEBUG
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -168,7 +170,9 @@ void problem(DomainS *pDomain)
   // if corr_type == 4 (magnetic field varies within shells), pre-compute the magnetic fields first, in order to properly adjust pressures for fair comparison
   if (corr_type == 4 && corr_switch == 1) { // 4: magnetic field strength perturbations inside shells
     #ifdef MHD
+    #ifdef DEBUG
     printf("Setting up magnetic field perturbations inside shells..\n");
+    #endif
     Real dx = pGrid->dx1, dy = pGrid->dx2;
     Real y1 = par_getd("domain1", "x2min");
     Real y2 = par_getd("domain1", "x2max");
@@ -178,8 +182,10 @@ void problem(DomainS *pDomain)
     Real precision = 1.0e-9; // desired precision for mean Bfield energy vs plasma_beta matching
     int safety_counter;
     for(int sh=0; sh < 2; sh++) {
+      #ifdef DEBUG
       printf(" -- SHELL %i\n", sh);
       printf("     original bfield_sh = %.2e\n", bfield_sh[sh]);
+      #endif
       x1 = x1_sh[sh]; x2 = x2_sh[sh];
       if (sh == 0) {
         beta = par_getd("problem", "beta_sh1");
@@ -211,31 +217,43 @@ void problem(DomainS *pDomain)
       // perform fitting
       safety_counter = 0;
       while ( (safety_counter++) < 1e3 ) { // 1000 iterations max
+        #ifdef DEBUG
         printf("  - Iteration %i\n", safety_counter);
         printf("   bfield_sh_old = [%.2e,%.2e], bfield_sh = %.2e\n", bfield_sh_old[0], bfield_sh_old[1], bfield_sh[sh]);
+        #endif
         Benergy_tot = try_bfield (pGrid, corr_ampl, n, x1, x2, bfield_sh[sh]);
+        #ifdef DEBUG
         printf("   Benergy_tot_old = [%.2e,%.2e], Benergy_tot = %.2e\n", Benergy_tot_old[0], Benergy_tot_old[1], Benergy_tot);
         printf("   fabs(Benergy_tot / (press_sh[sh] / beta) - 1.0) = %.2e VS precision = %.2e\n", fabs(Benergy_tot / (press_sh[sh] / beta) - 1.0), precision);
+        #endif
         // decide what to do to converge
         if (fabs(Benergy_tot / (press_sh[sh] / beta) - 1.0) <= precision) {
+          #ifdef DEBUG
           printf("    Converged, calling break.\n");
+          #endif
           break;
         } else {
+          #ifdef DEBUG
           printf("    (Benergy_tot-(press_sh[sh] / beta)) = %.2e\n", (Benergy_tot-(press_sh[sh] / beta)));
           printf("    (Benergy_tot_old[0]-(press_sh[sh] / beta)) %.2e\n", (Benergy_tot_old[0]-(press_sh[sh] / beta)));
           printf("    (Benergy_tot_old[1]-(press_sh[sh] / beta)) %.2e\n", (Benergy_tot_old[1]-(press_sh[sh] / beta)));
+          #endif
           if ( (Benergy_tot-(press_sh[sh] / beta)) * (Benergy_tot_old[0]-(press_sh[sh] / beta)) < 0 ) {
             buff = bfield_sh[sh];
             bfield_sh[sh] = 0.5 * (bfield_sh_old[0] + bfield_sh[sh]);
             bfield_sh_old[1] = buff;
             Benergy_tot_old[1] = Benergy_tot;
+            #ifdef DEBUG
             printf("    - bfield_sh set to mean with left boundary bfields, i.e., %.2e\n", bfield_sh[sh]);
+            #endif
           } else {
             buff = bfield_sh[sh];
             bfield_sh[sh] = 0.5 * (bfield_sh_old[1] + bfield_sh[sh]);
             bfield_sh_old[0] = buff;
             Benergy_tot_old[0] = Benergy_tot;
+            #ifdef DEBUG
             printf("    - bfield_sh set to mean with right boundary bfields, i.e., %.2e\n", bfield_sh[sh]);
+            #endif
           }
         }
       }
@@ -243,9 +261,13 @@ void problem(DomainS *pDomain)
         printf("   Bfield fitting failed to converge for shell %i, aborting.\n", sh);
         exit(1);
       }
+      #ifdef DEBUG
       printf(" -- SHELL %i done.\n\n", sh);
+      #endif
     }
+    #ifdef DEBUG
     printf("Magnetic field perturbations inside shells set.\n\n");
+    #endif // debug
     #else
     printf("[IntSh2-paper1.c] ERROR: corr_type==4 requires MHD to take effect. Please reconfigure Athena --with-mhd and try again.\n");
     exit(1);
