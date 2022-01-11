@@ -27,7 +27,7 @@ module load cuda
 module load ffmpeg
 
 # environment vars
-RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT3_vel/prod1_corr_ampl/prod1_corr_ampl
+RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT3_vel/prod1_corr_ampl
 corr_ampl=20
 
 # launch job
