@@ -5,7 +5,7 @@
 # not required if you have set a default allocation
 #SBATCH -A 2021-3-29
 
-#SBATCH -J IS2pp-t2a20        # job name
+#SBATCH -J IS2pp-t3a20        # job name
 #SBATCH -t 24:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
