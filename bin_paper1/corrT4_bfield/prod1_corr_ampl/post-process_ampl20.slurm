@@ -21,7 +21,10 @@ nproc=-1 # use all cores available
 
 # module setup
 module load anaconda
-source activate intsh2-tf
+eval "$(conda shell.bash hook)"
+conda activate /cfs/klemming/projects/snic/snic2020-4-12/ppjanka/anaconda/envs/intsh2-tf
+which python # print to have a record of which env is used
+
 module load pigz # needed for parallelized tar
 module load cuda
 module load ffmpeg
