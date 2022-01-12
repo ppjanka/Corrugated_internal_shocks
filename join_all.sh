@@ -43,7 +43,10 @@ if [ $last_rst_only == 1 ]; then
 fi
 
 if [ $tar_when_done == 1 ]; then
-    tar --use-compress-program=pigz -cvf $1/final_rst.tgz $1/joined_rst
+    workdir=`pwd`
+    cd $1
+    tar --use-compress-program=pigz -cvf final_rst.tgz joined_rst
+    cd $workdir
     if [[ -f $1/final_rst.tgz ]]
     then
         rm -r $1/joined_rst
@@ -107,7 +110,8 @@ export -f remove_folder
 ls -d $1/id* | parallel -I% --max-args 1 --jobs $nproc remove_folder %
 
 if [ $tar_when_done == 1 ]; then
-    tar --use-compress-program=pigz -cvf $1.tgz $1
+    dirname=`echo $1 | awk '{n=split($0,words,"/"); print(words[n]);}`
+    tar --use-compress-program=pigz -cvf $dirname.tgz $dirname
     if [[ -f $1.tgz ]]
     then
         rm -r $1

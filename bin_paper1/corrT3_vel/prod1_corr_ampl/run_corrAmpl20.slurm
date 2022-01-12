@@ -62,7 +62,7 @@ srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Joining and cleaning up the snapshot filesystem..
-srun ../../../join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=1
+srun ../../../join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0
 echo  - joining and cleaning done.
 
 # non-corrugated, 1D --------------------------------------------------------------
@@ -71,5 +71,5 @@ srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Joining and cleaning up the snapshot filesystem..
-srun ../../../join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=1
+srun ../../../join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0
 echo  - joining and cleaning done.
