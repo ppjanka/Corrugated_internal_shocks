@@ -34,4 +34,4 @@ corr_ampl=20
 cd $RUNDIR
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0ampl${corr_ampl}.tgz $RUNDIR/results_corr1ampl${corr_ampl}.tgz -nproc $nproc -opt_tf 1 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0
+srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0ampl${corr_ampl}.tgz $RUNDIR/results_corr1ampl${corr_ampl}.tgz -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0
