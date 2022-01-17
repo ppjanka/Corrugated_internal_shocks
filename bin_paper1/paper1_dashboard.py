@@ -617,6 +617,7 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
                     )
                 ) * dS / (xrange*yrange)
             ))
+        data_vtk['spectrum'] = [np.array(data_vtk['spectrum'][0]), np.array(data_vtk['spectrum'][1])]
     
     # time derivatives
     if type(previous_data_vtk) is dict:
