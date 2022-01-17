@@ -109,9 +109,9 @@ print('Using nproc = %i' % nproc, flush=True)
 #---------------------------------------------------------------
 
 # optimization logic
+import tensorflow as tf
 opt_tf = (not unit_check and opt_tf)
 if opt_tf:
-    import tensorflow as tf
     # do not use tensorflow if no or insufficient GPU detected (tf requires compute capability > 3.5), use numba instead
     gpu_list = tf.config.list_physical_devices('GPU')
     # if running on tegner
@@ -877,8 +877,6 @@ if processing_type == 'dashboard':
             ax2.tick_params(axis='y', which='both', colors='b')
             ax2.yaxis.label.set_color('b')
 
-        print(data_vtk['spectrum'], flush=True)
-            
         ax = plt.subplot(gs[3,6])
         plt.plot(
             data_vtk['spectrum'][0] * sim2phys['spectrum'][0], 
