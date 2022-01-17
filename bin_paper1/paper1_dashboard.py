@@ -109,9 +109,9 @@ print('Using nproc = %i' % nproc, flush=True)
 #---------------------------------------------------------------
 
 # optimization logic
-import tensorflow as tf
 opt_tf = (not unit_check and opt_tf)
 if opt_tf:
+    import tensorflow as tf
     # do not use tensorflow if no or insufficient GPU detected (tf requires compute capability > 3.5), use numba instead
     gpu_list = tf.config.list_physical_devices('GPU')
     # if running on tegner
@@ -606,7 +606,7 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
         ]
     else:
         data_vtk['spectrum'] = [[],[]]
-        for nu in tf.deconvert(freqs):
+        for nu in tf_deconvert(freqs):
             data_vtk['spectrum'][0].append(nu)
             data_vtk['spectrum'][1].append(tf_deconvert(
                 nansum(
