@@ -608,7 +608,7 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
         data_vtk['spectrum'] = [[],[]]
         for nu in tf.deconvert(freqs):
             data_vtk['spectrum'][0].append(nu)
-            blah = tf_deconvert(
+            data_vtk['spectrum'][1].append(tf_deconvert(
                 nansum(
                     flux_nu_per_dS(
                         nu=nu, B=Bcc_fluid_tot,
@@ -616,9 +616,7 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
                         filling_factor=filling_factor
                     )
                 ) * dS / (xrange*yrange)
-            )
-            print(nu, blah, flush=True)
-            data_vtk['spectrum'][1].append(blah)
+            ))
         data_vtk['spectrum'] = [np.array(data_vtk['spectrum'][0]), np.array(data_vtk['spectrum'][1])]
     
     # time derivatives
@@ -879,6 +877,8 @@ if processing_type == 'dashboard':
             ax2.tick_params(axis='y', which='both', colors='b')
             ax2.yaxis.label.set_color('b')
 
+        print(data_vtk['spectrum'], flush=True)
+            
         ax = plt.subplot(gs[3,6])
         plt.plot(
             data_vtk['spectrum'][0] * sim2phys['spectrum'][0], 
@@ -1266,9 +1266,6 @@ if processing_type == 'comparison':
             plt.gca().axes.xaxis.set_ticklabels([])
             plt.title('$U$ [ erg $/$ cm$^3$ ]')
             ax.set_xlim(min(data_vtk['x1v']), max(data_vtk['x1v']))
-
-            print(data_vtk['spectrum'], flush=True)
-            data_vtk['spectrum'] = [np.array(data_vtk['spectrum'][0]), np.array(data_vtk['spectrum'][1])]
 
             ax = plt.subplot(gs[3,6])
             plt.plot(
