@@ -1267,6 +1267,8 @@ if processing_type == 'comparison':
             plt.title('$U$ [ erg $/$ cm$^3$ ]')
             ax.set_xlim(min(data_vtk['x1v']), max(data_vtk['x1v']))
 
+            print(data_vtk['spectrum'], flush=True)
+
             ax = plt.subplot(gs[3,6])
             plt.plot(
                 data_vtk['spectrum'][0] * sim2phys['spectrum'][0], 
