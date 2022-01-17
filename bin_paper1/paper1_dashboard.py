@@ -32,6 +32,7 @@ if in_script:
                 -nproc - number of threads for parallel processing
                 -opt_tf <0/1> - turn off/on tensorflow parallelization
                 -opt_numba <0/1> - turn off/on numba optimization
+                -low_memory <0/1> - make adjustments to enable computing with low system memory available
                 -convert_vtk <0/1> - convert vtk files to .pkl
                 -tar_when_done <0/1> - if not already tarfiles, the datapath folders will be turned into *.tgz after the analysis is done
                 -force_recalc <0/1> - force recalculation from .vtk files even if suitable pre-calculated .pkl files are present''')
@@ -94,6 +95,7 @@ unit_check = False # turns off optimization but allows to use astropy to check t
 tar_when_done = get_arg('tar_when_done', default=True, val_type=boolean) # if not already a tarfile, datapath will be turned into .tgz at the end of analysis
 opt_tf = get_arg('opt_tf', default=True, val_type=boolean) # use tensorflow instead of numpy for GPU acceleration, x5 speedup
 opt_numba = get_arg('opt_numba', default=True, val_type=boolean) # use numba to pre-compile some of the functions, about 3x speedup (turned off if opt_tf is on and GPU available)
+low_memory = get_arg('low_memory', default=False, val_type=boolean) # make adjustments to enable computing with low system memory available
 convert_vtk = get_arg('convert_vtk', default=True, val_type=boolean) # saves vtk and processing data as pkl -- needed to use tensorflow, but also prevents from recalculating the same data
 force_recalc = get_arg('force_recalc', default=False, val_type=boolean) # force recalculation of augmented data, even if present in the pkl files
 
@@ -339,26 +341,47 @@ def flux_nu_per_dS (nu, B, R, filling_factor=1.0):
     nu, B, R, filling_factor = tf_convert(nu, B, R, filling_factor)
     return (doppler_factor**2 * gamma_jet / (2.*dist**2))              * filling_factor* intensity(nu/doppler_factor,B,R)
              #* (dS*simu_len**2) # perp. surface element, instead of (beta c dt R)
-# total flux within the IR-opt range: 300GHz - 3PHz
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def _flux_total_integrate (nu_grid,B_grid,R,dlognu_grid, filling_factor=1.0):
-    nu_grid,B_grid,R,dlognu_grid, filling_factor = tf_convert(nu_grid,B_grid,R,dlognu_grid, filling_factor)
-    integrand = nu_grid*Hz * get_cgs(flux_nu_per_dS(nu_grid,B_grid,R,filling_factor))
-    return npsum(integrand*dlognu_grid, axis=-1)
-# Do NOT use numba for flux_total. It does not understand np.meshgrid, and alternative implementations cause the code to be extremely slow.
-def flux_total_per_dS (B,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
-    '''Total observer-frame flux from dS within the IR-opt range: 300GHz - 3PHz.
-    Unit: erg/(cm**2*sec)'''
-    B,R, nu_min,nu_max = tf_convert(B,R, nu_min,nu_max)
-    Bshape = B.shape
-    # log-integrate the flux
-    lognu = linspace(log(nu_min), log(nu_max), resolution)
-    dlognu = lognu[1:] - lognu[:-1]
-    lognu = 0.5 * (lognu[1:] + lognu[:-1])
-    nu = exp(lognu)
-    B_grid, nu_grid = meshgrid(B, nu, indexing='ij')
-    B_grid, dlognu_grid = meshgrid(B, dlognu, indexing='ij')
-    return get_cgs(reshape(_flux_total_integrate(nu_grid,B_grid,R, dlognu_grid, filling_factor), Bshape))
+    
+if not low_memory:
+    # total flux within the IR-opt range: 300GHz - 3PHz
+    @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+    def _flux_total_integrate (nu_grid,B_grid,R,dlognu_grid, filling_factor=1.0):
+        nu_grid,B_grid,R,dlognu_grid, filling_factor = tf_convert(nu_grid,B_grid,R,dlognu_grid, filling_factor)
+        integrand = nu_grid*Hz * get_cgs(flux_nu_per_dS(nu_grid,B_grid,R,filling_factor))
+        return npsum(integrand*dlognu_grid, axis=-1)
+    # Do NOT use numba for flux_total. It does not understand np.meshgrid, and alternative implementations cause the code to be extremely slow.
+    def flux_total_per_dS (B,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
+        '''Total observer-frame flux from dS within the IR-opt range: 300GHz - 3PHz.
+        Unit: erg/(cm**2*sec)'''
+        B,R, nu_min,nu_max = tf_convert(B,R, nu_min,nu_max)
+        Bshape = B.shape
+        # log-integrate the flux
+        lognu = linspace(log(nu_min), log(nu_max), resolution)
+        dlognu = lognu[1:] - lognu[:-1]
+        lognu = 0.5 * (lognu[1:] + lognu[:-1])
+        nu = exp(lognu)
+        B_grid, nu_grid = meshgrid(B, nu, indexing='ij')
+        B_grid, dlognu_grid = meshgrid(B, dlognu, indexing='ij')
+        return get_cgs(reshape(_flux_total_integrate(nu_grid,B_grid,R, dlognu_grid, filling_factor), Bshape))
+    
+else: # low-memory
+    @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+    def flux_total_per_dS (B,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
+        '''Total observer-frame flux from dS within the IR-opt range: 300GHz - 3PHz.
+        Unit: erg/(cm**2*sec)'''
+        B,R, nu_min,nu_max = tf_convert(B,R, nu_min,nu_max)
+        Bshape = B.shape
+        # log-integrate the flux
+        lognu = linspace(log(nu_min), log(nu_max), resolution)
+        dlognu = lognu[1:] - lognu[:-1]
+        lognu = 0.5 * (lognu[1:] + lognu[:-1])
+        nu = exp(lognu)
+        result = np.zeros(Bshape)
+        for idx in range(len(nu)):
+            nu_here = nu[idx]
+            dlognu_here = dlognu[idx]
+            result += nu_here*Hz * get_cgs(flux_nu_per_dS(nu_here, B, R, filling_factor)) * dlognu_here
+        return get_cgs(result)
 
 
 # In[7]:
@@ -575,11 +598,25 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
     
     dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
-    nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
-    data_vtk['spectrum'] = [
-        tf_deconvert(freqs),
-        tf_deconvert(nansum(flux_nu_per_dS(nu=nu_grid, B=B_grid, R=R_selection, filling_factor=filling_factor)*dS, axis=-1) / (xrange*yrange))
-    ]
+    if not low_memory:
+        nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
+        data_vtk['spectrum'] = [
+            tf_deconvert(freqs),
+            tf_deconvert(nansum(flux_nu_per_dS(nu=nu_grid, B=B_grid, R=R_selection, filling_factor=filling_factor)*dS, axis=-1) / (xrange*yrange))
+        ]
+    else:
+        data_vtk['spectrum'] = [[],[]]
+        for nu in freqs:
+            data_vtk['spectrum'][0].append(tf_deconvert(nu))
+            data_vtk['spectrum'][1].append(tf_deconvert(
+                nansum(
+                    flux_nu_per_dS(
+                        nu=nu, B=Bcc_fluid_tot,
+                        R=R_selection,
+                        filling_factor=filling_factor
+                    )
+                ) * dS / (xrange*yrange)
+            ))
     
     # time derivatives
     if type(previous_data_vtk) is dict:
