@@ -606,9 +606,9 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
         ]
     else:
         data_vtk['spectrum'] = [[],[]]
-        for nu in freqs:
-            data_vtk['spectrum'][0].append(tf_deconvert(nu))
-            data_vtk['spectrum'][1].append(tf_deconvert(
+        for nu in tf.deconvert(freqs):
+            data_vtk['spectrum'][0].append(nu)
+            blah = tf_deconvert(
                 nansum(
                     flux_nu_per_dS(
                         nu=nu, B=Bcc_fluid_tot,
@@ -616,7 +616,9 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
                         filling_factor=filling_factor
                     )
                 ) * dS / (xrange*yrange)
-            ))
+            )
+            print(nu, blah, flush=True)
+            data_vtk['spectrum'][1].append(blah)
         data_vtk['spectrum'] = [np.array(data_vtk['spectrum'][0]), np.array(data_vtk['spectrum'][1])]
     
     # time derivatives
