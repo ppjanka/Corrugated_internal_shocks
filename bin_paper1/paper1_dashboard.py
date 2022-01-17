@@ -1268,6 +1268,7 @@ if processing_type == 'comparison':
             ax.set_xlim(min(data_vtk['x1v']), max(data_vtk['x1v']))
 
             print(data_vtk['spectrum'], flush=True)
+            data_vtk['spectrum'] = [np.array(data_vtk['spectrum'][0]), np.array(data_vtk['spectrum'][1])]
 
             ax = plt.subplot(gs[3,6])
             plt.plot(
