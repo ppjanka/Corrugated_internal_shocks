@@ -6,9 +6,9 @@
 #SBATCH -A 2021-3-29
 
 #SBATCH -J IS2t2a20           # job name
-#SBATCH -t 00:05:00 # 24:00:00           # time requested
+#SBATCH -t 24:00:00           # time requested
 
-#SBATCH --nodes=1 #8             # number of nodes
+#SBATCH --nodes=8             # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
@@ -16,8 +16,8 @@
 # Use only Haswell nodes
 #SBATCH -C Haswell
 #SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 32 # 256
-nproc=32 #256
+#SBATCH -n 256
+nproc=256
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -36,6 +36,9 @@ module load craype-hugepages64M
 module load gsl/2.3
 module load pigz
 
+# GNU parallel setup
+export PATH="/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/gnu-parallel/parallel-20211222/bin:$PATH"
+
 # use the Cray wrappers
 #export CXX=CC
 #export CC=cc
@@ -52,14 +55,16 @@ export LIBS="-lgsl"
 # export OMP_NUM_THREADS=1
 
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT2_press/prod1_corr_ampl
-export PATH="$RUNDIR:$PATH"
 
 # launch job
 cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
 corr=1
-#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=1 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=1 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+
+mkdir $RUNDIR/backup
+cp -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL $RUNDIR/backup/
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Joining and cleaning up the snapshot filesystem..
@@ -68,7 +73,9 @@ echo  - joining and cleaning done.
 
 # non-corrugated, 1D --------------------------------------------------------------
 corr=0
-#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=0 domain1/Nx2=2 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=0 domain1/Nx2=2 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+
+cp -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL $RUNDIR/backup/
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Joining and cleaning up the snapshot filesystem..
