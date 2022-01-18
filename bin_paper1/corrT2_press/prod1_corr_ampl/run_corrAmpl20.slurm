@@ -6,7 +6,7 @@
 #SBATCH -A 2021-3-29
 
 #SBATCH -J IS2t2a20           # job name
-#SBATCH -t 01:00:00 # 24:00:00           # time requested
+#SBATCH -t 00:05:00 # 24:00:00           # time requested
 
 #SBATCH --nodes=1 #8             # number of nodes
 
@@ -52,7 +52,7 @@ export LIBS="-lgsl"
 # export OMP_NUM_THREADS=1
 
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT2_press/prod1_corr_ampl
-export PATH='$RUNDIR:$PATH'
+export PATH="$RUNDIR:$PATH"
 
 # launch job
 cd $RUNDIR
