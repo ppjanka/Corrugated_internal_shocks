@@ -14,10 +14,10 @@
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
 
 # Use only Haswell nodes
-# SBATCH -C Haswell
-# SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-# SBATCH -n 256
-#nproc=256
+#SBATCH -C Haswell
+#SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
+#SBATCH -n 32 # 256
+nproc=32 #256
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -35,6 +35,9 @@ module load craype-hugepages64M
 
 module load gsl/2.3
 module load pigz
+
+# gnu-parallel
+alias parallel='/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/gnu-parallel/parallel-20211222/bin/parallel'
 
 # use the Cray wrappers
 #export CXX=CC
