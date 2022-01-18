@@ -6,18 +6,18 @@
 #SBATCH -A 2021-3-29
 
 #SBATCH -J IS2t2a20           # job name
-#SBATCH -t 24:00:00           # time requested
+#SBATCH -t 01:00:00 # 24:00:00           # time requested
 
-#SBATCH --nodes=8             # number of nodes
+#SBATCH --nodes=1 #8             # number of nodes
 
 # Use any nodes available with all cores per node:
 # SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
 
 # Use only Haswell nodes
-#SBATCH -C Haswell
-#SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 256
-nproc=256
+# SBATCH -C Haswell
+# SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
+# SBATCH -n 256
+#nproc=256
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -58,18 +58,18 @@ cd $RUNDIR
 
 # corrugated, 2D ------------------------------------------------------------------
 corr=1
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=1 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=1 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Joining and cleaning up the snapshot filesystem..
-srun ../../../join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0
+srun $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0
 echo  - joining and cleaning done.
 
 # non-corrugated, 1D --------------------------------------------------------------
 corr=0
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=0 domain1/Nx2=2 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+#srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=0 domain1/Nx2=2 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Joining and cleaning up the snapshot filesystem..
-srun ../../../join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0
+srun $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0
 echo  - joining and cleaning done.
