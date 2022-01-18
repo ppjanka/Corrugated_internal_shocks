@@ -63,7 +63,7 @@ corr=1
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Joining and cleaning up the snapshot filesystem..
-srun $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0
+srun $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0 athena_dir=../../..
 echo  - joining and cleaning done.
 
 # non-corrugated, 1D --------------------------------------------------------------
@@ -72,5 +72,5 @@ corr=0
 
 # remove all restart files but the last one, tar the latter to save file no
 echo Joining and cleaning up the snapshot filesystem..
-srun $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0
+srun $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0 athena_dir=../../..
 echo  - joining and cleaning done.
