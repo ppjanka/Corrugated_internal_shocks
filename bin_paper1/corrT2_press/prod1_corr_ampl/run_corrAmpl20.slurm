@@ -36,9 +36,6 @@ module load craype-hugepages64M
 module load gsl/2.3
 module load pigz
 
-# gnu-parallel
-alias parallel='/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/gnu-parallel/parallel-20211222/bin/parallel'
-
 # use the Cray wrappers
 #export CXX=CC
 #export CC=cc
