@@ -1062,7 +1062,7 @@ if processing_type == 'dashboard':
         else:
             raise
     except Exception as e:
-        print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, tempdir), flush=True)
+        print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, outpath), flush=True)
 
 
 # In[17]:
@@ -1425,7 +1425,7 @@ if processing_type == 'comparison':
         else:
             raise
     except Exception as e:
-        print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, tempdir), flush=True)
+        print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, outpath), flush=True)
     print("COMPARISON PROCESSING DONE.", flush=True)
 
 
