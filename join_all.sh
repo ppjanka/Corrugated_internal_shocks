@@ -19,6 +19,7 @@
 export nproc=1
 export last_rst_only=1
 export tar_when_done=0
+export athena_dir=".."
 for ARGUMENT in "$@"
 do
     KEY=$(echo $ARGUMENT | cut -f1 -d=)
@@ -60,9 +61,9 @@ echo  - rst files processed.
 echo Processing vtk files...
 
 # compile join_vtk.c on first use
-if [ ! -f ../vis/vtk/join_vtk ]; then
+if [ ! -f $athena_dir/vis/vtk/join_vtk ]; then
     echo Compiling join_vtk on first use.
-    gcc -Wall -W -o ../vis/vtk/join_vtk ../vis/vtk/join_vtk.c -lm
+    gcc -Wall -W -o $athena_dir/vis/vtk/join_vtk $athena_dir/vis/vtk/join_vtk.c -lm
 fi
 
 # join the vtk files
@@ -79,12 +80,12 @@ function process_snapshot {
     if [ ! -f $1/joined_vtk/lev$nlevels/$filename ]; then
         fileno=$(echo $filename | awk '{split($0,words,"."); print words[2];}')
         echo $fileno
-        ../vis/vtk/join_vtk -o $1/joined_vtk/$filename $1/id*/*$fileno.vtk
+        $athena_dir/vis/vtk/join_vtk -o $1/joined_vtk/$filename $1/id*/*$fileno.vtk
         rm $1/id*/*$fileno.vtk
         for level in $(seq 1 $nlevels)
         do
             mkdir $1/joined_vtk/lev$level
-            ../vis/vtk/join_vtk -o $1/joined_vtk/lev$level/$filename $1/id*/lev$level/*$fileno.vtk
+            $athena_dir/vis/vtk/join_vtk -o $1/joined_vtk/lev$level/$filename $1/id*/lev$level/*$fileno.vtk
             rm $1/id*/lev$level/*$fileno.vtk
         done
     fi
