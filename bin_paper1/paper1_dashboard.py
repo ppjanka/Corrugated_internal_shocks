@@ -188,7 +188,7 @@ else:
     log = np.log
     reshape = np.reshape
     sqrt = np.sqrt
-    npmax = np.max
+    npmax = lambda x : (np.max(x) if x else np.nan)
     logspace = np.logspace
     log10 = np.log10
     nansum = np.nansum
