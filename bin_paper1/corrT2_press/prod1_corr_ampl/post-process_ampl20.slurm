@@ -29,12 +29,25 @@ module load pigz # needed for parallelized tar
 module load cuda
 module load ffmpeg
 
+# GNU parallel setup
+export PATH="/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/gnu-parallel/parallel-20211222/bin:$PATH"
+
 # environment vars
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT2_press/prod1_corr_ampl
 corr_ampl=20
 
 # launch job
 cd $RUNDIR
+
+# remove all restart files but the last one, tar the latter to save file no
+echo Joining and cleaning up the snapshot filesystem..
+for corr in 0 1; do
+    #cp $RUNDIR/results_corr${corr}ampl${corr_ampl} $RUNDIR/backup/results_corr${corr}ampl${corr_ampl}
+    # for some reason, join_vtk.c does not work properly in parallel; hence nproc=1 MUST be used.. ://
+    $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl${corr_ampl} nproc=1 tar_when_done=0 athena_dir=../../..
+done
+echo  - joining and cleaning done.
+
 
 # process diagnostics
 srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0ampl${corr_ampl} $RUNDIR/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0 -low_memory 1

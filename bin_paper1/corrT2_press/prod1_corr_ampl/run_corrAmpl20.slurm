@@ -63,21 +63,6 @@ cd $RUNDIR
 corr=1
 srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=1 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
 
-mkdir $RUNDIR/backup
-cp -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL $RUNDIR/backup/
-
-# remove all restart files but the last one, tar the latter to save file no
-echo Joining and cleaning up the snapshot filesystem..
-srun $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0 athena_dir=../../..
-echo  - joining and cleaning done.
-
 # non-corrugated, 1D --------------------------------------------------------------
 corr=0
 srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=0 domain1/Nx2=2 domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
-
-cp -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL $RUNDIR/backup/
-
-# remove all restart files but the last one, tar the latter to save file no
-echo Joining and cleaning up the snapshot filesystem..
-srun $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL nproc=$nproc tar_when_done=0 athena_dir=../../..
-echo  - joining and cleaning done.
