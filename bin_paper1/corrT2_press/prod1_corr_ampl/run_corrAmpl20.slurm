@@ -3,7 +3,7 @@
 
 # Set the allocation to be charged for this job
 # not required if you have set a default allocation
-#SBATCH -A 2021-3-29
+#SBATCH -A snic2021-3-29
 
 #SBATCH -J IS2t2a20           # job name
 #SBATCH -t 24:00:00           # time requested
