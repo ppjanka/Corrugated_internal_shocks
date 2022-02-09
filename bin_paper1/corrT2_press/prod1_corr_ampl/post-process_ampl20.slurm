@@ -7,6 +7,7 @@
 
 #SBATCH --nodes=1             # number of nodes
 #SBATCH -p main               # partition
+#SBATCH --mem=512G            # memory requested
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
