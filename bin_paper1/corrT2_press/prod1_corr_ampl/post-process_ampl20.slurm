@@ -3,7 +3,7 @@
 #SBATCH -A snic2021-3-29      # allocation
 
 #SBATCH -J IS2pp-t2a20        # job name
-#SBATCH -t 24:00:00           # time requested
+#SBATCH -t 00:15:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 #SBATCH -p main               # partition
@@ -44,4 +44,4 @@ echo  - joining and cleaning done.
 
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0ampl${corr_ampl} $RUNDIR/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 0 -force_recalc 1 # -low_memory 1
+srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0ampl${corr_ampl} $RUNDIR/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 0 -force_recalc 0 # -low_memory 1

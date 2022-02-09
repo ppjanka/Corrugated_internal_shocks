@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 # coding: utf-8
 
 # ------------------------
@@ -188,7 +188,7 @@ else:
     log = np.log
     reshape = np.reshape
     sqrt = np.sqrt
-    npmax = lambda x : (np.max(x) if x else np.nan)
+    npmax = np.nanmax
     logspace = np.logspace
     log10 = np.log10
     nansum = np.nansum
