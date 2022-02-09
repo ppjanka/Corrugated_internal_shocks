@@ -16,15 +16,15 @@
 #      GNU parallel for bash-level parallel processing
 
 # parse arguments, thanks to JRichardsz (https://unix.stackexchange.com/questions/129391/passing-named-arguments-to-shell-scripts)
-export nproc=1
-export last_rst_only=1
-export tar_when_done=0
-export athena_dir=".."
+nproc=1
+last_rst_only=1
+tar_when_done=0
+athena_dir=".."
 for ARGUMENT in "$@"
 do
     KEY=$(echo $ARGUMENT | cut -f1 -d=)
     VALUE=$(echo $ARGUMENT | cut -f2 -d=)
-    export "$KEY"=$VALUE
+    declare "$KEY"="$VALUE"
 done
 echo join_all.sh will proceed with $nproc processes.
 
@@ -32,23 +32,23 @@ echo join_all.sh will proceed with $nproc processes.
 
 echo Processing rst files...
 
-if [ ! -d $1/joined_rst ]; then
+if [ $(ls $1/id*/*.rst 2> /dev/null) && ! -d $1/joined_rst ]; then
     mkdir $1/joined_rst
 fi
-mv $1/id*/*.rst $1/joined_rst
+mv $1/id*/*.rst $1/joined_rst 2> /dev/null
 
-if [ $last_rst_only == 1 ]; then
-    final_rst_no=`ls $1/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
-    final_to_rm=`printf %04d $(($final_rst_no-1))`
-    rm `eval echo $1/joined_rst/*.{0000..${final_to_rm}}.rst`
+if [ $last_rst_only -eq 1 ]; then
+    final_rst_no=$(ls $1/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}')
+    final_to_rm=$(printf %04d $(($final_rst_no-1)))
+    rm $(eval echo $1/joined_rst/*.{0000..${final_to_rm}}.rst) 2> /dev/null
 fi
 
-if [ $tar_when_done == 1 ]; then
-    workdir=`pwd`
+if [[ $tar_when_done -eq 1 && -d $1/joined_rst ]]; then
+    workdir=$(pwd)
     cd $1
     tar --use-compress-program=pigz -cvf final_rst.tgz joined_rst
     cd $workdir
-    if [[ -f $1/final_rst.tgz ]]
+    if [ -f $1/final_rst.tgz ]
     then
         rm -r $1/joined_rst
     fi
@@ -60,6 +60,8 @@ echo  - rst files processed.
 
 echo Processing vtk files...
 
+MIN_VTK_FILESIZE=1000 # minimal expected vtk filesize, in bytes
+
 # compile join_vtk.c on first use
 if [ ! -f $athena_dir/vis/vtk/join_vtk ]; then
     echo Compiling join_vtk on first use.
@@ -70,29 +72,43 @@ fi
 if [ ! -d $1/joined_vtk ]; then
     mkdir $1/joined_vtk
 fi
-nlevels=$(ls -d $1/id0/lev* | wc -l)
-export nlevels
+nlevels=$(ls -d $1/id0/lev* 2> /dev/null | wc -l)
 echo The snapshot directory contains $nlevels mesh refinement levels.
 # set up for parallel processing
-function process_snapshot {
+get_filesize () {
+    stat -c%s "$1"
+}
+process_snapshot () {
     # args: <the global $1, results directory> <filepath to process>`
-    filename=$(basename $2)
+    declare filename=$(basename $2)
     if [ ! -f $1/joined_vtk/lev$nlevels/$filename ]; then
-        fileno=$(echo $filename | awk '{split($0,words,"."); print words[2];}')
+        declare fileno=$(echo $filename | awk '{split($0,words,"."); print words[2];}')
         echo $fileno
         $athena_dir/vis/vtk/join_vtk -o $1/joined_vtk/$filename $1/id*/*$fileno.vtk
-        rm $1/id*/*$fileno.vtk
+        if [[ -f $1/joined_vtk/$filename && $(get_filesize $1/joined_vtk/$filename) -gt $MIN_VTK_FILESIZE ]]; then
+            rm $1/id*/*$fileno.vtk 2> /dev/null
+        fi
         for level in $(seq 1 $nlevels)
         do
             mkdir $1/joined_vtk/lev$level
             $athena_dir/vis/vtk/join_vtk -o $1/joined_vtk/lev$level/$filename $1/id*/lev$level/*$fileno.vtk
-            rm $1/id*/lev$level/*$fileno.vtk
+            if [[ -f $1/joined_vtk/lev$level/$filename && $(get_filesize $1/joined_vtk/lev$level/$filename) -gt $MIN_VTK_FILESIZE ]]; then
+                rm $1/id*/lev$level/*$fileno.vtk 2> /dev/null
+            fi
         done
     fi
 }
-export -f process_snapshot
-# process in parallel
-ls $1/id0/*.vtk | parallel -I% --max-args 1 --jobs $nproc process_snapshot $1 %
+if [[ $nproc -gt 1 && $(parallel --version &> /dev/null) ]]; then
+    # process in parallel
+    export -f get_filesize
+    export -f process_snapshot
+    ls $1/id0/*.vtk 2> /dev/null | parallel -I% --max-args 1 --jobs $nproc process_snapshot $1 %
+else
+    # process sequentially
+    for snapfile in $1/id0/*.vtk; do
+        process_snapshot "$1" "$snapfile"
+    done
+fi
 
 echo  - vtk files processed.
 
@@ -100,20 +116,30 @@ echo  - vtk files processed.
 
 echo Directory cleanup...
 
-mv $1/id0/*.hst $1
+MIN_RST_FILESIZE=1000000 # minimal expected rst filesize, in bytes
+
+if [ -f $1/id0/*.hst ]; then
+    mv $1/id0/*.hst $1
+fi
 function remove_folder {
-    n_elems=$(ls $1/* | wc -l)
-    if [ $n_elems == 0 ]; then
+    declare -i n_elems=$(ls $1/* 2> /dev/null | wc -l)
+    if [ $n_elems -eq 0 ]; then
         rm -r $1
     fi
 }
-export -f remove_folder
-ls -d $1/id* | parallel -I% --max-args 1 --jobs $nproc remove_folder %
+if [[ $nproc -gt 1 && $(parallel --version &> /dev/null) ]]; then
+    export -f remove_folder
+    ls -d $1/id* 2> /dev/null | parallel -I% --max-args 1 --jobs $nproc remove_folder %
+else
+    for folder in $1/id*; do
+        remove_folder "$folder"
+    done
+fi
 
-if [ $tar_when_done == 1 ]; then
-    dirname=`echo $1 | awk '{n=split($0,words,"/"); print(words[n]);}`
+if [[ -d $1 && $tar_when_done -eq 1 ]]; then
+    dirname=$(basename $1)
     tar --use-compress-program=pigz -cvf $dirname.tgz $dirname
-    if [[ -f $1.tgz ]]
+    if [[ -f $1.tgz && $(get_filesize $1.tgz) -gt $MIN_RST_FILESIZE  ]]
     then
         rm -r $1
     fi
