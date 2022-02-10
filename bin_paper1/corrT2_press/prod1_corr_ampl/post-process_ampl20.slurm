@@ -39,7 +39,7 @@ echo Joining and cleaning up the snapshot filesystem..
 for corr in 0 1; do
     #cp $RUNDIR/results_corr${corr}ampl${corr_ampl} $RUNDIR/backup/results_corr${corr}ampl${corr_ampl}
     # for some reason, join_vtk.c does not work properly in parallel; hence nproc=1 MUST be used.. ://
-    $RUNDIR/join_all.sh $RUNDIR/results_corr${corr}ampl${corr_ampl} nproc=1 tar_when_done=0 athena_dir=../../..
+    $RUNDIR/join_all.sh "$RUNDIR/results_corr${corr}ampl${corr_ampl}" nproc=1 tar_when_done=0 athena_dir="../../.."
 done
 echo  - joining and cleaning done.
 

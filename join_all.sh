@@ -20,7 +20,7 @@ nproc=1
 last_rst_only=1
 tar_when_done=0
 athena_dir=".."
-for ARGUMENT in "$@"
+for ARGUMENT in ${@:1}
 do
     KEY=$(echo $ARGUMENT | cut -f1 -d=)
     VALUE=$(echo $ARGUMENT | cut -f2 -d=)
@@ -32,7 +32,7 @@ echo join_all.sh will proceed with $nproc processes.
 
 echo Processing rst files...
 
-if [ $(ls $1/id*/*.rst 2> /dev/null) && ! -d $1/joined_rst ]; then
+if [[ $(ls $1/id*/*.rst 2> /dev/null) && ! -d $1/joined_rst ]]; then
     mkdir $1/joined_rst
 fi
 mv $1/id*/*.rst $1/joined_rst 2> /dev/null
@@ -81,7 +81,7 @@ get_filesize () {
 process_snapshot () {
     # args: <the global $1, results directory> <filepath to process>`
     declare filename=$(basename $2)
-    if [ ! -f $1/joined_vtk/lev$nlevels/$filename ]; then
+    if [[ ( $nlevels -eq 0 && ! -f $1/joined_vtk/$filename ) || ! -f $1/joined_vtk/lev$nlevels/$filename ]]; then
         declare fileno=$(echo $filename | awk '{split($0,words,"."); print words[2];}')
         echo $fileno
         $athena_dir/vis/vtk/join_vtk -o $1/joined_vtk/$filename $1/id*/*$fileno.vtk
@@ -132,7 +132,7 @@ if [[ $nproc -gt 1 && $(parallel --version &> /dev/null) ]]; then
     ls -d $1/id* 2> /dev/null | parallel -I% --max-args 1 --jobs $nproc remove_folder %
 else
     for folder in $1/id*; do
-        remove_folder "$folder"
+        remove_folder "$folder" 2> /dev/null
     done
 fi
 
