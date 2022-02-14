@@ -1,23 +1,14 @@
-#!/bin/bash -l
-# The -l above is required to get the full environment with modules
+#!/bin/bash
 
-# Set the allocation to be charged for this job
-# not required if you have set a default allocation
-#SBATCH -A snic2021-3-29
+#SBATCH -A snic2021-3-29      # allocation
 
 #SBATCH -J IS2t2a20           # job name
 #SBATCH -t 24:00:00           # time requested
 
-#SBATCH --nodes=8             # number of nodes
-
-# Use any nodes available with all cores per node:
-# SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
-
-# Use only Haswell nodes
-#SBATCH -C Haswell
-#SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 256
-nproc=256
+#SBATCH --nodes=1             # number of nodes
+#SBATCH -p main               # partition
+# SBATCH --cpus-per-task=2     # number of cpus per MPI process (2: all cores, ignore hyperthreading)
+nproc=256 # 2nodes x 2xCPU x 64cores x2hyperthreading
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -27,32 +18,13 @@ nproc=256
 CORR_AMPL=20
 
 # set up environment -- GCC compiler + Cray MPI + Cray HDF5
-module swap PrgEnv-cray PrgEnv-gnu/6.0.7
-module swap gcc gcc/10.2.0
-module load cray-mpich/7.7.14
-module load cray-hdf5-parallel/1.10.6.1
+module load PDC
+module load PrgEnv-gnu/8.2.0
+module swap gcc gcc/11.2.0
+module load cray-mpich/8.1.11
+module load cray-hdf5-parallel/1.12.0.7
 module load craype-hugepages64M
-
-module load gsl/2.3
-module load pigz
-
-# GNU parallel setup
-export PATH="/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/gnu-parallel/parallel-20211222/bin:$PATH"
-
-# use the Cray wrappers
-#export CXX=CC
-#export CC=cc
-#export FC=ftn
-
-# set up Athena 4.2 environment variables
-export CC="/opt/cray/pe/craype/2.6.1/bin/cc"
-export CFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include"
-export CPP="/opt/cray/pe/craype/2.6.1/bin/CC"
-export CPPFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include"
-export LDFLAGS="-L/pdc/vol/gsl/2.3/GNU/8.3/lib"
-export LIBS="-lgsl"
-
-# export OMP_NUM_THREADS=1
+module load GSL/2.7-cpeGNU-21.11
 
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT2_press/prod1_corr_ampl
 
