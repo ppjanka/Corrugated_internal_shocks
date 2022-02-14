@@ -28,3 +28,7 @@ bin/unit_tests
 *.pkl
 *.png
 tf_dashboard_testing
+*.tgz
+slurm*.out
+*.hst
+*.vtk
