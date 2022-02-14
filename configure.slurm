@@ -13,7 +13,7 @@
 #SBATCH --mail-user=patryk.pjanka@su.se
 
 # set up environment -- GCC compiler + Cray MPI + Cray HDF5
-module swap PrgEnv-cray PrgEnv-gnu/8.2.0
+module load PrgEnv-gnu/8.2.0
 module swap gcc gcc/11.2.0
 module load cray-mpich/8.1.11
 module load cray-hdf5-parallel/1.12.0.7
