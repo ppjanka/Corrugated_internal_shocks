@@ -114,6 +114,13 @@ ifeq ($(MACHINE),beskow)
   LDR = /opt/cray/pe/craype/2.6.1/bin/cc
   MPIINC = -I/pdc/vol/gsl/2.3/GNU/8.3/include
   MPILIB = -L/pdc/vol/gsl/2.3/GNU/8.3/lib
+else
+ifeq ($(MACHINE),dardel)
+  CC = cc
+  LDR = cc
+#  MPIINC = -I/pdc/vol/gsl/2.3/GNU/8.3/include
+#  MPILIB = -L/pdc/vol/gsl/2.3/GNU/8.3/lib
+endif
 endif
 endif
 endif

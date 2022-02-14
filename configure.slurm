@@ -43,7 +43,7 @@ cd $RUNDIR
 # prepare the SMR version
 #srun make clean
 #srun -n 1 $RUNDIR/configure --enable-mpi --enable-special-relativity --with-problem=IntSh2-paper1 --with-eos=adiabatic --with-coord=cartesian --with-order=2p --with-integrator=vl --with-flux=hlld --with-gas=mhd --enable-smr CC="/opt/cray/pe/craype/2.6.1/bin/cc" CFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" CPP="/opt/cray/pe/craype/2.6.1/bin/CC" CPPFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include" LDFLAGS="-L/pdc/vol/gsl/2.3/GNU/8.3/lib" LIBS="-lgsl"
-#srun -n 1 make -j all MACHINE=beskow
+#srun -n 1 make -j all MACHINE=dardel
 #mv $RUNDIR/bin/athena $RUNDIR/bin_paper1/athena_SMR
 
 # prepare the noSMR version
@@ -59,5 +59,5 @@ srun -n 1 $RUNDIR/configure \
     --with-flux=hlld \
     --with-gas=mhd \
     CC=$CC CFLAGS=$CFLAGS CPP=$CPP CPPFLAGS=$CPPFLAGS LDFLAGS=$LDFLAGS LIBS=$LIBS
-srun -n 1 make -j all MACHINE=beskow
+srun -n 1 make -j all MACHINE=dardel
 #mv $RUNDIR/bin/athena $RUNDIR/bin_paper1/
