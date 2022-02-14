@@ -118,8 +118,8 @@ else
 ifeq ($(MACHINE),dardel)
   CC = cc
   LDR = cc
-#  MPIINC = -I/pdc/vol/gsl/2.3/GNU/8.3/include
-#  MPILIB = -L/pdc/vol/gsl/2.3/GNU/8.3/lib
+  MPIINC = -I/pdc/software/21.11/eb/software/GSL/2.7-cpeGNU-21.11/include
+  MPILIB = -L/pdc/software/21.11/eb/software/GSL/2.7-cpeGNU-21.11/lib
 endif
 endif
 endif

@@ -13,12 +13,13 @@
 #SBATCH --mail-user=patryk.pjanka@su.se
 
 # set up environment -- GCC compiler + Cray MPI + Cray HDF5
+module load PDC
 module load PrgEnv-gnu/8.2.0
 module swap gcc gcc/11.2.0
 module load cray-mpich/8.1.11
 module load cray-hdf5-parallel/1.12.0.7
 module load craype-hugepages64M
-# module load gsl/2.3
+module load GSL/2.7-cpeGNU-21.11
 
 # use the Cray wrappers
 #export CXX=CC
@@ -27,11 +28,11 @@ module load craype-hugepages64M
 
 # set up Athena 4.2 environment variables
 export CC='cc'
-export CFLAGS="" #"-I/pdc/vol/gsl/2.3/GNU/8.3/include"
+export CFLAGS="-I/pdc/software/21.11/eb/software/GSL/2.7-cpeGNU-21.11/include"
 export CPP='CC'
-export CPPFLAGS="" #"-I/pdc/vol/gsl/2.3/GNU/8.3/include"
-export LDFLAGS="" #"-L/pdc/vol/gsl/2.3/GNU/8.3/lib"
-export LIBS="" #"-lgsl"
+export CPPFLAGS="-I/pdc/software/21.11/eb/software/GSL/2.7-cpeGNU-21.11/include"
+export LDFLAGS="-L/pdc/software/21.11/eb/software/GSL/2.7-cpeGNU-21.11/lib"
+export LIBS="-lgsl"
 
 # export OMP_NUM_THREADS=1
 
