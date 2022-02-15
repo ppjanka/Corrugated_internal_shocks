@@ -20,7 +20,7 @@ nproc=1
 last_rst_only=1
 tar_when_done=0
 athena_dir=".."
-for ARGUMENT in ${@:1}
+for ARGUMENT in ${@:2}
 do
     KEY=$(echo $ARGUMENT | cut -f1 -d=)
     VALUE=$(echo $ARGUMENT | cut -f2 -d=)
@@ -105,7 +105,7 @@ if [[ $nproc -gt 1 && $(parallel --version &> /dev/null) ]]; then
     ls $1/id0/*.vtk 2> /dev/null | parallel -I% --max-args 1 --jobs $nproc process_snapshot $1 %
 else
     # process sequentially
-    for snapfile in $1/id0/*.vtk; do
+    for snapfile in $(ls $1/id0/*.vtk 2> /dev/null); do
         process_snapshot "$1" "$snapfile"
     done
 fi
