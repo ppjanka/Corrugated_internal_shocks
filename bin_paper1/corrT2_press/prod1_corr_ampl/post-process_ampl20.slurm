@@ -3,7 +3,7 @@
 #SBATCH -A snic2021-3-29      # allocation
 
 #SBATCH -J IS2pp-t2a20        # job name
-#SBATCH -t 00:15:00           # time requested
+#SBATCH -t 03:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 #SBATCH -p main               # partition
@@ -17,10 +17,11 @@ nproc=-1 # use all cores available
 
 # module setup
 module load PDC
+
 module load Anaconda3
 eval "$(conda shell.bash hook)"
 conda activate /cfs/klemming/projects/snic/snic2020-4-12/ppjanka/anaconda/envs/intsh2-tf
-which python # print to have a record of which env is used
+echo Using python from $(which python). # print to have a record of which env is used
 
 module load ffmpeg
 
