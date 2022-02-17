@@ -46,4 +46,4 @@ echo  - joining and cleaning done.
 
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0ampl${corr_ampl} $RUNDIR/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 0 -force_recalc 0 # -low_memory 1
+srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0ampl${corr_ampl} $RUNDIR/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0 # -low_memory 1
