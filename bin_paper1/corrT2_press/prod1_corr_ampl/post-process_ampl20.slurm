@@ -3,7 +3,7 @@
 #SBATCH -A snic2021-3-29      # allocation
 
 #SBATCH -J IS2pp-t2a20        # job name
-#SBATCH -t 03:00:00           # time requested
+#SBATCH -t 06:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 #SBATCH -p main               # partition
@@ -17,6 +17,9 @@ nproc=-1 # use all cores available
 
 # module setup
 module load PDC
+
+module load PrgEnv-gnu/8.2.0
+module swap gcc gcc/11.2.0
 
 module load Anaconda3
 eval "$(conda shell.bash hook)"
@@ -42,8 +45,9 @@ for corr in 0 1; do
     # for some reason, join_vtk.c does not work properly in parallel; hence nproc=1 MUST be used.. ://
     $RUNDIR/join_all.sh "$RUNDIR/results_corr${corr}ampl${corr_ampl}" nproc=1 tar_when_done=0 athena_dir="../../.."
 done
-echo  - joining and cleaning done.
+echo Joining and cleaning done.
+echo; echo
 
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0ampl${corr_ampl} $RUNDIR/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0 # -low_memory 1
+srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0ampl${corr_ampl} $RUNDIR/results_corr1ampl${corr_ampl} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 1 # -low_memory 1
