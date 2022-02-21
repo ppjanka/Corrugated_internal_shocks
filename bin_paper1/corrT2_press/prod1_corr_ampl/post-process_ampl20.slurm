@@ -28,9 +28,6 @@ echo Using python from $(which python). # print to have a record of which env is
 
 module load ffmpeg
 
-# GNU parallel setup
-#export PATH="/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/gnu-parallel/parallel-20211222/bin:$PATH"
-
 # environment vars
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT2_press/prod1_corr_ampl
 corr_ampl=20
