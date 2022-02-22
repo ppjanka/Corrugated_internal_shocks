@@ -3,12 +3,12 @@
 #SBATCH -A snic2021-3-29      # allocation
 
 #SBATCH -J IS2t2a20           # job name
-#SBATCH -t 15:00:00           # time requested
+#SBATCH -t 12:00:00           # time requested
 
 #SBATCH --nodes=2             # number of nodes
 #SBATCH -p main               # partition
-#SBATCH --cpus-per-task=2     # number of cpus per MPI process (2: all cores, ignore hyperthreading)
-nproc=256 # 2nodes x 2xCPU x 64cores
+#SBATCH --cpus-per-task=1     # number of cpus per MPI process (2: all cores, ignore hyperthreading)
+nproc=512 # 2nodes x 2xCPU x 64cores x2 (hyperthreading)
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
