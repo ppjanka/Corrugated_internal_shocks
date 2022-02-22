@@ -2,7 +2,7 @@
 
 #SBATCH -A snic2021-3-29      # allocation
 
-#SBATCH -J IS2t3a20           # job name
+#SBATCH -J IS2t3a5
 #SBATCH -t 12:00:00           # time requested
 
 #SBATCH --nodes=2             # number of nodes

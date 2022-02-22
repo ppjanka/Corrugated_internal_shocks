@@ -21,7 +21,18 @@ for arg in $@; do
             continue
         fi
         echo -n "$VAL "
-        awk -v par_env="$PAR_ENV=" -v par_val=$VAL '{if (substr($0,0,10) == par_env) {printf("%s%s\n",par_env,par_val);} else {print($0);}}' "$template_name.slurm" > "$pathstem/$filename"
+        # change the environment variable value and the job name
+        awk -v par_env="$PAR_ENV=" -v par_val=$VAL '{\
+          if (substr($0,0,10) == par_env) {\
+            printf("%s%s\n",par_env,par_val);\
+          } else if (substr($0,0,10) == "#SBATCH -J") {\
+            split($0,words);\
+            gsub("[0-9]+$",par_val,words[3]);\
+            printf("#SBATCH -J %s\n", words[3]);\
+          } else {\
+            print($0);\
+          };\
+        }' "$template_name.slurm" > "$pathstem/$filename"
     done
     echo
 
