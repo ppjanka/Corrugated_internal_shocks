@@ -30,7 +30,7 @@ module load ffmpeg
 
 # environment vars
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT2_press/prod1_corr_ampl
-CORR_AMPL=20
+CORR_AMPL=10
 
 # launch job
 cd $RUNDIR
