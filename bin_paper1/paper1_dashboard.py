@@ -1401,6 +1401,10 @@ if processing_type == 'comparison':
             tar_location = '/'.join(datapaths_comp[idx].split('/')[:-2])
             if tar_location != '':
                 os.chdir(tar_location)
+            try:
+                os.system('cp %s %s' % (datapaths_comp[idx].split('/')[-2]+'/history.pkl', 'history_%s.pkl' % (datapaths_comp[idx].split('/')[-2].split('_')[-1],)))
+            except Exception as e:
+                pass
             os.system('tar -cvzf %s %s' % (datapaths_comp[idx].split('/')[-2] + '.tgz',datapaths_comp[idx].split('/')[-2]))
             if os.path.isfile(datapaths_comp[idx][:-1] + '.tgz'):
                 rmtree(datapaths_comp[idx])
