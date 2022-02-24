@@ -48,13 +48,13 @@ process_restarts() {
         ls $1/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}' \
         || echo 0 \
     )
-    echo final_rst_no
+    echo $final_rst_no
 }
 
 # launch job
 cd $RUNDIR
 
-for corr in 0 1; do
+for corr in 1 0; do
     declare outdir="$RUNDIR/results_corr${corr}ampl$CORR_AMPL"
     if [ -d "$outdir" ]; then
         declare final_rst_no=$(process_restarts "$outdir")
