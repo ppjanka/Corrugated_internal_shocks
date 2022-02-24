@@ -26,7 +26,7 @@ module load cray-hdf5-parallel/1.12.0.7
 module load craype-hugepages64M
 module load GSL/2.7-cpeGNU-21.11
 
-RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT4_press/prod1_corr_ampl
+RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT4_bfield/prod1_corr_ampl
 
 # Usage: run_from_scratch <corr[0,1]>
 run_from_scratch() {
