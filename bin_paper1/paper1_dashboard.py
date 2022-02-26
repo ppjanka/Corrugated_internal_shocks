@@ -1191,7 +1191,7 @@ if processing_type == 'comparison':
         fileno = int(vtk_filenames_comp[0][i_vtk].split('/')[-1].split('.')[1])
         if fileno != int(vtk_filenames_comp[1][i_vtk].split('/')[-1].split('.')[1]):
             print('[comparison_frame] file lists not aligned. Aborting.')
-            sys.exit()
+            return
 
         vtk_time = fileno * out_dt_vtk # presumably we can trust this..
 
