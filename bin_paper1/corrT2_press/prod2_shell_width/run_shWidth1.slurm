@@ -82,18 +82,18 @@ process_restarts() {
 cd $RUNDIR
 
 for corr in 1 0; do
-    declare outdir="$RUNDIR/results_corr${corr}ampl$CORR_AMPL"
+    declare outdir="$RUNDIR/results_corr${corr}shWidth$SHELL_WIDTH_LABEL"
     if [ -d "$outdir" ]; then
         declare final_rst_no=$(process_restarts "$outdir")
         if [ $final_rst_no -gt 0 ]; then
-            echo "Running corr${corr}ampl$CORR_AMPL from restart no $final_rst_no..."
-            srun $RUNDIR/athena -r "$RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/IntSh2-p1.$(printf "%04i" $final_rst_no).rst" -d "$RUNDIR/results_corr${corr}ampl$CORR_AMPL"
+            echo "Running  from restart no $final_rst_no..."
+            srun $RUNDIR/athena -r "$outdir/joined_rst/IntSh2-p1.$(printf "%04i" $final_rst_no).rst" -d "$outdir"
         else
-            echo "Running corr${corr}ampl$CORR_AMPL from scratch..."
+            echo "Running $outdir from scratch..."
             run_from_scratch $corr
         fi
     else
-        echo "Running corr${corr}ampl$CORR_AMPL from scratch..."
+        echo "Running $outdir from scratch..."
         run_from_scratch $corr
     fi
 done
