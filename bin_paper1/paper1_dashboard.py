@@ -1178,6 +1178,9 @@ if processing_type == 'comparison':
         os.makedirs(outpath)
 
     n_levels = 64
+    
+    def get_fileno (filename):
+        return int(filename.split('/')[-1].split('.')[1])
 
     # WARNING: add_snapshot_FIFO below is NOT embarassingly parallelizable, but does significantly save memory
     def comparison_frame (i_vtk, verbose=False, save=True, recalculate=False, history_comp=None, augment_kwargs=default_augment_kwargs, tarpaths=[None,None]):
@@ -1188,8 +1191,8 @@ if processing_type == 'comparison':
 
         from read_vtk import vtk
 
-        fileno = int(vtk_filenames_comp[0][i_vtk].split('/')[-1].split('.')[1])
-        if fileno != int(vtk_filenames_comp[1][i_vtk].split('/')[-1].split('.')[1]):
+        fileno = get_fileno(vtk_filenames_comp[0][i_vtk])
+        if fileno != get_fileno(vtk_filenames_comp[1][i_vtk]):
             print('[comparison_frame] file lists not aligned. Aborting.')
             return
 
@@ -1382,6 +1385,19 @@ if processing_type == 'comparison':
                     tarpaths[idx] = datapaths_comp[idx]
             else:
                 tarpaths[idx] = datapaths_comp[idx]
+    
+    # fill in the gaps in datasets
+    for idx in [0,1]:
+        vtk_filenames_comp[idx] = sum([[elem1,]*(get_fileno(elem2)-get_fileno(elem1)) for elem1,elem2 in zip(vtk_filenames_comp[idx][:-1], vtk_filenames_comp[idx][1:])], []) + [vtk_filenames_comp[idx][-1],]
+    lendiff = len(vtk_filenames_comp[1]) - len(vtk_filenames_comp[0])
+    if lendiff > 0:
+        vtk_filenames_comp[0] += [vtk_filenames_comp[0][-1],]*lendiff
+    elif lendiff < 0:
+        vtk_filenames_comp[1] += [vtk_filenames_comp[1][-1],]*(-lendiff)
+    print('Dataset alignment:')
+    for i in range(len(vtk_filenames_comp[0])):
+        print('%i -- %i' % (get_fileno(vtk_filenames_comp[0][i]),get_fileno(vtk_filenames_comp[1][i])))
+    print(' --- ')
     
     # now, parallelize the frame generation
     from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
