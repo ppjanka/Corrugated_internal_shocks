@@ -38,4 +38,4 @@ for corr in 0 1; do
 done
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0shWidth$SHELL_WIDTH_LABEL.tgz $RUNDIR/results_corr1shWidth$SHELL_WIDTH_LABEL.tgz -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0 # -low_memory 1
+srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0shWidth$SHELL_WIDTH_LABEL $RUNDIR/results_corr1shWidth$SHELL_WIDTH_LABEL -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0 # -low_memory 1
