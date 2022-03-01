@@ -3,12 +3,12 @@
 #SBATCH -A snic2021-3-29      # allocation
 
 #SBATCH -J IS2t3a75
-#SBATCH -t 12:00:00           # time requested
+#SBATCH -t 24:00:00           # time requested
 
 #SBATCH --nodes=2             # number of nodes
 #SBATCH -p main               # partition
-#SBATCH --cpus-per-task=1     # number of cpus per MPI process (2: all cores, ignore hyperthreading)
-nproc=512 # 2nodes x 2xCPU x 64cores x2 (hyperthreading)
+#SBATCH --cpus-per-task=2     # number of cpus per MPI process (2: all cores, ignore hyperthreading)
+nproc=256 # 2nodes x 2xCPU x 64cores
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -35,7 +35,7 @@ run_from_scratch() {
     if [ $corr -eq 0 ]; then
         extra_args='domain1/Nx2=2'
     fi
-    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=0.$CORR_AMPL problem/corr_switch=0 $extra_args domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$(echo ${CORR_AMPL} | awk '{print 0.01*$0}') problem/corr_switch=0 $extra_args domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
 }
 # Usage: process_restarts <results folder containing id* dirs>
 process_restarts() {
