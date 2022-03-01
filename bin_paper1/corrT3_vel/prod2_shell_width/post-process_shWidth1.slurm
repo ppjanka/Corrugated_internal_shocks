@@ -35,16 +35,15 @@ SHELL_WIDTH=`awk -v s=$SHELL_WIDTH_FRAC 'BEGIN {print s*5.0}'`
 XCEN=`awk -v s=$SHELL_WIDTH 'BEGIN {print 2.5 + 0.5*s}'`
 
 # environment vars
-RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT3_vel
-datafolder=prod2_shell_width
+RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT3_vel/prod2_shell_width
 
 # launch job
 cd $RUNDIR
 
 # join the files from different processors
 for corr in 0 1; do
-    $RUNDIR/join_all.sh "$datafolder/results_corr${corr}shWidth$SHELL_WIDTH_LABEL" nproc=1 tar_when_done=0 athena_dir="../../.."
+    $RUNDIR/join_all.sh "results_corr${corr}shWidth$SHELL_WIDTH_LABEL" nproc=1 tar_when_done=0 athena_dir="../../.."
 done
 
 # process diagnostics
-srun python paper1_dashboard.py -comparison $RUNDIR/$datafolder/results_corr0shWidth$SHELL_WIDTH_LABEL.tgz $RUNDIR/$datafolder/results_corr1shWidth$SHELL_WIDTH_LABEL.tgz -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0 # -low_memory 1
+srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0shWidth$SHELL_WIDTH_LABEL.tgz $RUNDIR/results_corr1shWidth$SHELL_WIDTH_LABEL.tgz -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0 # -low_memory 1
