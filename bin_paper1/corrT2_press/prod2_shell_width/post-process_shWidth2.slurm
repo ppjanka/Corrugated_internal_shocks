@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#SBATCH -J IS2pp-t2sw2        # job name
+#SBATCH -t 1-00:00:00         # time requested
+
+#SBATCH --nodes=1             # number of nodes
+#SBATCH -C fat --exclusive    # memory requested (fat node, 384GiB)
+
+#SBATCH --mail-type=begin
+#SBATCH --mail-type=end
+#SBATCH --mail-user=patryk.pjanka@su.se
+
+nproc=-1 # use all cores available
+
+# module setup
+module load Anaconda3
+eval "$(conda shell.bash hook)"
+conda activate /proj/snic2020-4-12/users/x_patpj/conda/envs/intsh2-tf
+echo Using python from $(which python). # print to have a record of which env is used
+
+module load FFmpeg/4.1-nsc1-intel-2018b-eb
+
+# shell width for this script
+SHELL_WIDTH_FRAC=1 # shell width as a fraction of the gap size (5 lt-s)
+SHELL_WIDTH_LABEL=`echo $SHELL_WIDTH_FRAC | sed -r 's/[.]+/p/g'`
+SHELL_WIDTH=`awk -v s=$SHELL_WIDTH_FRAC 'BEGIN {print s*5.0}'`
+XCEN=`awk -v s=$SHELL_WIDTH 'BEGIN {print 2.5 + 0.5*s}'`
+
+# environment vars
+RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT2_press/prod2_shell_width
+
+# launch job
+cd $RUNDIR
+
+# join the files from different processors
+for corr in 0 1; do
+    $RUNDIR/join_all.sh "results_corr${corr}shWidth$SHELL_WIDTH_LABEL" nproc=1 tar_when_done=0 athena_dir="../../.."
+done
+
+# process diagnostics
+srun python paper1_dashboard.py -comparison $RUNDIR/results_corr0shWidth$SHELL_WIDTH_LABEL.tgz $RUNDIR/results_corr1shWidth$SHELL_WIDTH_LABEL.tgz -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0 # -low_memory 1
