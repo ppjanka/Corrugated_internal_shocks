@@ -35,7 +35,7 @@ run_from_scratch() {
     if [ $corr -eq 0 ]; then
         extra_args='domain1/Nx2=2'
     fi
-    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$(echo ${CORR_AMPL} | awk '{print 0.01*$0}') problem/corr_switch=0 $extra_args domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$(echo ${CORR_AMPL} | awk '{print 0.01*$0}') problem/corr_switch=${corr} $extra_args domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
 }
 # Usage: process_restarts <results folder containing id* dirs>
 process_restarts() {
@@ -65,6 +65,8 @@ for corr in 1 0; do
             echo "Running corr${corr}ampl$CORR_AMPL from scratch..."
             run_from_scratch $corr
         fi
+    elif [ -f "$outdir.tgz" ]; then
+        echo "File $outdir.tgz exists. Nothing to be done."
     else
         echo "Running corr${corr}ampl$CORR_AMPL from scratch..."
         run_from_scratch $corr
