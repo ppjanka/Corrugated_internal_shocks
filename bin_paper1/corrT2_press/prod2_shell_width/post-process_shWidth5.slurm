@@ -2,7 +2,7 @@
 
 #SBATCH -A snic2021-3-29      # allocation
 
-#SBATCH -J IS2pp-t2sw1        # job name
+#SBATCH -J IS2pp-t2sw5
 #SBATCH -t 06:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
@@ -29,7 +29,7 @@ echo Using python from $(which python). # print to have a record of which env is
 module load ffmpeg
 
 # shell width for this script
-SHELL_WIDTH_FRAC=1 # shell width as a fraction of the gap size (5 lt-s)
+SHELL_WIDTH_FRAC=5
 SHELL_WIDTH_LABEL=`echo $SHELL_WIDTH_FRAC | sed -r 's/[.]+/p/g'`
 SHELL_WIDTH=`awk -v s=$SHELL_WIDTH_FRAC 'BEGIN {print s*5.0}'`
 XCEN=`awk -v s=$SHELL_WIDTH 'BEGIN {print 2.5 + 0.5*s}'`

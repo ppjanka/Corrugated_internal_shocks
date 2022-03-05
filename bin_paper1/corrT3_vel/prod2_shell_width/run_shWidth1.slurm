@@ -7,8 +7,8 @@
 
 #SBATCH --nodes=2             # number of nodes
 #SBATCH -p main               # partition
-#SBATCH --cpus-per-task=2     # number of cpus per MPI process (2: all cores, ignore hyperthreading)
-NPROC=256 # 2nodes x 2xCPU x 64cores x2 (hyperthreading)
+#SBATCH --cpus-per-task=1     # number of cpus per MPI process (2: all cores, ignore hyperthreading)
+NPROC=512 # 2nodes x 2xCPU x 64cores x2 (hyperthreading)
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end

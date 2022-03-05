@@ -2,7 +2,7 @@
 
 #SBATCH -A snic2021-3-29      # allocation
 
-#SBATCH -J IS2t4sw1           # job name
+#SBATCH -J IS2t3sw10
 #SBATCH -t 24:00:00           # time requested
 
 #SBATCH --nodes=2             # number of nodes
@@ -15,7 +15,7 @@ NPROC=512 # 2nodes x 2xCPU x 64cores x2 (hyperthreading)
 #SBATCH --mail-user=patryk.pjanka@su.se
 
 # shell width for this script
-SHELL_WIDTH_FRAC=1 # shell width as a fraction of the gap size (5 lt-s)
+SHELL_WIDTH_FRAC=10
 SHELL_WIDTH_LABEL=`echo $SHELL_WIDTH_FRAC | sed -r 's/[.]+/p/g'`
 SHELL_WIDTH=`awk -v s=$SHELL_WIDTH_FRAC 'BEGIN {print s*5.0}'`
 
@@ -40,7 +40,7 @@ module load cray-hdf5-parallel/1.12.0.7
 module load craype-hugepages64M
 module load GSL/2.7-cpeGNU-21.11
 
-RUNDIR='/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT4_bfield/prod2_shell_width'
+RUNDIR='/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT3_vel/prod2_shell_width'
 
 # Usage: run_from_scratch <corr[0,1]>
 run_from_scratch() {
