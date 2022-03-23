@@ -1735,7 +1735,7 @@ if processing_type == 'expLongFsyn':
     for idx in range(2):
         # Extract the dataset if needed
         if datapaths_comp[idx][-4:] == '.tgz':
-            os.system(f'cd $(dirname {datapaths_comp[idx]}) && tar --use-compress-program=pigz -xf $(basename {datapaths_comp[idx]})'
+            os.system(f'cd $(dirname {datapaths_comp[idx]}) && tar --use-compress-program=pigz -xf $(basename {datapaths_comp[idx]}')
         # list the files needed
         vtk_filenames_comp.append(
             sorted(list(set(
