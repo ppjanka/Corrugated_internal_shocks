@@ -1,10 +1,10 @@
-
+#!/usr/bin/env python
 # coding: utf-8
 
 # ------------------------
 # **COMMAND LINE PROCESSING**
 
-# In[1]:
+# In[20]:
 
 
 # check whether we're running in Jupyter or from a script file
@@ -28,6 +28,8 @@ if in_script:
                 python paper1_dashboard.py -dashboard <datapath with joined_vtk folder>
             > to process a comparison dashboard:
                 python paper1_dashboard.py -comparison <datapath with joined_vtk folder> <datapath with joined_vtk folder>
+            > to perform an experiment regarding long-term Fsyn enhancement (see Pjanka et al. 2022)
+                python paper1_dashboard.py -expLongFsyn <datapath with joined_vtk folder for 1D case> <datapath with joined_vtk folder for 2D (corrugated) case>
             > other options
                 -nproc - number of threads for parallel processing
                 -opt_tf <0/1> - turn off/on tensorflow parallelization
@@ -61,7 +63,7 @@ def get_arg (argname, n_read=1, default=None, val_type=str):
 # ------------------------
 # **EXECUTION SETUP**
 
-# In[2]:
+# In[21]:
 
 
 # NOTE: Throughout this work, Bfield is defined such that U_B = B**2/2, unless stated otherwise
@@ -78,8 +80,16 @@ elif '-comparison' in cmd_args:
     for i in range(2):
         if '.tgz' not in datapaths_comp[i] and datapaths_comp[i][-1] != '/':
             datapaths_comp[i] += '/'
-else:
-    if False:
+elif '-expLongFsyn' in cmd_args:
+    processing_type = 'expLongFsyn'
+    datapaths_comp = list(get_arg('expLongFsyn', n_read=2, val_type=[str,str]))
+    for i in range(2):
+        if '.tgz' not in datapaths_comp[i] and datapaths_comp[i][-1] != '/':
+            datapaths_comp[i] += '/'
+else: # default processing options
+    if True:
+        processing_type = 'expLongFsyn'
+    elif False:
         processing_type = 'dashboard'
         datapath = '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test_tf.tgz'
     else:
@@ -93,7 +103,7 @@ else:
 # MAIN EXECUTION PARAMETERS
 unit_check = False # turns off optimization but allows to use astropy to check the units
 tar_when_done = get_arg('tar_when_done', default=True, val_type=boolean) # if not already a tarfile, datapath will be turned into .tgz at the end of analysis
-opt_tf = get_arg('opt_tf', default=True, val_type=boolean) # use tensorflow instead of numpy for GPU acceleration, x5 speedup
+opt_tf = get_arg('opt_tf', default=False, val_type=boolean) # use tensorflow instead of numpy for GPU acceleration, x5 speedup
 opt_numba = get_arg('opt_numba', default=True, val_type=boolean) # use numba to pre-compile some of the functions, about 3x speedup (turned off if opt_tf is on and GPU available)
 low_memory = get_arg('low_memory', default=False, val_type=boolean) # make adjustments to enable computing with low system memory available
 convert_vtk = get_arg('convert_vtk', default=True, val_type=boolean) # saves vtk and processing data as pkl -- needed to use tensorflow, but also prevents from recalculating the same data
@@ -144,7 +154,7 @@ except ImportError:
         sys.exit()
 
 
-# In[3]:
+# In[22]:
 
 
 # tensorflow optimization wrappers
@@ -194,7 +204,7 @@ else:
     nansum = np.nansum
 
 
-# In[4]:
+# In[23]:
 
 
 # constants
@@ -248,14 +258,14 @@ simu_B_8piCorr = np.sqrt(8.*np.pi*simu_press) # sqrt( erg / cm^3 )
 # --------------------
 # **PHYSICS**
 
-# In[5]:
+# In[24]:
 
 
 out_dt_vtk = 0.1
 adiab_idx = 1.33333333333
 
 
-# In[6]:
+# In[25]:
 
 
 # sychrotron emission treatment
@@ -384,7 +394,7 @@ else: # low-memory
         return get_cgs(result)
 
 
-# In[7]:
+# In[26]:
 
 
 if unit_check:
@@ -398,59 +408,59 @@ if unit_check:
           get_cgs(flux_total(np.array([12.,]),12.,0.5)) / get_cgs(erg/(cm**2*sec)))
 
 
-# In[8]:
+# In[27]:
 
 
 # other frequently used functions, moved here to enable numba optimization
 
 # vector operations
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def sqr_vec_l2 (x,y,z):
     x,y,z = tf_convert(x,y,z)
     return x**2 + y**2 + z**2
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def norm_vec_l2 (x,y,z):
     x,y,z = tf_convert(x,y,z)
     return sqrt(x**2 + y**2 + z**2)
 
 # SR operations
 # NOTE: in Athena 4.2 vel1, vel2, vel3 are 3-velocities. Instead Athena++ uses 4-velocities in the code (so they would need to be translated).
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def v2gamma (v):
     v, = tf_convert(v)
     return 1.0/sqrt(1.0-v**2)
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def vsqr2gamma (vsqr):
     vsqr, = tf_convert(vsqr)
     return 1.0/sqrt(1.0-vsqr)
 
 # Bcc in the fluid frame
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def BccFl0 (gamma, v1,v2,v3, b1,b2,b3):
     gamma, v1,v2,v3, b1,b2,b3 = tf_convert(gamma, v1,v2,v3, b1,b2,b3)
     return gamma * (v1*b1 + v2*b2 + v3*b3)
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def BccFli (gamma, v,b, bFl0):
     gamma, v,b, bFl0 = tf_convert(gamma, v,b, bFl0)
     return b / gamma + bFl0 * v
 
 # plasma parameters
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def plasma_beta (press, Bflsqr):
     press, Bflsqr = tf_convert(press, Bflsqr)
     return 2.*press / Bflsqr
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def magnetization (Bflsqr, rho):
     Bflsqr, rho = tf_convert(Bflsqr, rho)
     return 0.5 * Bflsqr / rho
 
 # internal energy in the fluid frame, see Beckwith & Stone (2011)
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def enthalpy (adiab_idx, press, rho):
     '''Fluid-frame gas enthalpy per unit mass.'''
     adiab_idx, press, rho = tf_convert(adiab_idx, press, rho)
     return 1.0 + ((adiab_idx)/(adiab_idx-1.0)) * press / rho
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def internal_energy (rho, enthalpy, gamma, press, Bflsqr):
     '''Fluid-frame total internal energy per unit volume.
      - see Beckwith & Stone (2011), https://github.com/PrincetonUniversity/athena/wiki/Special-Relativity'''
@@ -458,7 +468,7 @@ def internal_energy (rho, enthalpy, gamma, press, Bflsqr):
     return rho * enthalpy * gamma**2 - press + 0.5 * Bflsqr # warning!: includes rest mass
 
 
-# In[9]:
+# In[28]:
 
 
 sim2phys = {
@@ -500,7 +510,7 @@ sim2phys = {
 }
 
 
-# In[10]:
+# In[29]:
 
 
 def do_vertical_avg (data_vtk, quantity):
@@ -627,7 +637,7 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     return data_vtk
 
 
-# In[11]:
+# In[30]:
 
 
 def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
@@ -681,7 +691,7 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
     return data_vtk
 
 
-# In[12]:
+# In[31]:
 
 
 def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
@@ -1456,8 +1466,306 @@ if processing_type == 'comparison' and not in_script:
     comparison_frame(80, history_comp=history_comp, save=False)
 
 
+# ---
+# # Experiment regarding long-term Fsyn enhancement
+#  (see Pjanka et al. 2022)
+
+# In[13]:
+
+
+if processing_type == 'expLongFsyn':
+    
+    def calc_alternative_augmentations (default_dict, new_bcc_dict, 
+                      nu_res=128, nu_min=1., nu_max=1.1*nu_int_max,
+                      nu_int_min=nu_int_min, nu_int_max=nu_int_max,
+                      R_selection=R_choice, nu_selection=nu_choice,
+                      filling_factor=1.0,
+                    calc_spectrum=False):
+        '''Uses the default-augmented file and appends Bfield and Fsyn data for alternative scenarios:
+         - with Bfield from a separate non-corrugated (1D) run
+         - with Bfield from the corrugated (2D) run but vertically-averaged into a 1D structure
+         - with the above scaled so that the average is the same as the 1D run, leaving only the horizontal structure (but not the overall bfield enhancement)
+         - with Bfield from the corrugated (2D) run scaled down so that the average matches the 1D case, leaving only the 2D structure (but not the overall bfield enhancement)'''
+        
+        data_vtk = default_dict
+    
+        # box dimensions
+        xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
+        yrange = (data_vtk['x2v'][1] - data_vtk['x2v'][0]) * len(data_vtk['x2v'])
+        for f in [1,2]:
+            new_bcc_dict[f'x{f}v'] = data_vtk[f'x{f}v']
+
+        # SR quantities
+        gam = data_vtk['gamma']
+
+        # total Bcc in observer frame
+        new_bcc_dict['Bcc_tot'] = tf_deconvert(norm_vec_l2(new_bcc_dict['Bcc1'], new_bcc_dict['Bcc2'], new_bcc_dict['Bcc3']))
+
+        # Bcc in the fluid frame
+        Bfl0 = BccFl0(
+            gam,
+            data_vtk['vel1'],data_vtk['vel2'],data_vtk['vel3'],
+            new_bcc_dict['Bcc1'],new_bcc_dict['Bcc2'],new_bcc_dict['Bcc3'],
+        )
+        Bfl1 = BccFli(
+            gam, 
+            data_vtk['vel1'], new_bcc_dict['Bcc1'],
+            Bfl0
+        )
+        Bfl2 = BccFli(
+            gam, 
+            data_vtk['vel2'], new_bcc_dict['Bcc2'],
+            Bfl0
+        )
+        Bfl3 = BccFli(
+            gam, 
+            data_vtk['vel3'], new_bcc_dict['Bcc3'],
+            Bfl0
+        )
+        Bcc_fluid_tot_sqr = sqr_vec_l2(Bfl1, Bfl2, Bfl3)
+        Bcc_fluid_tot = sqrt(Bcc_fluid_tot_sqr)
+        new_bcc_dict['Bcc_fluid_0'] = tf_deconvert(Bfl0)
+        new_bcc_dict['Bcc_fluid_1'] = tf_deconvert(Bfl1)
+        new_bcc_dict['Bcc_fluid_2'] = tf_deconvert(Bfl2)
+        new_bcc_dict['Bcc_fluid_3'] = tf_deconvert(Bfl3)
+        new_bcc_dict['Bcc_fluid_tot'] = tf_deconvert(Bcc_fluid_tot)
+        do_vertical_avg(new_bcc_dict, 'Bcc_fluid_tot')
+
+        # plasma parameters
+        new_bcc_dict['plasma_beta'] = tf_deconvert(plasma_beta(data_vtk['press'], Bcc_fluid_tot_sqr))
+        new_bcc_dict['magnetization'] = tf_deconvert(magnetization(Bcc_fluid_tot_sqr, data_vtk['rho']))
+
+        # internal energy in the fluid frame
+        # see Beckwith & Stone (2011), https://github.com/PrincetonUniversity/athena/wiki/Special-Relativity
+        enth = data_vtk['enthalpy']
+        new_bcc_dict['internal_energy'] = tf_deconvert(internal_energy(data_vtk['rho'], enth, gam, data_vtk['press'], Bcc_fluid_tot_sqr)) # warning!: includes rest mass
+        do_vertical_avg(new_bcc_dict, 'internal_energy')
+
+        del Bcc_fluid_tot_sqr, enth
+
+        # synchrotron emission diagnostics
+        jnu = j_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
+        new_bcc_dict['j_nu'] = tf_deconvert(jnu)
+        do_vertical_avg(new_bcc_dict, 'j_nu')
+        alphanu = alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
+        new_bcc_dict['alpha_nu'] = tf_deconvert(alphanu)
+        do_vertical_avg(new_bcc_dict, 'alpha_nu')
+        janu = j_over_alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
+        new_bcc_dict['j_over_alpha_nu'] = tf_deconvert(janu)
+        do_vertical_avg(new_bcc_dict, 'j_over_alpha_nu')
+        flux_tot = flux_total_per_dS(B=Bcc_fluid_tot, R=R_selection, nu_min=nu_int_min, nu_max=nu_int_max)
+        new_bcc_dict['flux_density'] = tf_deconvert(flux_tot)
+        do_vertical_avg(new_bcc_dict, 'flux_density')
+
+        if calc_spectrum:
+            nu_min, nu_max = tf_convert(nu_min, nu_max)
+            freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
+
+            dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
+            if not low_memory:
+                nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
+                new_bcc_dict['spectrum'] = [
+                    tf_deconvert(freqs),
+                    tf_deconvert(nansum(flux_nu_per_dS(nu=nu_grid, B=B_grid, R=R_selection, filling_factor=filling_factor)*dS, axis=-1) / (xrange*yrange))
+                ]
+            else:
+                new_bcc_dict['spectrum'] = [[],[]]
+                for nu in tf_deconvert(freqs):
+                    new_bcc_dict['spectrum'][0].append(nu)
+                    new_bcc_dict['spectrum'][1].append(tf_deconvert(
+                        nansum(
+                            flux_nu_per_dS(
+                                nu=nu, B=Bcc_fluid_tot,
+                                R=R_selection,
+                                filling_factor=filling_factor
+                            )
+                        ) * dS / (xrange*yrange)
+                    ))
+                new_bcc_dict['spectrum'] = [np.array(new_bcc_dict['spectrum'][0]), np.array(new_bcc_dict['spectrum'][1])]
+
+
 # In[ ]:
 
 
+if processing_type == 'expLongFsyn':
+    
+    def augment_Bfield_alternatives (augmented_2d_pkl, augmented_1d_pkl, append=True):
+        '''Uses the default-augmented file and appends Bfield and Fsyn data for alternative scenarios:
+         - with Bfield from a separate non-corrugated (1D) run
+         - with Bfield from the corrugated (2D) run but vertically-averaged into a 1D structure
+         - with the above scaled so that the average is the same as the 1D run, leaving only the horizontal structure (but not the overall bfield enhancement)
+         - with Bfield from the corrugated (2D) run scaled down so that the average matches the 1D case, leaving only the 2D structure (but not the overall bfield enhancement)'''
+        # First, extract both files
+        with open(augmented_1d_pkl, 'rb') as f:
+            data_1d, _ = pkl.load(f)
+        with open(augmented_2d_pkl, 'rb') as f:
+            data_2d, augment_kwargs = pkl.load(f)
+        jres = data_2d['Bcc1'].shape[0]
+        # Process the alternatives
+        data_2d['alternatives'] = {}
+        # - with Bfield from a separate non-corrugated (1D) run
+        alternative = 'B1d_sep'
+        data_2d['alternatives'][alternative] = {}
+        for f in [1,2,3]:
+            data_2d['alternatives'][alternative][f'Bcc{f}'] = np.repeat(data_1d[f'Bcc{f}'][:1], jres, axis=0)
+        calc_alternative_augmentations(
+            data_2d, data_2d['alternatives'][alternative],
+            **augment_kwargs
+        )
+        # - with Bfield from the corrugated (2D) run but vertically-averaged into a 1D structure
+        alternative = 'B1d_avg'
+        data_2d['alternatives'][alternative] = {}
+        for f in [1,2,3]:
+            data_2d['alternatives'][alternative][f'Bcc{f}'] = np.repeat(np.mean(data[f'Bcc{f}'], axis=0, keepdims=True), jres, axis=0)
+        calc_alternative_augmentations(
+            data_2d, data_2d['alternatives'][alternative],
+            **augment_kwargs
+        )
+        # - with the above scaled so that the average is the same as the 1D run, leaving only the horizontal structure (but not the overall bfield enhancement)
+        alternative = 'B1d_avgScaled'
+        data_2d['alternatives'][alternative] = {}
+        for f in [1,2,3]:
+            data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d['alternatives']['B1d_avg'] * np.sum(data_1d[f'Bcc{f}'][0]) / np.sum(data_2d['alternatives']['B1d_avg'][0])
+        calc_alternative_augmentations(
+            data_2d, data_2d['alternatives'][alternative],
+            **augment_kwargs
+        )
+        # - with Bfield from the corrugated (2D) run scaled down so that the average matches the 1D case, leaving only the 2D structure (but not the overall bfield enhancement)
+        alternative = 'B2d_scaled'
+        data_2d['alternatives'][alternative] = {}
+        for f in [1,2,3]:
+            data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d[f'Bcc{f}'] * np.sum(data_1d[f'Bcc{f}'][:1])*jres / np.sum(data_2d[f'Bcc{f}'])
+        calc_alternative_augmentations(
+            data_2d, data_2d['alternatives'][alternative],
+            **augment_kwargs
+        )
+        # Save the alternative-appended result to the 2d file
+        if append:
+            with open(augmented_2d_pkl, 'wb') as f:
+                pkl.dump((data_2d, augment_kwargs), f)
+        else:
+            return data_2d
 
+
+# In[ ]:
+
+
+if processing_type == 'expLongFsyn':
+    
+    def precalc_alternate_history (history_pkl, vtk_pkl_filenames_1d2d_pairs, append=True):
+        '''Note: requires the archive containing *.vtk.pkl files to be untarred (to be able to append the pkl files), extract first if needed.'''
+        # load the original history
+        with open(history_pkl, 'rb') as f:
+            history = pkl.load(f)
+        # prepare to append
+        quantities = ('internal_energy', 'flux_density')
+        alternatives = ('B1d_sep', 'B1d_avg', 'B1d_avgScaled', 'B2d_scaled')
+        history['alternatives'] = {a:{q:[] for q in quantities} for a in alternatives}
+        # processing file-by-file
+        for pkl_1d, pkl_2d in tqdm(vtk_pkl_filenames):
+            # augment the files
+            try:
+                augment_Bfield_alternatives (pkl_2d, pkl_1d, append=True)
+                del pkl_1d
+            except Exception as e:
+                print(f'[precalc_alternate_history] Could not read vtk.pkl files:\n  {pkl_1d, pkl_2d}\n  error msg: {e}')
+                print(' - the file will be ignored.')
+                continue
+            # calculate history variables
+            data_vtk = pkl_2d
+            xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
+            dl = (data_vtk['x1v'][1] - data_vtk['x1v'][0])
+            for alternative in alternatives:
+                branch = history['alternatives'][alternative]
+                branch['internal_energy'].append(
+                    np.sum(pkl_2d['alternatives'][alternative]['internal_energy_vsZ']*dl)/xrange
+                )
+                branch['flux_density'].append(
+                    get_cgs_value(np.sum(pkl_2d['alternatives'][alternative]['flux_density_vsZ']*dl))/xrange
+                )
+                for quantity in quantities:
+                    branch[quantity] = np.array(branch[quantity])
+                branch['ddt_internal_energy'] = (branch['internal_energy'][1:] - branch['internal_energy'][:-1]) / (history['times'][1:] - history['times'][:-1])
+                branch['ddt_internal_energy'] = np.insert(branch['ddt_internal_energy'], 0, np.nan)
+        # Save the alternative-appended result to the 2d file
+        if append:
+            with open(history_pkl, 'wb') as f:
+                pkl.dump(history, f)
+        else:
+            return history
+
+
+# In[ ]:
+
+
+if processing_type == 'expLongFsyn':
+    
+    # Preprocessing and history augmentation
+    
+    def diff_name(a,b):
+        """Returns a comparison-style name based on two strings"""
+        # don't edit the original paths
+        a,b = copy(a), copy(b)
+        # strip the .tgz, if needed
+        if a[-4:] == '.tgz': a = a[:-4]
+        if b[-4:] == '.tgz': b = b[:-4]
+        # strip the trailing /
+        if a[-1] == '/': a = a[:-1]
+        if b[-1] == '/': b = b[:-1]
+        # first, read from the front
+        idxl = 0
+        while a[:idxl] == b[:idxl]:
+            idxl += 1
+        # then, read from the back
+        idxr = 1
+        while a[-idxr:] == b[-idxr:]:
+            idxr += 1
+        na, nb = len(a), len(b)
+        return a[:(idxl-1)] + '-' + a[(idxl-1):(na-idxr+1)] + '-vs-' + b[(idxl-1):(nb-idxr+1)] + '-' + b[(nb-idxr+1):]
+    
+    def get_fileno (filename):
+        return int(filename.split('/')[-1].split('.')[1])
+
+    linestyles_comp = ['k-', 'b-']
+
+    # create lists of vtk files to be compared
+    vtk_filenames_comp = []
+    history_outfile_comp = []
+    history_comp = []
+    for idx in range(2):
+        # Extract the dataset if needed
+        if datapaths_comp[idx][-4:] == '.tgz':
+            os.system(f'cd $(dirname {datapaths_comp[idx]}) && tar --use-compress-program=pigz -xf $(basename {datapaths_comp[idx]})'
+        # list the files needed
+        vtk_filenames_comp.append(
+            sorted(list(set(
+                glob.glob(datapaths_comp[idx] + 'joined_vtk/*.vtk.pkl')
+            )))
+        )
+        history_outfile_comp.append(datapaths_comp[idx] + 'history.pkl')
+    
+    # fill in the gaps in datasets
+    for idx in [0,1]:
+        vtk_filenames_comp[idx] = sum([[elem1,]*(get_fileno(elem2)-get_fileno(elem1)) for elem1,elem2 in zip(vtk_filenames_comp[idx][:-1], vtk_filenames_comp[idx][1:])], []) + [vtk_filenames_comp[idx][-1],]
+    lendiff = len(vtk_filenames_comp[1]) - len(vtk_filenames_comp[0])
+    if lendiff > 0:
+        vtk_filenames_comp[0] += [vtk_filenames_comp[0][-1],]*lendiff
+    elif lendiff < 0:
+        vtk_filenames_comp[1] += [vtk_filenames_comp[1][-1],]*(-lendiff)
+    print('Dataset alignment:')
+    for i in range(len(vtk_filenames_comp[0])):
+        print('%i -- %i' % (get_fileno(vtk_filenames_comp[0][i]),get_fileno(vtk_filenames_comp[1][i])))
+    print(' --- ')
+                      
+    # Calculate the alternative histories
+    precalc_alternate_history(history_outfile_comp[1], zip(*vtk_filenames_comp), append=True)
+
+
+# In[ ]:
+
+
+if processing_type == 'expLongFsyn':
+    
+    def expLongFsyn_frame (i_vtk, verbose=False, save=True, recalculate=False, history_comp=None, augment_kwargs=default_augment_kwargs, tarpaths=[None,None]):
+        pass
 
