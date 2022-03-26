@@ -1662,7 +1662,7 @@ if processing_type == 'expLongFsyn':
         alternatives = ('B1d_sep', 'B1d_avg', 'B1d_avgScaled', 'B2d_scaled')
         history['alternatives'] = {a:{q:[] for q in quantities} for a in alternatives}
         # processing file-by-file
-        for pkl_1d, pkl_2d in tqdm(vtk_pkl_filenames):
+        for pkl_1d, pkl_2d in tqdm(vtk_pkl_filenames_1d2d_pairs):
             # augment the files
             try:
                 augment_Bfield_alternatives (pkl_2d, pkl_1d, append=True)
