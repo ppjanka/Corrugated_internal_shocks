@@ -8,6 +8,8 @@
 # - will replace the PAR_ENV env variable in each script based on the list hard coded here
 declare PAR_ENV='SHELL_WIDTH_FRAC'
 declare -a VALS=( 0.1 0.2 0.5 1 2 5 10 )
+declare -a NPROCS=( 96 96 96 96 64 32 16 )
+declare NVALS=${#VALS[@]}
 
 # prepare a script with sbatch commands for the whole folder
 echo -e '#!/usr/env/bin bash\n' > submit_all.sh
@@ -16,7 +18,10 @@ chmod +x submit_all.sh
 echo "Generating .slurm scripts for parameter study... "
 
 declare dependency
-for VAL in ${VALS[@]}; do
+for IDX in $(seq 0 $NVALS); do
+
+  declare VAL=${VALS[IDX]}
+  declare NPROC=${NPROCS[IDX]}
   
   echo -n "$VAL "
   dependency=false
@@ -31,14 +36,21 @@ for VAL in ${VALS[@]}; do
 
     if [ "$filename" != "$template_name.slurm" ]; then
 
-      # change the environment variable value and the job name
-      awk -v par_env="$PAR_ENV=" -v par_val=$VAL '{\
+      # change the environment variable value, nproc, and the job name
+      awk -v par_env="$PAR_ENV=" \
+          -v par_val=$VAL \
+          -v nproc=$NPROC \
+          -v filename=$filename \
+      '{\
         if (substr($0,0,17) == par_env) {\
           printf("%s%s\n",par_env,par_val);\
         } else if (substr($0,0,10) == "#SBATCH -J") {\
           split($0,words);\
           gsub("[0-9]+$",par_val,words[3]);\
           printf("#SBATCH -J %s\n", words[3]);\
+        } else if (substr(filename,0,12) == "post-process"\
+                && substr($0,0,6) == "nproc=") {\
+          printf("nproc=%d",nproc);\
         } else {\
           print($0);\
         };\

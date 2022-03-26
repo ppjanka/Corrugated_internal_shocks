@@ -13,8 +13,7 @@
 #SBATCH --mail-type=end
 #SBATCH --mail-user=patryk.pjanka@su.se
 
-nproc=96  #-1 # use all cores available
-
+nproc=32
 # module setup
 module load PDC
 
