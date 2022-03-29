@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+
 # coding: utf-8
 
 # ------------------------
 # **COMMAND LINE PROCESSING**
 
-# In[20]:
+# In[1]:
 
 
 # check whether we're running in Jupyter or from a script file
@@ -63,7 +63,7 @@ def get_arg (argname, n_read=1, default=None, val_type=str):
 # ------------------------
 # **EXECUTION SETUP**
 
-# In[21]:
+# In[2]:
 
 
 # NOTE: Throughout this work, Bfield is defined such that U_B = B**2/2, unless stated otherwise
@@ -89,13 +89,22 @@ elif '-expLongFsyn' in cmd_args:
 else: # default processing options
     if True:
         processing_type = 'expLongFsyn'
+        datapaths_comp = [
+            '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/test_corr0_ampl50',
+            '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/test_corr1_ampl50'
+        ]
+        for i in range(2):
+            if datapaths_comp[i][-4:] != '.tgz' and datapaths_comp[i][-1] != '/':
+                datapaths_comp[i] += '/'
     elif False:
         processing_type = 'dashboard'
         datapath = '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test_tf.tgz'
     else:
         processing_type = 'comparison'
-        datapaths_comp = [ '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test_tf.tgz', '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test_tf2.tgz'
-]
+        datapaths_comp = [
+            '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/test_corr0_ampl50',
+            '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/test_corr1_ampl50'
+        ]
         for i in range(2):
             if datapaths_comp[i][-4:] != '.tgz' and datapaths_comp[i][-1] != '/':
                 datapaths_comp[i] += '/'
@@ -154,7 +163,7 @@ except ImportError:
         sys.exit()
 
 
-# In[22]:
+# In[3]:
 
 
 # tensorflow optimization wrappers
@@ -204,7 +213,7 @@ else:
     nansum = np.nansum
 
 
-# In[23]:
+# In[4]:
 
 
 # constants
@@ -258,14 +267,14 @@ simu_B_8piCorr = np.sqrt(8.*np.pi*simu_press) # sqrt( erg / cm^3 )
 # --------------------
 # **PHYSICS**
 
-# In[24]:
+# In[5]:
 
 
 out_dt_vtk = 0.1
 adiab_idx = 1.33333333333
 
 
-# In[25]:
+# In[6]:
 
 
 # sychrotron emission treatment
@@ -394,7 +403,7 @@ else: # low-memory
         return get_cgs(result)
 
 
-# In[26]:
+# In[7]:
 
 
 if unit_check:
@@ -408,7 +417,7 @@ if unit_check:
           get_cgs(flux_total(np.array([12.,]),12.,0.5)) / get_cgs(erg/(cm**2*sec)))
 
 
-# In[27]:
+# In[8]:
 
 
 # other frequently used functions, moved here to enable numba optimization
@@ -468,7 +477,7 @@ def internal_energy (rho, enthalpy, gamma, press, Bflsqr):
     return rho * enthalpy * gamma**2 - press + 0.5 * Bflsqr # warning!: includes rest mass
 
 
-# In[28]:
+# In[9]:
 
 
 sim2phys = {
@@ -510,7 +519,7 @@ sim2phys = {
 }
 
 
-# In[29]:
+# In[10]:
 
 
 def do_vertical_avg (data_vtk, quantity):
@@ -637,7 +646,7 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     return data_vtk
 
 
-# In[30]:
+# In[11]:
 
 
 def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
@@ -691,7 +700,7 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
     return data_vtk
 
 
-# In[31]:
+# In[12]:
 
 
 def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
@@ -1093,7 +1102,7 @@ if processing_type == 'dashboard':
 # -----------
 # **Two-dataset comparison**
 
-# In[23]:
+# In[19]:
 
 
 if processing_type == 'comparison':
@@ -1364,7 +1373,7 @@ if processing_type == 'comparison':
         print(' - frame done.', flush=True)
 
 
-# In[25]:
+# In[20]:
 
 
 if processing_type == 'comparison':
@@ -1440,7 +1449,7 @@ if processing_type == 'comparison':
             print('done.')
 
 
-# In[26]:
+# In[21]:
 
 
 if processing_type == 'comparison':
@@ -1459,7 +1468,7 @@ if processing_type == 'comparison':
     print("COMPARISON PROCESSING DONE.", flush=True)
 
 
-# In[24]:
+# In[22]:
 
 
 if processing_type == 'comparison' and not in_script:
@@ -1470,7 +1479,7 @@ if processing_type == 'comparison' and not in_script:
 # # Experiment regarding long-term Fsyn enhancement
 #  (see Pjanka et al. 2022)
 
-# In[13]:
+# In[23]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1584,7 +1593,7 @@ if processing_type == 'expLongFsyn':
                 new_bcc_dict['spectrum'] = [np.array(new_bcc_dict['spectrum'][0]), np.array(new_bcc_dict['spectrum'][1])]
 
 
-# In[ ]:
+# In[24]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1616,7 +1625,7 @@ if processing_type == 'expLongFsyn':
         alternative = 'B1d_avg'
         data_2d['alternatives'][alternative] = {}
         for f in [1,2,3]:
-            data_2d['alternatives'][alternative][f'Bcc{f}'] = np.repeat(np.mean(data[f'Bcc{f}'], axis=0, keepdims=True), jres, axis=0)
+            data_2d['alternatives'][alternative][f'Bcc{f}'] = np.repeat(np.mean(data_2d[f'Bcc{f}'], axis=0, keepdims=True), jres, axis=0)
         calc_alternative_augmentations(
             data_2d, data_2d['alternatives'][alternative],
             **augment_kwargs
@@ -1625,7 +1634,7 @@ if processing_type == 'expLongFsyn':
         alternative = 'B1d_avgScaled'
         data_2d['alternatives'][alternative] = {}
         for f in [1,2,3]:
-            data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d['alternatives']['B1d_avg'] * np.sum(data_1d[f'Bcc{f}'][0]) / np.sum(data_2d['alternatives']['B1d_avg'][0])
+            data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d['alternatives']['B1d_avg'][f'Bcc{f}'] * np.sum(data_1d[f'Bcc{f}'][0]) / np.sum(data_2d['alternatives']['B1d_avg'][f'Bcc{f}'][0])
         calc_alternative_augmentations(
             data_2d, data_2d['alternatives'][alternative],
             **augment_kwargs
@@ -1643,11 +1652,11 @@ if processing_type == 'expLongFsyn':
         if append:
             with open(augmented_2d_pkl, 'wb') as f:
                 pkl.dump((data_2d, augment_kwargs), f)
-        else:
-            return data_2d
+        del data_1d
+        return data_2d
 
 
-# In[ ]:
+# In[27]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1665,28 +1674,30 @@ if processing_type == 'expLongFsyn':
         for pkl_1d, pkl_2d in tqdm(vtk_pkl_filenames_1d2d_pairs):
             # augment the files
             try:
-                augment_Bfield_alternatives (pkl_2d, pkl_1d, append=True)
-                del pkl_1d
+                data_2d = augment_Bfield_alternatives (pkl_2d, pkl_1d, append=True)
             except Exception as e:
                 print(f'[precalc_alternate_history] Could not read vtk.pkl files:\n  {pkl_1d, pkl_2d}\n  error msg: {e}')
                 print(' - the file will be ignored.')
                 continue
             # calculate history variables
-            data_vtk = pkl_2d
+            data_vtk = data_2d
             xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
             dl = (data_vtk['x1v'][1] - data_vtk['x1v'][0])
             for alternative in alternatives:
-                branch = history['alternatives'][alternative]
-                branch['internal_energy'].append(
-                    np.sum(pkl_2d['alternatives'][alternative]['internal_energy_vsZ']*dl)/xrange
+                history_branch = history['alternatives'][alternative]
+                data_branch = data_2d['alternatives'][alternative]
+                history_branch['internal_energy'].append(
+                    get_cgs_value(np.sum(data_branch['internal_energy_vsZ']*dl))/xrange
                 )
-                branch['flux_density'].append(
-                    get_cgs_value(np.sum(pkl_2d['alternatives'][alternative]['flux_density_vsZ']*dl))/xrange
+                history_branch['flux_density'].append(
+                    get_cgs_value(np.sum(data_branch['flux_density_vsZ']*dl))/xrange
                 )
-                for quantity in quantities:
-                    branch[quantity] = np.array(branch[quantity])
-                branch['ddt_internal_energy'] = (branch['internal_energy'][1:] - branch['internal_energy'][:-1]) / (history['times'][1:] - history['times'][:-1])
-                branch['ddt_internal_energy'] = np.insert(branch['ddt_internal_energy'], 0, np.nan)
+        # convert to numpy
+        for quantity in quantities:
+            history_branch[quantity] = np.array(history_branch[quantity])
+        # calculate derivatives
+        history_branch['ddt_internal_energy'] = (history_branch['internal_energy'][1:] - history_branch['internal_energy'][:-1]) / (history['times'][1:] - history['times'][:-1])
+        history_branch['ddt_internal_energy'] = np.insert(history_branch['ddt_internal_energy'], 0, np.nan)
         # Save the alternative-appended result to the 2d file
         if append:
             with open(history_pkl, 'wb') as f:
@@ -1695,7 +1706,7 @@ if processing_type == 'expLongFsyn':
             return history
 
 
-# In[ ]:
+# In[28]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1761,11 +1772,17 @@ if processing_type == 'expLongFsyn':
     precalc_alternate_history(history_outfile_comp[1], zip(*vtk_filenames_comp), append=True)
 
 
-# In[ ]:
+# In[29]:
 
 
 if processing_type == 'expLongFsyn':
     
     def expLongFsyn_frame (i_vtk, verbose=False, save=True, recalculate=False, history_comp=None, augment_kwargs=default_augment_kwargs, tarpaths=[None,None]):
         pass
+
+
+# In[ ]:
+
+
+
 
