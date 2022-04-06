@@ -132,6 +132,7 @@ void problem(DomainS *pDomain)
   Real gamma_sh [2];
   Real rho_sh [2] =
           {par_getd("problem", "rho_sh1"), par_getd("problem", "rho_sh2")};
+  Real rho_sh_mean = 0.5*(rho_sh[0] + rho_sh[1]);
   #ifdef MHD
   Real sigmaB_sh [2] =
           {par_getd("problem", "sigmaB_sh1"), par_getd("problem", "sigmaB_sh2")};
@@ -164,7 +165,7 @@ void problem(DomainS *pDomain)
   // corrugation
   int corr_switch = par_geti_def("problem", "corr_switch", 0);
   int corr_type = par_geti_def("problem", "corr_type", 1); // default=1 for backward compatibility
-  Real corr_ampl = par_getd_def("problem", "corr_ampl", 0.0);
+  Real corr_ampl = 0.01 * par_getd_def("problem", "corr_ampl", 0.0);
   int corr_nx = par_geti_def("problem", "corr_nx", 2);
   int corr_ny = par_geti_def("problem", "corr_ny", 2);
   // if corr_type == 4 (magnetic field varies within shells), pre-compute the magnetic fields first, in order to properly adjust pressures for fair comparison
@@ -277,7 +278,10 @@ void problem(DomainS *pDomain)
   // --- LOOP OVER ALL CELLS, SET ALL INITIAL CONDITIONS ---
 
   // set the initial conditions
-  Real rho, press, vel, gamma, sqr_gamma, enthalpy;
+  Real rho, press, vel, gamma, sqr_gamma, enthalpy, xi;
+  if (corr_type == 1) {
+    xi = 0.5 * (1 + corr_ampl* rho_sh_mean / rho_amb);
+  }
 	for (k = ks; k <= ke; k++) {
     for (j = js; j <= je+1; j++) {
       #pragma omp simd
@@ -288,19 +292,12 @@ void problem(DomainS *pDomain)
 
         if (z < x1_sh[0]) {
           // left of first shell ---------------------------------
-          rho = rho_amb + 0.5*corr_ampl; // adjustment by corr_ampl to ensure fair comparison
-          press = press_amb * (rho/rho_amb); // keep the ambient temperature the same
-          vel = vel_sh[0]; gamma = gamma_sh[0];
+          rho = rho_amb; press = press_amb; vel = vel_sh[0]; gamma = gamma_sh[0];
           #ifdef MHD
           B = 0.0;
           #endif
-          if (press < 0) { // ensure pressure equilibrium
-            press = press_sh[0]
-              #ifdef MHD
-                + 0.5 * (SQR(bfield_sh[0]) - SQR(B)) / SQR(gamma);
-              #else
-                ;
-              #endif
+          if (corr_type == 1) { // density modulation
+            rho *= xi;
           }
         } else if (z <= x2_sh[0]) {
           // inside first shell ---------------------------------
@@ -308,28 +305,18 @@ void problem(DomainS *pDomain)
           #ifdef MHD
           B = bfield_sh[0];
           #endif
-          if (corr_type == 2) { // pressure perturbations inside shells
-            if (corr_switch == 1) {
-              press += corr_ampl * (press - press_amb)
-                  * 0.5 * cos( 2.*M_PI *
-                  (corr_nx * (z-x1_sh[0]) / (x2_sh[0]-x1_sh[0])
-                 + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
-              - M_PI);
-            } else { // ensure fair comparison
-              ;
-            }
-          } else if (corr_type == 3) { // velocity perturbations inside shells
-            if (corr_switch == 1) {
+          if (corr_type == 2 && corr_switch == 1) { // pressure perturbations inside shells
+            press += corr_ampl * (press - press_amb)
+                * 0.5 * cos( 2.*M_PI *
+                (corr_nx * (z-x1_sh[0]) / (x2_sh[0]-x1_sh[0])
+               + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1])));
+          } else if (corr_type == 3 && corr_switch == 1) { // velocity perturbations inside shells
               // varying gamma^2 gives us conserved total energy
               gamma = sqrt(SQR(gamma) + corr_ampl * (SQR(gamma) - 1.0)
                   * 0.5 * cos( 2.*M_PI *
                   (corr_nx * (z-x1_sh[0]) / (x2_sh[0]-x1_sh[0])
-                 + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
-              - M_PI));
+                 + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))));
               vel = (vel/fabs(vel)) * gamma2v(gamma);
-            } else { // ensure fair comparison
-              ;
-            }
           }
         } else if (z < x1_sh[1]) {
           // between shells -------------------------------------
@@ -342,30 +329,16 @@ void problem(DomainS *pDomain)
           gamma = v2gamma(vel);*/
           vel = 0.0;
           gamma = 1.0;
-          if (press < 0) { // ensure pressure equilibrium
-            press = sigmoid(z*(2*M_PI/(x1_sh[1]-x2_sh[0])))
-                          * (press_sh[1]-press_sh[0]) + press_sh[0]
-            #ifdef MHD
-              + 0.5 * (SQR(
-                            sigmoid(z*(2*M_PI/(x1_sh[1]-x2_sh[0])))
-                              * (bfield_sh[1]-bfield_sh[0]) + bfield_sh[0]
-                         )
-                  - SQR(B)) / SQR(gamma);
-            #else
-              ;
-            #endif
-          }
           if (corr_type == 1) { // density perturbations between shells
             if (corr_switch > 0) { // apply corrugation
-              rho += (corr_ampl - rho_amb)
+              rho += (corr_ampl*rho_sh_mean - rho_amb)
                   * 0.5 * ( cos( 2.*M_PI *
                        (corr_nx * (z-x2_sh[0]) / (x1_sh[1]-x2_sh[0])
-                      + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
-                   - M_PI) +1 );
+                      + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1])))
+                      +1 );
             } else {
-              rho += 0.5*corr_ampl; // ensure fair comparison
+              rho *= xi; // ensure fair comparison
             }
-            press *= (rho/rho_amb); // keep the ambient temperature the same
           }
         } else if (z <= x2_sh[1]) {
           // inside second shell -----------------------------
@@ -373,18 +346,12 @@ void problem(DomainS *pDomain)
           #ifdef MHD
           B = bfield_sh[1];
           #endif
-          if (corr_type == 2) { // pressure perturbations inside shells
-            if (corr_switch == 1) {
-              press += corr_ampl * (press - press_amb)
-                  * 0.5 * cos( 2.*M_PI *
-                  (corr_nx * (z-x1_sh[1]) / (x2_sh[1]-x1_sh[1])
-                 + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
-              - M_PI);
-            } else { // ensure fair comparison
-              ;
-            }
-          } else if (corr_type == 3) { // velocity perturbations inside shells
-            if (corr_switch == 1) {
+          if (corr_type == 2 && corr_switch == 1) { // pressure perturbations inside shells
+            press += corr_ampl * (press - press_amb)
+                * 0.5 * cos( 2.*M_PI *
+                (corr_nx * (z-x1_sh[1]) / (x2_sh[1]-x1_sh[1])
+               + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1])));
+          } else if (corr_type == 3 && corr_switch == 1) { // velocity perturbations inside shells
               // varying gamma^2 gives us conserved total energy
               gamma = sqrt(SQR(gamma) + corr_ampl * (SQR(gamma) - 1.0)
                   * 0.5 * cos( 2.*M_PI *
@@ -392,25 +359,15 @@ void problem(DomainS *pDomain)
                  + corr_ny * (r-pDomain->MinX[1]) / (pDomain->MaxX[1]-pDomain->MinX[1]))
               - M_PI));
               vel = (vel/fabs(vel)) * gamma2v(gamma);
-            } else { // ensure fair comparison
-              ;
-            }
           }
         } else {
           // right of second shell ---------------------------
-          rho = rho_amb + 0.5*corr_ampl; // adjustment by corr_ampl to ensure fair comparison
-          press = press_amb * (rho/rho_amb); // keep the ambient temperature the same
-          vel = vel_sh[1]; gamma = gamma_sh[1];
+          rho = rho_amb; press = press_amb; vel = vel_sh[1]; gamma = gamma_sh[1];
           #ifdef MHD
           B = 0.0;
           #endif
-          if (press < 0) { // ensure pressure equilibrium
-            press = press_sh[1]
-              #ifdef MHD
-                + 0.5 * (SQR(bfield_sh[0]) - SQR(B)) / SQR(gamma);
-              #else
-                ;
-              #endif
+          if (corr_type == 1) { // density modulation
+            rho *= xi;
           }
         }
 
@@ -451,6 +408,7 @@ void problem(DomainS *pDomain)
     // set the rest of bfield
     for (k=ks; k<=ke; k++) {
       for (j=js; j<=je; j++) {
+        #pragma omp simd
         for (i=is; i<=ie+1; i++) {
           pGrid->B1i[k][j][i] = 0.0;
         }
@@ -458,6 +416,7 @@ void problem(DomainS *pDomain)
     }
     for (k=ks; k<=(ke > 1 ? ke+1 : ke); k++) {
       for (j=js; j<=je; j++) {
+        #pragma omp simd
         for (i=is; i<=ie; i++) {
           pGrid->B3i[k][j][i] = 0.0;
         }
