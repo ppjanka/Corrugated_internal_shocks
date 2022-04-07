@@ -1,100 +1,79 @@
-#!/bin/bash -l
-# The -l above is required to get the full environment with modules
+#!/bin/bash
 
-# Set the allocation to be charged for this job
-# not required if you have set a default allocation
-#SBATCH -A 2020-3-30
+#SBATCH -A snic2021-3-29      # allocation
 
-#SBATCH -J IS2ca1             # job name
-#SBATCH -t 16:00:00           # time requested
+#SBATCH -J IS2t1a1
+#SBATCH -t 24:00:00           # time requested
 
-#SBATCH --nodes=8             # number of nodes
-
-# Use any nodes available with all cores per node:
-# SBATCH --cpus-per-task=2    # number of cpus per MPI process (2: all cores, ignore hyperthreading)
-
-# Use only Haswell nodes
-#SBATCH -C Haswell
-#SBATCH --ntasks-per-node=32 # number of MPI processes per node (Haswell)
-#SBATCH -n 256
+#SBATCH --nodes=2             # number of nodes
+#SBATCH -p main               # partition
+#SBATCH --cpus-per-task=2     # number of cpus per MPI process (2: all cores, ignore hyperthreading)
+nproc=256 # 2nodes x 2xCPU x 64cores
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
 #SBATCH --mail-user=patryk.pjanka@su.se
 
 # corrugation amplitude for this script
+CORR_TYPE=1
+PROD_TYPE=1
 CORR_AMPL=1
 
-# set up environment
-ENV_CONFIG=2
+# set up environment -- GCC compiler + Cray MPI + Cray HDF5
+module load PDC
+module load PrgEnv-gnu/8.2.0
+module swap gcc gcc/11.2.0
+module load cray-mpich/8.1.11
+module load cray-hdf5-parallel/1.12.0.7
+module load craype-hugepages64M
+module load GSL/2.7-cpeGNU-21.11
 
-if [ $ENV_CONFIG -eq 1 ]
-then
-    # set up environment -- Intel compiler + Cray MPI + Cray HDF5
-    #  -> 232 cycles / 5min on 4 Haswell nodes on Beskow with hugepages64M
-    module swap PrgEnv-cray PrgEnv-intel/6.0.7
-    module load intel/18.0.0.128
-    module load cray-mpich/7.7.14
-    module load cray-hdf5-parallel/1.10.6.1
-    module load craype-hugepages64M
-elif [ $ENV_CONFIG -eq 2 ]
-then
-    # set up environment -- GCC compiler + Cray MPI + Cray HDF5
-    module swap PrgEnv-cray PrgEnv-gnu/6.0.7
-    module swap gcc gcc/10.2.0
-    module load cray-mpich/7.7.14
-    module load cray-hdf5-parallel/1.10.6.1
-    module load craype-hugepages64M
-else
-    echo Incorrect ENV_CONFIG value. Aborting.
-    exit
-fi
-module load gsl/2.3
+# figure out the work directory
+declare -a corr_type_folders=( [1]="corrT1_dens" [2]="corrT2_press" [3]="corrT3_vel" [4]="corrT4_bfield" )
+declare -a prod_type_folders=( [1]="prod1_corr_ampl" [2]="prod2_shell_width" )
+RUNDIR="/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/${corr_type_folders[${CORR_TYPE}]}/${prod_type_folders[${PROD_TYPE}]}"
 
-# use the Cray wrappers
-#export CXX=CC
-#export CC=cc
-#export FC=ftn
+# Usage: run_from_scratch <corr[0,1]>
+run_from_scratch() {
+    declare corr=$1
+    declare extra_args=''
+    if [ $corr -eq 0 ]; then
+        extra_args='domain1/Nx2=2'
+    fi
+    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_type=${CORR_TYPE} problem/corr_ampl=${CORR_AMPL} problem/corr_switch=${corr} ${extra_args} domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl${CORR_AMPL}
+}
+# Usage: process_restarts <results folder containing id* dirs>
+process_restarts() {
+    if [[ $(ls $1/id*/*.rst 2> /dev/null) && ! -d $1/joined_rst ]]; then
+        mkdir $1/joined_rst
+    fi
+    mv $1/id*/*.rst $1/joined_rst 2> /dev/null
 
-# set up Athena 4.2 environment variables
-export CC="/opt/cray/pe/craype/2.6.1/bin/cc"
-export CFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include"
-export CPP="/opt/cray/pe/craype/2.6.1/bin/CC"
-export CPPFLAGS="-I/pdc/vol/gsl/2.3/GNU/8.3/include"
-export LDFLAGS="-L/pdc/vol/gsl/2.3/GNU/8.3/lib"
-export LIBS="-lgsl"
-
-# export OMP_NUM_THREADS=1
-
-RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/prod1_corr_ampl
+    declare final_rst_no=$( \
+        ls $1/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}' \
+        || echo 0 \
+    )
+    echo $final_rst_no
+}
 
 # launch job
 cd $RUNDIR
 
-# corrugated, 2D ------------------------------------------------------------------
-corr=1
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=1 -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
-
-# remove all restart files but the last one, tar the latter to save file no
-echo Cleaning up restart files..
-srun ../join_rst.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL
-final_rst_no=`ls $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
-final_to_rm=`printf %04d $(($final_rst_no-1))`
-rm `eval echo $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.{0000..${final_to_rm}}.rst`
-#tar -cvzf $RUNDIR/results_corr${corr}ampl$CORR_AMPL/final_rst.tgz $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
-#rm -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
-echo  - restart files cleaning done.
-
-# non-corrugated, 1D --------------------------------------------------------------
-corr=0
-srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$CORR_AMPL problem/corr_switch=0 domain1/Nx2=2 -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
-
-# remove all restart files but the last one, tar the latter to save file no
-echo Cleaning up restart files..
-srun ../join_rst.sh $RUNDIR/results_corr${corr}ampl$CORR_AMPL
-final_rst_no=`ls $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.rst | awk 'BEGIN{max=0000}{n=split($0,words,"."); if(words[n-1] > max) {max=words[n-1]}}END{print max}'`
-final_to_rm=`printf %04d $(($final_rst_no-1))`
-rm `eval echo $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/*.{0000..${final_to_rm}}.rst`
-#tar -cvzf $RUNDIR/results_corr${corr}ampl$CORR_AMPL/final_rst.tgz $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
-#rm -r $RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst
-echo  - restart files cleaning done.
+for corr in 1 0; do
+    declare outdir="$RUNDIR/results_corr${corr}ampl$CORR_AMPL"
+    if [ -d "$outdir" ]; then
+        declare final_rst_no=$(process_restarts "$outdir")
+        if [ $final_rst_no -gt 0 ]; then
+            echo "Running corr${corr}ampl$CORR_AMPL from restart no $final_rst_no..."
+            srun $RUNDIR/athena -r "$RUNDIR/results_corr${corr}ampl$CORR_AMPL/joined_rst/IntSh2-p1.$(printf "%04i" $final_rst_no).rst" -d "$RUNDIR/results_corr${corr}ampl$CORR_AMPL"
+        else
+            echo "Running corr${corr}ampl$CORR_AMPL from scratch..."
+            run_from_scratch $corr
+        fi
+    elif [ -f "$outdir.tgz" ]; then
+        echo "File $outdir.tgz exists. Nothing to be done."
+    else
+        echo "Running corr${corr}ampl$CORR_AMPL from scratch..."
+        run_from_scratch $corr
+    fi
+done
