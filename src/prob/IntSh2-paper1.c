@@ -159,14 +159,14 @@ void problem(DomainS *pDomain)
     press_sh[0] = par_getd("problem", "press_sh1");
     press_sh[1] = par_getd("problem", "press_sh2");
   } else if (press_set_mode == 1) { // set plasma beta (requires bfield to be set!)
-    press_sh[0] = par_getd("problem", "beta_sh1") * 0.5*SQR(bfield_sh[0]);
-    press_sh[1] = par_getd("problem", "beta_sh2") * 0.5*SQR(bfield_sh[1]);
+    press_sh[0] = par_getd("problem", "beta_sh1") * 0.5*SQR(bfield_sh[0] / gamma_sh[0]);
+    press_sh[1] = par_getd("problem", "beta_sh2") * 0.5*SQR(bfield_sh[1] / gamma_sh[1]);
   }
   // corrugation
   int corr_switch = par_geti_def("problem", "corr_switch", 0);
   int corr_type = par_geti_def("problem", "corr_type", 1); // default=1 for backward compatibility
   Real corr_ampl = 0.01 * par_getd_def("problem", "corr_ampl", 0.0);
-  int corr_nx = par_geti_def("problem", "corr_nx", 2);
+  int corr_nx = par_geti_def("problem", "corr_nx", 1);
   int corr_ny = par_geti_def("problem", "corr_ny", 2);
   // if corr_type == 4 (magnetic field varies within shells), pre-compute the magnetic fields first, in order to properly adjust pressures for fair comparison
   if (corr_type == 4 && corr_switch == 1) { // 4: magnetic field strength perturbations inside shells
@@ -382,7 +382,7 @@ void problem(DomainS *pDomain)
         pGrid->U[k][j][i].E = sqr_gamma*rho*enthalpy - press;
 
         #ifdef MHD
-        if (corr_type != 4 ||  corr_switch == 0) {
+        if (corr_type != 4 || corr_switch == 0) {
           // set bfield in the y-direction
           pGrid->U[k][j][i].B1c = 0.;
           pGrid->U[k][j][i].B2c = B;
@@ -425,7 +425,6 @@ void problem(DomainS *pDomain)
 	}
   #endif // MHD
 
-  //exit(0);
 }
 
 /*==============================================================================
