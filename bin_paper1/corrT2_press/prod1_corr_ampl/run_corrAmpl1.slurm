@@ -15,6 +15,8 @@ nproc=256 # 2nodes x 2xCPU x 64cores
 #SBATCH --mail-user=patryk.pjanka@su.se
 
 # corrugation amplitude for this script
+CORR_TYPE=2
+PROD_TYPE=1
 CORR_AMPL=1
 
 # set up environment -- GCC compiler + Cray MPI + Cray HDF5
@@ -26,7 +28,10 @@ module load cray-hdf5-parallel/1.12.0.7
 module load craype-hugepages64M
 module load GSL/2.7-cpeGNU-21.11
 
-RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT2_press/prod1_corr_ampl
+# figure out the work directory
+declare -a corr_type_folders=( [1]="corrT1_dens" [2]="corrT2_press" [3]="corrT3_vel" [4]="corrT4_bfield" )
+declare -a prod_type_folders=( [1]="prod1_corr_ampl" [2]="prod2_shell_width" )
+RUNDIR="/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/${corr_type_folders[${CORR_TYPE}]}/${prod_type_folders[${PROD_TYPE}]}"
 
 # Usage: run_from_scratch <corr[0,1]>
 run_from_scratch() {
@@ -35,7 +40,7 @@ run_from_scratch() {
     if [ $corr -eq 0 ]; then
         extra_args='domain1/Nx2=2'
     fi
-    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_ampl=$(echo ${CORR_AMPL} | awk '{print 0.01*$0}') problem/corr_switch=${corr} $extra_args domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl$CORR_AMPL
+    srun $RUNDIR/athena -i $RUNDIR/athinput.IntSh2_paper1 problem/corr_type=${CORR_TYPE} problem/corr_ampl=${CORR_AMPL} problem/corr_switch=${corr} ${extra_args} domain1/AutoWithNProc=$nproc -d $RUNDIR/results_corr${corr}ampl${CORR_AMPL}
 }
 # Usage: process_restarts <results folder containing id* dirs>
 process_restarts() {
