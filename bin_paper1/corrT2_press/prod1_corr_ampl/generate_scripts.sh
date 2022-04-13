@@ -7,7 +7,7 @@
 
 # - will replace the PAR_ENV env variable in each script based on the list hard coded here
 declare PAR_ENV='CORR_AMPL'
-declare -a VALS=( 1 2 5 10 20 50 75 100 )
+declare -a VALS=( 1 20 50 ) #( 1 2 5 10 20 50 75 100 )
 
 # prepare a script with sbatch commands for the whole folder
 echo -e '#!/usr/env/bin bash\n' > submit_all.sh
