@@ -12,9 +12,6 @@
 #SBATCH --mail-type=end
 #SBATCH --mail-user=patryk.pjanka@su.se
 
-# modules
-module load pigz
-
 # environment vars
 RUNDIR=/cfs/klemming/projects/snic/snic2020-4-12/ppjanka/intsh2/bin_paper1/corrT1_dens/prod1_corr_ampl
 
