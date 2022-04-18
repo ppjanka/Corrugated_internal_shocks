@@ -3,7 +3,7 @@
 #SBATCH -A snic2021-3-29
 
 #SBATCH -J IS2caTar           # job name
-#SBATCH -t 02:00:00           # time requested
+#SBATCH -t 24:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 #SBATCH -p main
@@ -24,6 +24,12 @@ for corr in 0 1
 do
     for ampl in 1 2 5 10 20 50 75 100
     do
-    	tar --use-compress-program=pigz -xf results_corr${corr}ampl${ampl}.tgz results_corr${corr}ampl${ampl}/joined_vtk/IntSh2-p1.$(printf %04d ${snapshots[ampl]}).vtk.pkl
+	# create a string of files to extract
+	to_extract=''
+	for fno in $(seq $((${snapshots[ampl]}-10)) $((${snapshots[ampl]}+20))); do
+	    to_extract+=" results_corr${corr}ampl${ampl}/joined_vtk/IntSh2-p1.$(printf %04d $fno).vtk.pkl"
+  	echo "Files to extract for ampl $ampl: $to_extract."
+	# once ready, extract
+    	tar --use-compress-program=pigz -xf results_corr${corr}ampl${ampl}.tgz $to_extract
     done
 done
