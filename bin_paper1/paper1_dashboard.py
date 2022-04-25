@@ -30,6 +30,8 @@ if in_script:
                 python paper1_dashboard.py -comparison <datapath with joined_vtk folder> <datapath with joined_vtk folder>
             > to perform an experiment regarding long-term Fsyn enhancement (see Pjanka et al. 2022)
                 python paper1_dashboard.py -expLongFsyn <datapath with joined_vtk folder for 1D case> <datapath with joined_vtk folder for 2D (corrugated) case>
+            > to process and plot magnetic field curvature diagnostics
+                python paper1_dashboard.py -curvature <datapath with joined_vtk folder>
             > other options
                 -nproc - number of threads for parallel processing
                 -opt_tf <0/1> - turn off/on tensorflow parallelization
@@ -86,8 +88,18 @@ elif '-expLongFsyn' in cmd_args:
     for i in range(2):
         if '.tgz' not in datapaths_comp[i] and datapaths_comp[i][-1] != '/':
             datapaths_comp[i] += '/'
+elif '-curvature' in cmd_args:
+    processing_type = 'curvature'
+    datapath = get_arg('curvature')
+    if '.tgz' not in datapath and datapath[-1] != '/':
+        datapath += '/'
 else: # default processing options
     if True:
+        processing_type = 'curvature'
+        datapath = '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/results_corr1ampl20'
+        if '.tgz' not in datapath and datapath[-1] != '/':
+            datapath += '/'
+    elif False:
         processing_type = 'expLongFsyn'
         datapaths_comp = [
             '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/test_corr0_ampl50',
@@ -99,6 +111,8 @@ else: # default processing options
     elif False:
         processing_type = 'dashboard'
         datapath = '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/test_tf.tgz'
+        if '.tgz' not in datapath and datapath[-1] != '/':
+            datapath += '/'
     else:
         processing_type = 'comparison'
         datapaths_comp = [
@@ -192,11 +206,27 @@ if opt_tf:
         return tf.math.log(x) / tf.math.log(ten)
     def nansum (x, axis):
         return tf.math.reduce_sum(tf.where(tf.math.is_nan(x),tf.zeros_like(x),x), axis=axis)
+    cos = tf.math.cos
+    sin = tf.math.sin
+    arctan = tf.math.atan
+    arccos = tf.math.acos
+    modulo = tf.experimental.numpy.mod
+    repeat = tf.repeat
+    top_k = tf.math.top_k
+    expand_dims = tf.expand_dims
+    npsort = tf.sort
+    nptake = tf.experimental.numpy.take
+    nptake_along_axis = tf.experimental.numpy.take_along_axis
+    transpose = tf.transpose
+    npstack = tf.stack
+    swapaxes = tf.experimental.numpy.swapaxes
+    npmean = tf.reduce_mean
+    npmax = tf.max
 else:
-    @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+    @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
     def tf_convert (*arg):
         return arg
-    @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+    @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
     def tf_deconvert (arg):
         return arg
     where = np.where
@@ -211,6 +241,26 @@ else:
     logspace = np.logspace
     log10 = np.log10
     nansum = np.nansum
+    cos = np.cos
+    sin = np.sin
+    arctan = np.arctan
+    arccos = np.arccos
+    modulo = np.mod
+    repeat = np.repeat
+    #@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+    def top_k (x, k):
+        return np.argpartition(
+            x, k, axis=-1
+        )[...,:k]
+    expand_dims = np.expand_dims
+    npsort = np.sort
+    nptake = np.take
+    nptake_along_axis = np.take_along_axis
+    transpose = np.transpose
+    npstack = np.stack
+    swapaxes = np.swapaxes
+    npmean = np.mean
+    npabs = np.abs
 
 
 # In[4]:
@@ -480,6 +530,131 @@ def internal_energy (rho, enthalpy, gamma, press, Bflsqr):
 # In[9]:
 
 
+# TODO: could probably optimize it better, also: NOT tested for tensorflow yet
+
+# magnetic field curvature treatment
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def _vector_orientation (vectors):
+    '''Returns orientation phi (Arc tan(y/x)) of the vector field.'''
+    result = arctan(vectors[...,1] / vectors[...,0])
+    result = where(
+        vectors[...,0] > 0,
+        result,
+        result - np.pi
+    )
+    result = modulo(result, 2.*np.pi)
+    return result
+
+# we look at Bfield in counterclockwise manner, shifting by (dx,dy)
+# note the margin to ensure periodicity
+_phi_angles = tuple(np.arange(-0.75*np.pi, 2.75*np.pi, 0.25*np.pi))
+_shifts = (
+    (-1,-1), (0,-1), (1,-1),
+    (1,0), (1,1), (0,1), (-1,1), (-1,0), (-1,-1), (0,-1), (1,-1),
+    (1,0), (1,1), (0,1)
+)
+#@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def _bfield_angles (bfield, bfield_phi):
+    '''For each cell, we limit ourselves to the three neighbours closest to the direction of Bfield in that cell. Then, we report the angles between center cell's Bfield and Bfield at these neighbours.'''
+    # calculate which neighbouring cells are closest to where Bfield is pointing
+    direction_distances = repeat(expand_dims(bfield_phi,-1),len(_phi_angles), axis=-1) - _phi_angles
+    direction_idxs = top_k(
+        np.reshape(np.abs(direction_distances), (-1,len(_phi_angles))),
+        k=3
+    )
+    direction_idxs = reshape(direction_idxs, (*(direction_distances.shape[:-1]),3))
+    npsort(direction_idxs, axis=-1)
+    direction_distances = nptake_along_axis(
+        direction_distances,
+        direction_idxs,
+        axis=-1
+    )
+    # calculate angles between Bfield vectors
+    shift_vectors = nptake(
+        np.array(_shifts),
+        direction_idxs.flatten(),
+        axis=0
+    )
+    shift_vectors = reshape(
+        shift_vectors,
+        (*(bfield_phi.shape),3,2)
+    )
+    shift_vectors = transpose(shift_vectors, (-2,-1,0,1))
+    indices = np.meshgrid(range(bfield.shape[0]), range(bfield.shape[1]), indexing='ij')
+    indices = np.stack(indices)
+    indices = np.stack(3*[indices,])[...,1:-1,1:-1]
+    rolled_indices = indices + shift_vectors
+    bfield_rolled = np.array([
+        bfield[i,j] for i,j in rolled_indices
+    ])
+    bfield_here = npstack(3*[bfield[...,1:-1,1:-1,:],])
+    bfield_angles = arccos(
+        npsum(
+            bfield_here * bfield_rolled, axis=-1
+        ) / sqrt(npsum(bfield_here**2, -1) * npsum(bfield_rolled**2, -1))
+    )
+    bfield_angles = transpose(swapaxes(bfield_angles, 0,-1), (1,0,2))
+    
+    # clean up and return
+    del direction_idxs, shift_vectors, indices, rolled_indices, bfield_rolled, bfield_here
+    return direction_distances, bfield_angles
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def _extract_bfield_curvature (direction_distance, bfield_angles, bfield_phi):
+    x,y = direction_distance, bfield_angles
+    a = ( 1./(x[...,2]-x[...,0]) ) * ( (y[...,2]-y[...,1])/(x[...,2]-x[...,1]) - (y[...,1]-y[...,0])/(x[...,1]-x[...,0]) )
+    b = (y[...,1]-y[...,0])/(x[...,1]-x[...,0]) - a*(x[...,0]-x[...,1])
+    c = y[...,0] - a*x[...,0]**2 - b*x[...,0]
+    bfield_rotation = c
+    #del x,y, a,b
+    # we also need a length scale, we take it from the square-neighbourhood of our bfield
+    vectors = npstack((
+        cos(bfield_phi), sin(bfield_phi)
+    ))
+    # normalize so that one coordinate ==1 (i.e., we're on a unit square)
+    vectors /= where(
+        vectors[0] > vectors[1],
+        vectors[0],
+        vectors[1]
+    )
+    length = sqrt(npsum(
+        vectors**2, axis=0
+    ))
+    #del vectors
+    # calculate curvature radius
+    curvature = bfield_rotation / length
+    
+    # clean up and return
+    #del c, length 
+    return transpose(curvature)
+
+def bfield_curvature (data, verbose=False):
+    # collect bfields as vectors
+    bfield = swapaxes(np.array((
+        data['Bcc1'],
+        data['Bcc2'],
+        #data['Bcc3'], # == 0
+    )), 0,-1)
+    if verbose: print('Calculating angles.. ', end='', flush=True)
+    # at each cell, collect angles between the cell's Bfield direction, and Bfield directions in the neighbouring cells
+    bfield_phi = _vector_orientation(bfield)[1:-1,1:-1]
+    direction_distance, bfield_angles = _bfield_angles(bfield, bfield_phi)
+    if verbose: print('done.', flush=True)
+    if verbose: print('Interpolating and extracting curvature.. ', end='', flush=True)
+    # now, interpolate these values as a function of position angle
+    # we'll use simple piecewise parabolic interpolation (y = ax2+bx+c)
+    curvature = _extract_bfield_curvature (direction_distance, bfield_angles, bfield_phi)
+    del bfield, direction_distance, bfield_angles
+    if verbose: print('done.', flush=True)
+    
+    # clean up and return
+    del bfield_phi
+    return curvature
+
+
+# In[10]:
+
+
 sim2phys = {
     'Time':simu_t, # sec
     'x1f':simu_len, # cm
@@ -519,7 +694,7 @@ sim2phys = {
 }
 
 
-# In[10]:
+# In[11]:
 
 
 def do_vertical_avg (data_vtk, quantity):
@@ -642,11 +817,14 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     if type(previous_data_vtk) is dict:
         for quantity in ['internal_energy','internal_energy_vsZ']:
             data_vtk['ddt_'+quantity] = (data_vtk[quantity]-previous_data_vtk[quantity]) / (data_vtk['Time']-previous_data_vtk['Time'])
+            
+    # magnetic field curvature
+    data_vtk['curvature'] = bfield_curvature(data_vtk)
     
     return data_vtk
 
 
-# In[11]:
+# In[12]:
 
 
 def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
@@ -700,7 +878,7 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
     return data_vtk
 
 
-# In[12]:
+# In[13]:
 
 
 def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
@@ -736,9 +914,9 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
 
 
 # --------------
-# **Single-dataset dashboard**
+# # Single-dataset dashboard
 
-# In[13]:
+# In[14]:
 
 
 
@@ -968,7 +1146,7 @@ if processing_type == 'dashboard':
         print(' - frame done.', flush=True)
 
 
-# In[14]:
+# In[15]:
 
 
 if processing_type == 'dashboard':
@@ -1013,7 +1191,7 @@ if processing_type == 'dashboard':
             datapath = datapath
 
 
-# In[15]:
+# In[16]:
 
 
 if processing_type == 'dashboard':
@@ -1066,7 +1244,7 @@ if processing_type == 'dashboard':
             print('done.')
 
 
-# In[16]:
+# In[17]:
 
 
 if processing_type == 'dashboard':
@@ -1084,14 +1262,14 @@ if processing_type == 'dashboard':
         print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, outpath), flush=True)
 
 
-# In[17]:
+# In[18]:
 
 
 if False and processing_type == 'dashboard' and not in_script:
     dashboard_frame(80, save=False, recalculate=False, history=history, tarpath=tarpath)
 
 
-# In[18]:
+# In[19]:
 
 
 if processing_type == 'dashboard':
@@ -1100,9 +1278,9 @@ if processing_type == 'dashboard':
 
 
 # -----------
-# **Two-dataset comparison**
+# # Two-dataset comparison
 
-# In[19]:
+# In[20]:
 
 
 if processing_type == 'comparison':
@@ -1373,7 +1551,7 @@ if processing_type == 'comparison':
         print(' - frame done.', flush=True)
 
 
-# In[20]:
+# In[21]:
 
 
 if processing_type == 'comparison':
@@ -1449,7 +1627,7 @@ if processing_type == 'comparison':
             print('done.')
 
 
-# In[21]:
+# In[22]:
 
 
 if processing_type == 'comparison':
@@ -1468,7 +1646,7 @@ if processing_type == 'comparison':
     print("COMPARISON PROCESSING DONE.", flush=True)
 
 
-# In[22]:
+# In[23]:
 
 
 if processing_type == 'comparison' and not in_script:
@@ -1479,7 +1657,7 @@ if processing_type == 'comparison' and not in_script:
 # # Experiment regarding long-term Fsyn enhancement
 #  (see Pjanka et al. 2022)
 
-# In[23]:
+# In[24]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1593,7 +1771,7 @@ if processing_type == 'expLongFsyn':
                 new_bcc_dict['spectrum'] = [np.array(new_bcc_dict['spectrum'][0]), np.array(new_bcc_dict['spectrum'][1])]
 
 
-# In[24]:
+# In[25]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1656,7 +1834,7 @@ if processing_type == 'expLongFsyn':
         return data_2d
 
 
-# In[27]:
+# In[26]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1706,7 +1884,7 @@ if processing_type == 'expLongFsyn':
             return history
 
 
-# In[28]:
+# In[27]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1772,13 +1950,224 @@ if processing_type == 'expLongFsyn':
     precalc_alternate_history(history_outfile_comp[1], zip(*vtk_filenames_comp), append=True)
 
 
-# In[29]:
+# In[28]:
 
 
 if processing_type == 'expLongFsyn':
     
     def expLongFsyn_frame (i_vtk, verbose=False, save=True, recalculate=False, history_comp=None, augment_kwargs=default_augment_kwargs, tarpaths=[None,None]):
         pass
+
+
+# ---
+# # Magnetic field curvature
+
+# In[29]:
+
+
+if processing_type == 'curvature':
+    
+    # check if we are reading from a folder or from a tarfile
+    if ('.tgz' in datapath) and os.path.isdir(datapath[:-4]):
+        print('Tarfile %s has already been extracted, using the extracted version.' % datapath)
+        datapath = datapath[:-4]+'/'
+    using_tarfile = ('.tgz' in datapath)
+
+    if not using_tarfile:
+        vtk_filenames = sorted(list(set(
+            glob.glob(datapath + 'joined_vtk/*.vtk') + [x[:-4] for x in glob.glob(datapath + 'joined_vtk/*.vtk.pkl')]
+        )))
+    else:
+        tar = tarfile.open(datapath)
+        vtk_filenames = sorted(
+            [x.path for x in tar.getmembers() if (x.path[-4:] == '.vtk')] + [x.path[:-4] for x in tar.getmembers() if (x.path[-8:] == '.vtk.pkl')]
+        )
+        tar.close()
+    print(f'Found {len(vtk_filenames)} vtk files.', flush=True)
+
+    outpath = './temp_curvature/'
+    if not os.path.exists(outpath):
+        os.makedirs(outpath)
+
+    # WARNING: add_snapshot_FIFO below is NOT embarassingly parallelizable, but does significantly save memory
+    def curvature_frame (i_vtk, verbose=False, save=True, recalculate=False, tarpath=None, force_recalc=False):
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import matplotlib.gridspec as gridspec
+        import pickle as pkl
+
+        fileno = int(vtk_filenames[i_vtk].split('/')[-1].split('.')[1])
+        vtk_time = fileno * out_dt_vtk # presumably we can trust this..
+
+        print('Processing vtk no %i, vtk_time = %.2e..' % (i_vtk, vtk_time), flush=True)
+
+        # see whether we can skip the file as already plotted
+        outfile = (outpath + 'curvature_%05i.png') % fileno
+        if save and not recalculate and os.path.exists(outfile):
+            print(' - file already plotted, skipping.', flush=True)
+            return
+        
+        # read the file
+        data = read_vtk_file(vtk_filenames[i_vtk], previous_data_vtk=None, out_dt=out_dt_vtk, tarpath=tarpath)
+        
+        # augment if needed
+        if 'curvature' not in data.keys() or force_recalc:
+            data['curvature'] = bfield_curvature(data)
+            if os.path.isfile(f'{vtk_filenames[i_vtk]}.pkl') and not tarpath:
+                with open(vtk_filenames[i_vtk], 'wb') as f:
+                    pkl.dump(data, f)
+        
+        # initialize the plot
+        fig = plt.figure(figsize=(24,12))
+        gs = gridspec.GridSpec(4,1)
+        plt.suptitle('Time = %.2f sec.' % (vtk_time * sim2phys['Time'],))
+
+        # ----------------------------------------------------------
+        
+        # curvature contour plot
+        plt.subplot(gs[0,0])
+        
+        curvature_to_plot = np.where(
+            data['curvature'] > np.exp(-15),
+            np.log(data['curvature']), -15
+        )
+
+        plt.contourf(
+            data['x1v'][1:-1], data['x2v'][1:-1],
+            curvature_to_plot,
+            128,
+            cmap='magma')
+        #plt.gca().set_aspect(1)
+        plt.colorbar(label='Log Curvature')
+        
+        # curvature histogram
+        plt.subplot(gs[1,0])
+        
+        bins = np.linspace(np.min(curvature_to_plot),np.max(curvature_to_plot), 128)
+        hist = np.transpose([np.histogram(row, bins=bins)[0] for row in np.transpose(curvature_to_plot)])
+
+        plt.contourf(data['x1v'][1:-1], 0.5*(bins[1:]+bins[:-1]), np.log(hist), 128, cmap='magma')
+        plt.colorbar(label='log N')
+        plt.ylabel('Log N')
+        plt.xlabel('x[sim.u.]')
+        plt.ylabel('Log Bfield curvature')
+        plt.title('Bfield curvature histogram')
+
+        plt.plot(
+            data['x1v'][1:-1],
+            np.mean(curvature_to_plot, axis=0),
+            color='green',
+            label='mean'
+        )
+        plt.legend()
+        
+        del bins, hist
+        
+        # Bfield histograms
+        plt.subplot(gs[2,0])
+        
+        bins = np.linspace(0.,np.max(np.abs(data['Bcc1'])), 128)
+        hist = np.transpose([np.histogram(np.abs(row), bins=bins)[0] for row in np.transpose(data['Bcc1'])])
+
+        plt.contourf(data['x1v'], 0.5*(bins[1:]+bins[:-1]), np.log(hist), 128, cmap='magma')
+        plt.colorbar(label='log N')
+        plt.xlabel('x[sim.u.]')
+        plt.ylabel('Perpendicular Bfield')
+        plt.title('Perpendicular Bfield histogram')
+
+        plt.plot(
+            data['x1v'],
+            np.mean(np.abs(data['Bcc1']), axis=0),
+            label='mean', color='green'
+        )
+        plt.legend()
+        
+        del bins, hist
+        
+        plt.subplot(gs[3,0])
+        
+        bins = np.linspace(0.,np.max(np.abs(data['Bcc2'])), 128)
+        hist = np.transpose([np.histogram(np.abs(row), bins=bins)[0] for row in np.transpose(data['Bcc2'])])
+
+        plt.contourf(data['x1v'], 0.5*(bins[1:]+bins[:-1]), np.log(hist), 128, cmap='magma')
+        plt.colorbar(label='log N')
+        plt.xlabel('x[sim.u.]')
+        plt.ylabel('Parallel Bfield')
+        plt.title('Parallel Bfield histogram')
+
+        plt.plot(
+            data['x1v'],
+            np.mean(np.abs(data['Bcc2']), axis=0),
+            label='mean', color='green'
+        )
+        plt.legend()
+
+        # clean up
+        del data, bins, hist, curvature_to_plot
+
+        if verbose:
+            print('     done.', flush=True)
+
+        #plt.tight_layout()
+        if save:
+            plt.savefig(outfile, format='png', dpi=300, facecolor='w')
+        else:
+            plt.show()
+        plt.close()
+
+        print(' - frame done.', flush=True)
+
+
+# In[30]:
+
+
+if processing_type == 'curvature' and in_script:
+    tarpath = None
+    if '.tgz' in datapath:
+        tarpath = datapath
+    # now, parallelize the frame generation
+    from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
+    chunks = np.array_split(range(len(vtk_filenames)), nproc)
+    def worker (ichunk):
+        indices = chunks[ichunk]
+        for i in indices:
+            data_vtk = curvature_frame(i_vtk=i, recalculate=force_recalc, verbose=False, tarpath=tarpath)
+    with ProcessPool(nproc) as pool:
+        _ = pool.map(worker, list(range(nproc)))
+
+
+# In[31]:
+
+
+if processing_type == 'curvature' and in_script:
+    # render the movie
+    try:
+        print("Rendering the movie..", flush=True)
+        command = ("ffmpeg -threads %i -y -r 20 -f image2 -i \"%scurvature_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 curvature.mp4" % (nproc, outpath,))
+        print(command, flush=True)
+        os.system(command)
+        if os.path.isfile('curvature.mp4'):
+            os.system('rm -r ' + outpath)
+        else:
+            raise
+    except Exception as e:
+        print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, outpath), flush=True)
+
+
+# In[32]:
+
+
+if processing_type == 'curvature' and not in_script:
+    curvature_frame (0, verbose=False, save=False, recalculate=False, tarpath=None, force_recalc=False)
+
+
+# In[33]:
+
+
+if processing_type == 'curvature':
+    print("CURVATURE PROCESSING DONE.", flush=True)
+    sys.exit()
 
 
 # In[ ]:
