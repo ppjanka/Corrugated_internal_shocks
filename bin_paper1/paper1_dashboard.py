@@ -1985,7 +1985,7 @@ if processing_type == 'curvature':
         tar.close()
     print(f'Found {len(vtk_filenames)} vtk files.', flush=True)
 
-    outpath = './temp_curvature/'
+    outpath = f'./temp_curvature_{datapath.split("/")[-2].split(".")[0]}/'
     if not os.path.exists(outpath):
         os.makedirs(outpath)
 
@@ -2144,7 +2144,7 @@ if processing_type == 'curvature' and in_script:
     # render the movie
     try:
         print("Rendering the movie..", flush=True)
-        command = ("ffmpeg -threads %i -y -r 20 -f image2 -i \"%scurvature_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 curvature.mp4" % (nproc, outpath,))
+        command = ("ffmpeg -threads %i -y -r 20 -f image2 -i \"%scurvature_%%*.png\" -f mp4 -q:v 0 -vcodec mpeg4 -r 20 %s_curvature.mp4" % (nproc, outpath, datapath.split('/')[-2].split('.')[0]))
         print(command, flush=True)
         os.system(command)
         if os.path.isfile('curvature.mp4'):

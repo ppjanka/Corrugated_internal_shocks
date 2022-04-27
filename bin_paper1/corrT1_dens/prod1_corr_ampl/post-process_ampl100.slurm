@@ -3,7 +3,7 @@
 #SBATCH -A snic2021-3-29      # allocation
 
 #SBATCH -J IS2pp-t1a100
-#SBATCH -t 06:00:00           # time requested
+#SBATCH -t 01:00:00 # 06:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 #SBATCH -p main               # partition
