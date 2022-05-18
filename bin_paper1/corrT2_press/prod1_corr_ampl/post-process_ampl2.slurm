@@ -3,7 +3,7 @@
 #SBATCH -A snic2021-3-29      # allocation
 
 #SBATCH -J IS2pp-t2a2
-#SBATCH -t 01:00:00 # 06:00:00           # time requested
+#SBATCH -t 03:00:00 # 06:00:00           # time requested
 
 #SBATCH --nodes=1             # number of nodes
 #SBATCH -p main               # partition
@@ -18,7 +18,7 @@ CORR_TYPE=2
 PROD_TYPE=1
 CORR_AMPL=2
 
-nproc=-1 # use all cores available
+nproc=16 # use all cores available
 
 # module setup
 module load PDC

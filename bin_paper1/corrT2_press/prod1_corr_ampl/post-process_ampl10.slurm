@@ -18,7 +18,7 @@ CORR_TYPE=2
 PROD_TYPE=1
 CORR_AMPL=10
 
-nproc=-1 # use all cores available
+nproc=16 # use all cores available
 
 # module setup
 module load PDC
