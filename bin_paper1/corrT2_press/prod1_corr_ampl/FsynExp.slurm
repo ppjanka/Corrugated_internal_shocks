@@ -34,4 +34,4 @@ cd $RUNDIR
 
 
 # process diagnostics
-srun python paper1_dashboard.py -expLongFsyn $RUNDIR/results_corr0ampl${CORR_AMPL} $RUNDIR/results_corr1ampl${CORR_AMPL} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 1 -force_recalc 0 # -low_memory 1
+srun python paper1_dashboard.py -expLongFsyn $RUNDIR/results_corr0ampl${CORR_AMPL} $RUNDIR/results_corr1ampl${CORR_AMPL} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 0 -force_recalc 0 # -low_memory 1
