@@ -94,7 +94,7 @@ elif '-curvature' in cmd_args:
     if '.tgz' not in datapath and datapath[-1] != '/':
         datapath += '/'
 else: # default processing options
-    if True:
+    if False:
         processing_type = 'curvature'
         datapath = '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/results_corr1ampl20'
         if '.tgz' not in datapath and datapath[-1] != '/':
@@ -116,8 +116,8 @@ else: # default processing options
     else:
         processing_type = 'comparison'
         datapaths_comp = [
-            '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/test_corr0_ampl50',
-            '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/test_corr1_ampl50'
+            '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/results_corr0ampl50',
+            '/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT2_press/prod1_corr_ampl/results_corr1ampl50'
         ]
         for i in range(2):
             if datapaths_comp[i][-4:] != '.tgz' and datapaths_comp[i][-1] != '/':
@@ -125,7 +125,7 @@ else: # default processing options
 
 # MAIN EXECUTION PARAMETERS
 unit_check = False # turns off optimization but allows to use astropy to check the units
-tar_when_done = get_arg('tar_when_done', default=True, val_type=boolean) # if not already a tarfile, datapath will be turned into .tgz at the end of analysis
+tar_when_done = get_arg('tar_when_done', default=False, val_type=boolean) # if not already a tarfile, datapath will be turned into .tgz at the end of analysis
 opt_tf = get_arg('opt_tf', default=False, val_type=boolean) # use tensorflow instead of numpy for GPU acceleration, x5 speedup
 opt_numba = get_arg('opt_numba', default=True, val_type=boolean) # use numba to pre-compile some of the functions, about 3x speedup (turned off if opt_tf is on and GPU available)
 low_memory = get_arg('low_memory', default=False, val_type=boolean) # make adjustments to enable computing with low system memory available
@@ -346,7 +346,8 @@ nu_int_max = 3.0e15
 
 # system properties (see overleaf)
 gamma_jet = 2.0
-beta_jet = np.sqrt(1.0 - 1.0/gamma_jet**2)
+# TODO: for now kept fixed for consistency, but it is incorrect, fix everything later
+beta_jet = 0.75 # np.sqrt(1.0 - 1.0/gamma_jet**2)
 incl = 23.0 * np.pi / 180.
 theta_j = 2.3 * np.pi / 180.
 dist = 8. * kpc
@@ -1269,7 +1270,7 @@ if False and processing_type == 'dashboard' and not in_script:
     dashboard_frame(80, save=False, recalculate=False, history=history, tarpath=tarpath)
 
 
-# In[19]:
+# In[ ]:
 
 
 if processing_type == 'dashboard':
@@ -1280,7 +1281,7 @@ if processing_type == 'dashboard':
 # -----------
 # # Two-dataset comparison
 
-# In[20]:
+# In[ ]:
 
 
 if processing_type == 'comparison':
@@ -1523,10 +1524,16 @@ if processing_type == 'comparison':
                 plt.ylabel('Avg. syn. flux / dS [${\\rm erg}/({\\rm cm}^2{\\rm s}) / {\\rm cm}^2$]')
 
                 # set up limits
-                mask = [
-                    (history_comp[0]['times'] * sim2phys['Time'] > 4.0),
-                    (history_comp[1]['times'] * sim2phys['Time'] > 4.0)
-                ]
+                if npmax(history_comp[0]['times'] * sim2phys['Time']) > 4.0 and npmax(history_comp[1]['times'] * sim2phys['Time']) > 4.0:
+                    mask = [
+                        (history_comp[0]['times'] * sim2phys['Time'] > 4.0),
+                        (history_comp[1]['times'] * sim2phys['Time'] > 4.0)
+                    ]
+                else:
+                    mask = [
+                        (history_comp[0]['times'] * sim2phys['Time'] > 0.0),
+                        (history_comp[1]['times'] * sim2phys['Time'] > 0.0)
+                    ]
                 ax_Fsyn.set_ylim(
                     None,
                     npmax([
@@ -1551,7 +1558,7 @@ if processing_type == 'comparison':
         print(' - frame done.', flush=True)
 
 
-# In[21]:
+# In[ ]:
 
 
 if processing_type == 'comparison':
@@ -1627,10 +1634,10 @@ if processing_type == 'comparison':
             print('done.')
 
 
-# In[22]:
+# In[ ]:
 
 
-if processing_type == 'comparison':
+if processing_type == 'comparison' and in_script:
     # render the movie
     try:
         print("Rendering the movie..", flush=True)
@@ -1646,7 +1653,7 @@ if processing_type == 'comparison':
     print("COMPARISON PROCESSING DONE.", flush=True)
 
 
-# In[23]:
+# In[ ]:
 
 
 if processing_type == 'comparison' and not in_script:
@@ -1657,7 +1664,7 @@ if processing_type == 'comparison' and not in_script:
 # # Experiment regarding long-term Fsyn enhancement
 #  (see Pjanka et al. 2022)
 
-# In[24]:
+# In[ ]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1771,7 +1778,7 @@ if processing_type == 'expLongFsyn':
                 new_bcc_dict['spectrum'] = [np.array(new_bcc_dict['spectrum'][0]), np.array(new_bcc_dict['spectrum'][1])]
 
 
-# In[25]:
+# In[ ]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1790,6 +1797,16 @@ if processing_type == 'expLongFsyn':
         jres = data_2d['Bcc1'].shape[0]
         # Process the alternatives
         data_2d['alternatives'] = {}
+        # Test: create identical flux
+        if True:
+            alternative = 'identity'
+            data_2d['alternatives'][alternative] = {}
+            for f in [1,2,3]:
+                data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d[f'Bcc{f}']
+            calc_alternative_augmentations(
+                data_2d, data_2d['alternatives'][alternative],
+                **augment_kwargs
+            )
         # - with Bfield from a separate non-corrugated (1D) run
         alternative = 'B1d_sep'
         data_2d['alternatives'][alternative] = {}
@@ -1812,7 +1829,12 @@ if processing_type == 'expLongFsyn':
         alternative = 'B1d_avgScaled'
         data_2d['alternatives'][alternative] = {}
         for f in [1,2,3]:
-            data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d['alternatives']['B1d_avg'][f'Bcc{f}'] * np.sum(data_1d[f'Bcc{f}'][0]) / np.sum(data_2d['alternatives']['B1d_avg'][f'Bcc{f}'][0])
+            norm = np.sum(data_2d['alternatives']['B1d_avg'][f'Bcc{f}'][0])
+            if norm != 0.:
+                data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d['alternatives']['B1d_avg'][f'Bcc{f}'] * np.sum(data_1d[f'Bcc{f}'][0]) / norm
+            else:
+                data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d['alternatives']['B1d_avg'][f'Bcc{f}']
+            del norm
         calc_alternative_augmentations(
             data_2d, data_2d['alternatives'][alternative],
             **augment_kwargs
@@ -1821,7 +1843,12 @@ if processing_type == 'expLongFsyn':
         alternative = 'B2d_scaled'
         data_2d['alternatives'][alternative] = {}
         for f in [1,2,3]:
-            data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d[f'Bcc{f}'] * np.sum(data_1d[f'Bcc{f}'][:1])*jres / np.sum(data_2d[f'Bcc{f}'])
+            norm = np.sum(data_2d[f'Bcc{f}'])
+            if norm != 0.:
+                data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d[f'Bcc{f}'] * np.sum(data_1d[f'Bcc{f}'][:1])*jres / np.sum(data_2d[f'Bcc{f}'])
+            else:
+                data_2d['alternatives'][alternative][f'Bcc{f}'] = data_2d[f'Bcc{f}']
+            del norm
         calc_alternative_augmentations(
             data_2d, data_2d['alternatives'][alternative],
             **augment_kwargs
@@ -1834,7 +1861,7 @@ if processing_type == 'expLongFsyn':
         return data_2d
 
 
-# In[26]:
+# In[ ]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1846,7 +1873,7 @@ if processing_type == 'expLongFsyn':
             history = pkl.load(f)
         # prepare to append
         quantities = ('internal_energy', 'flux_density')
-        alternatives = ('B1d_sep', 'B1d_avg', 'B1d_avgScaled', 'B2d_scaled')
+        alternatives = ('B1d_sep', 'B1d_avg', 'B1d_avgScaled', 'B2d_scaled', 'identity')
         history['alternatives'] = {a:{q:[] for q in quantities} for a in alternatives}
         # processing file-by-file
         for pkl_1d, pkl_2d in tqdm(vtk_pkl_filenames_1d2d_pairs):
@@ -1870,12 +1897,14 @@ if processing_type == 'expLongFsyn':
                 history_branch['flux_density'].append(
                     get_cgs_value(np.sum(data_branch['flux_density_vsZ']*dl))/xrange
                 )
-        # convert to numpy
-        for quantity in quantities:
-            history_branch[quantity] = np.array(history_branch[quantity])
-        # calculate derivatives
-        history_branch['ddt_internal_energy'] = (history_branch['internal_energy'][1:] - history_branch['internal_energy'][:-1]) / (history['times'][1:] - history['times'][:-1])
-        history_branch['ddt_internal_energy'] = np.insert(history_branch['ddt_internal_energy'], 0, np.nan)
+        for alternative in alternatives:
+            history_branch = history['alternatives'][alternative]
+            # convert to numpy
+            for quantity in quantities:
+                history_branch[quantity] = np.array(history_branch[quantity])
+            # calculate derivatives
+            history_branch['ddt_internal_energy'] = (history_branch['internal_energy'][1:] - history_branch['internal_energy'][:-1]) / (history['times'][1:] - history['times'][:-1])
+            history_branch['ddt_internal_energy'] = np.insert(history_branch['ddt_internal_energy'], 0, np.nan)
         # Save the alternative-appended result to the 2d file
         if append:
             with open(history_pkl, 'wb') as f:
@@ -1884,7 +1913,7 @@ if processing_type == 'expLongFsyn':
             return history
 
 
-# In[27]:
+# In[ ]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1950,7 +1979,7 @@ if processing_type == 'expLongFsyn':
     precalc_alternate_history(history_outfile_comp[1], zip(*vtk_filenames_comp), append=True)
 
 
-# In[28]:
+# In[ ]:
 
 
 if processing_type == 'expLongFsyn':
@@ -1962,7 +1991,7 @@ if processing_type == 'expLongFsyn':
 # ---
 # # Magnetic field curvature
 
-# In[29]:
+# In[ ]:
 
 
 if processing_type == 'curvature':
@@ -2119,7 +2148,7 @@ if processing_type == 'curvature':
         print(' - frame done.', flush=True)
 
 
-# In[30]:
+# In[ ]:
 
 
 if processing_type == 'curvature' and in_script:
@@ -2137,7 +2166,7 @@ if processing_type == 'curvature' and in_script:
         _ = pool.map(worker, list(range(nproc)))
 
 
-# In[31]:
+# In[ ]:
 
 
 if processing_type == 'curvature' and in_script:
@@ -2155,14 +2184,14 @@ if processing_type == 'curvature' and in_script:
         print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, outpath), flush=True)
 
 
-# In[32]:
+# In[ ]:
 
 
 if processing_type == 'curvature' and not in_script:
     curvature_frame (0, verbose=False, save=False, recalculate=False, tarpath=None, force_recalc=False)
 
 
-# In[33]:
+# In[ ]:
 
 
 if processing_type == 'curvature':
