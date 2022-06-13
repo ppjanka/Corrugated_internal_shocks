@@ -346,8 +346,7 @@ nu_int_max = 3.0e15
 
 # system properties (see overleaf)
 gamma_jet = 2.0
-# TODO: for now kept fixed for consistency, but it is incorrect, fix everything later
-beta_jet = 0.75 # np.sqrt(1.0 - 1.0/gamma_jet**2)
+beta_jet = np.sqrt(1.0 - 1.0/gamma_jet**2) # old bug: 0.75
 incl = 23.0 * np.pi / 180.
 theta_j = 2.3 * np.pi / 180.
 dist = 8. * kpc
