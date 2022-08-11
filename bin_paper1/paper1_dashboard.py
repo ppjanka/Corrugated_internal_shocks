@@ -347,7 +347,7 @@ nu_int_max = 3.0e15
 # system properties (see overleaf)
 gamma_jet = 2.0
 beta_jet = np.sqrt(1.0 - 1.0/gamma_jet**2) # old bug: 0.75
-incl = 30.0 * np.pi / 180.
+incl = 60.0 * np.pi / 180.
 theta_j = 2.3 * np.pi / 180.
 dist = 8. * kpc
 mbh = 10. * Msun
