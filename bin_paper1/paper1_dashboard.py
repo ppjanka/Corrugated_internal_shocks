@@ -399,30 +399,46 @@ def intensity (nu_fl, B, R):
     )
     
 # observables
-doppler_factor = 1.0 / (gamma_jet*(1.0-beta_jet*np.cos(incl)))
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def nu2nu_fl (nu):
-    return nu/doppler_factor
+def combined_beta (beta):
+    '''Combines the fluid beta with the bulk jet motion (assumed parallel!)'''
+    beta = tf_convert(beta)
+    return (beta + beta_jet) / (1.0 + beta*beta_jet)
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def flux_nu_per_dS (nu, B, R, filling_factor=1.0):
+def combined_gamma (beta):
+    '''Combines the fluid beta with the bulk jet motion (assumed parallel!)'''
+    beta = combined_beta(beta)
+    gamma = 1.0/sqrt(1.0-beta*beta)
+    return beta, gamma
+@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def combined_doppler_factor (beta):
+    '''Combines the fluid beta with the bulk jet motion (assumed parallel!) to get the total doppler factor.'''
+    beta, gamma = combined_gamma(beta)
+    return beta, gamma, 1.0 / (gamma*(1.0-beta*np.cos(incl)))
+@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def nu2nu_fl (nu, beta):
+    return nu/(combined_doppler_factor(beta)[-1])
+@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def flux_nu_per_dS (nu, B, beta, R, filling_factor=1.0):
     '''Observer-frame synchrotron flux from the given simulation unit surface.
     Unit: erg / (s cm**2 Hz) / cm**2'''
-    nu, B, R, filling_factor = tf_convert(nu, B, R, filling_factor)
-    return (doppler_factor**2 * gamma_jet / (2.*dist**2))              * filling_factor* intensity(nu/doppler_factor,B,R)
+    nu, B, beta, R, filling_factor = tf_convert(nu, B, beta, R, filling_factor)
+    beta, gamma, df = combined_doppler_factor(beta)
+    return (df**2 * gamma / (2.*dist**2))              * filling_factor* intensity(nu/df,B,R)
              #* (dS*simu_len**2) # perp. surface element, instead of (beta c dt R)
     
 if not low_memory:
     # total flux within the IR-opt range: 300GHz - 3PHz
     @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-    def _flux_total_integrate (nu_grid,B_grid,R,dlognu_grid, filling_factor=1.0):
-        nu_grid,B_grid,R,dlognu_grid, filling_factor = tf_convert(nu_grid,B_grid,R,dlognu_grid, filling_factor)
-        integrand = nu_grid*Hz * get_cgs(flux_nu_per_dS(nu_grid,B_grid,R,filling_factor))
+    def _flux_total_integrate (nu_grid,B_grid,beta_grid,R,dlognu_grid, filling_factor=1.0):
+        nu_grid,B_grid,beta_grid,R,dlognu_grid, filling_factor = tf_convert(nu_grid,B_grid,beta_grid,R,dlognu_grid, filling_factor)
+        integrand = nu_grid*Hz * get_cgs(flux_nu_per_dS(nu_grid,B_grid,beta_grid,R,filling_factor))
         return npsum(integrand*dlognu_grid, axis=-1)
     # Do NOT use numba for flux_total. It does not understand np.meshgrid, and alternative implementations cause the code to be extremely slow.
-    def flux_total_per_dS (B,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
+    def flux_total_per_dS (B,beta,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
         '''Total observer-frame flux from dS within the IR-opt range: 300GHz - 3PHz.
-        Unit: erg/(cm**2*sec)'''
-        B,R, nu_min,nu_max = tf_convert(B,R, nu_min,nu_max)
+        Unit: erg/(cm**4*sec)'''
+        B,beta,R, nu_min,nu_max = tf_convert(B,beta,R, nu_min,nu_max)
         Bshape = B.shape
         # log-integrate the flux
         lognu = linspace(log(nu_min), log(nu_max), resolution)
@@ -430,15 +446,15 @@ if not low_memory:
         lognu = 0.5 * (lognu[1:] + lognu[:-1])
         nu = exp(lognu)
         B_grid, nu_grid = meshgrid(B, nu, indexing='ij')
-        B_grid, dlognu_grid = meshgrid(B, dlognu, indexing='ij')
-        return get_cgs(reshape(_flux_total_integrate(nu_grid,B_grid,R, dlognu_grid, filling_factor), Bshape))
+        beta_grid, dlognu_grid = meshgrid(beta, dlognu, indexing='ij')
+        return get_cgs(reshape(_flux_total_integrate(nu_grid,B_grid,beta_grid,R, dlognu_grid, filling_factor), Bshape))
     
 else: # low-memory
     @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-    def flux_total_per_dS (B,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
+    def flux_total_per_dS (B,beta,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
         '''Total observer-frame flux from dS within the IR-opt range: 300GHz - 3PHz.
-        Unit: erg/(cm**2*sec)'''
-        B,R, nu_min,nu_max = tf_convert(B,R, nu_min,nu_max)
+        Unit: erg/(cm**4*sec)'''
+        B,beta,R, nu_min,nu_max = tf_convert(B,beta,R, nu_min,nu_max)
         Bshape = B.shape
         # log-integrate the flux
         lognu = linspace(log(nu_min), log(nu_max), resolution)
@@ -449,8 +465,16 @@ else: # low-memory
         for idx in range(len(nu)):
             nu_here = nu[idx]
             dlognu_here = dlognu[idx]
-            result += nu_here*Hz * get_cgs(flux_nu_per_dS(nu_here, B, R, filling_factor)) * dlognu_here
+            result += nu_here*Hz * get_cgs(flux_nu_per_dS(nu_here, B, beta, R, filling_factor)) * dlognu_here
         return get_cgs(result)
+    
+@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def syn_emission_rate_per_dS (flux_total_per_dS, beta, filling_factor=1.0):
+    '''Total synchrotron emision rate, averaged over the box surface, observer frame.
+    Unit: erg / (cm^2 s)'''
+    flux_total_per_dS, beta = tf_convert(flux_total_per_dS, beta)
+    beta, gamma, df = combined_doppler_factor(beta)
+    return (8*np.pi*dist**2 / filling_factor) * npmean(df * flux_total_per_dS / gamma)
 
 
 # In[7]:
@@ -461,7 +485,7 @@ if unit_check:
     print(j_nu(12., 12.))
     print(alpha_nu(12., 12.))
     print(intensity(12., 12.,12.))
-    print(flux_total_per_dS(np.array([12.,]),12.,0.5))
+    print(flux_total_per_dS(np.array([12.,]),np.array([12.,]),12.,0.5))
     if unit_check:
         print("Check that dimensionless: ", get_cgs(j_over_alpha_nu(12., 12.) / (erg / (cm**2))),
           get_cgs(flux_total(np.array([12.,]),12.,0.5)) / get_cgs(erg/(cm**2*sec)))
@@ -525,6 +549,15 @@ def internal_energy (rho, enthalpy, gamma, press, Bflsqr):
      - see Beckwith & Stone (2011), https://github.com/PrincetonUniversity/athena/wiki/Special-Relativity'''
     rho, enthalpy, gamma, press, Bflsqr = tf_convert(rho, enthalpy, gamma, press, Bflsqr)
     return rho * enthalpy * gamma**2 - press + 0.5 * Bflsqr # warning!: includes rest mass
+
+# total available energy in the observer frame
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def etot_observer (beta, rho, enthalpy, press, Bflsqr):
+    '''Total energy per dS in observer frame.
+     - cf. Beckwith & Stone (2011), eq. (20)'''
+    beta, gamma = combined_gamma(beta)
+    rho, enthalpy, press, Bflsqr = tf_convert(rho, enthalpy, press, Bflsqr)
+    return rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta**2) Bflsqr
 
 
 # In[9]:
@@ -771,20 +804,28 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     data_vtk['enthalpy'] = tf_deconvert(enth)
     data_vtk['internal_energy'] = tf_deconvert(internal_energy(data_vtk['rho'], enth, gam, data_vtk['press'], Bcc_fluid_tot_sqr)) # warning!: includes rest mass
     do_vertical_avg(data_vtk, 'internal_energy')
+    data_vtk['etot_observer'] = tf_deconvert(
+        etot_observer (data_vtk['vel1'], data_vtk['rho'], enth, data_vtk['press'], Bcc_fluid_tot_sqr)
+    )
+    do_vertical_avg(data_vtk, 'etot_observer')
     
     del Bcc_fluid_tot_sqr, enth
     
     # synchrotron emission diagnostics
-    jnu = j_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
+    jnu = j_nu(nu2nu_fl(nu_selection,data_vtk['vel1']), Bcc_fluid_tot)
     data_vtk['j_nu'] = tf_deconvert(jnu)
     do_vertical_avg(data_vtk, 'j_nu')
-    alphanu = alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
+    alphanu = alpha_nu(nu2nu_fl(nu_selection,data_vtk['vel1']), Bcc_fluid_tot)
     data_vtk['alpha_nu'] = tf_deconvert(alphanu)
     do_vertical_avg(data_vtk, 'alpha_nu')
-    janu = j_over_alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
+    janu = j_over_alpha_nu(nu2nu_fl(nu_selection,data_vtk['vel1']), Bcc_fluid_tot)
     data_vtk['j_over_alpha_nu'] = tf_deconvert(janu)
     do_vertical_avg(data_vtk, 'j_over_alpha_nu')
-    flux_tot = flux_total_per_dS(B=Bcc_fluid_tot, R=R_selection, nu_min=nu_int_min, nu_max=nu_int_max)
+    flux_tot = flux_total_per_dS(
+        B=Bcc_fluid_tot, beta=data_vtk['vel1'],
+        R=R_selection, 
+        nu_min=nu_int_min, nu_max=nu_int_max
+    )
     data_vtk['flux_density'] = tf_deconvert(flux_tot)
     do_vertical_avg(data_vtk, 'flux_density')
     
@@ -794,9 +835,17 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
     if not low_memory:
         nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
+        nu_grid, beta_grid = meshgrid(freqs, data_vtk['vel1'], indexing='ij')
         data_vtk['spectrum'] = [
             tf_deconvert(freqs),
-            tf_deconvert(nansum(flux_nu_per_dS(nu=nu_grid, B=B_grid, R=R_selection, filling_factor=filling_factor)*dS, axis=-1) / (xrange*yrange))
+            tf_deconvert(nansum(
+                flux_nu_per_dS(
+                    nu=nu_grid, 
+                    B=B_grid, beta=beta_grid,
+                    R=R_selection, 
+                    filling_factor=filling_factor
+                )*dS, axis=-1) / (xrange*yrange)
+            )
         ]
     else:
         data_vtk['spectrum'] = [[],[]]
@@ -806,6 +855,7 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
                 nansum(
                     flux_nu_per_dS(
                         nu=nu, B=Bcc_fluid_tot,
+                        beta=data_vtk['vel1'],
                         R=R_selection,
                         filling_factor=filling_factor
                     )
@@ -884,7 +934,7 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
 def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
     previous_data_vtk = None
     history = {}
-    quantities = ['times', 'internal_energy', 'flux_density']
+    quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'etot_observer']
     for quantity in quantities:
         history[quantity] = []
     for vtk_filename in tqdm(vtk_filenames):
@@ -903,6 +953,10 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
         dl = (data_vtk['x1v'][1] - data_vtk['x1v'][0])
         history['internal_energy'].append(np.sum(data_vtk['internal_energy_vsZ']*dl)/xrange)
         history['flux_density'].append(get_cgs_value(np.sum(data_vtk['flux_density_vsZ']*dl))/xrange)
+        history['syn_emission_rate_per_dS'].append(get_cgs_value(tf_deconvert(
+            syn_emission_rate_per_dS(data_vtk['flux_tot'], beta=data_vtk['vel1'])
+        )))
+        history['etot_observer'].append(get_cgs_value(np.sum(data_vtk['etot_observer_vsZ']*dl))/xrange)
         # move on
         del previous_data_vtk
         previous_data_vtk = data_vtk
@@ -1759,7 +1813,14 @@ if processing_type == 'expLongFsyn':
                 nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
                 new_bcc_dict['spectrum'] = [
                     tf_deconvert(freqs),
-                    tf_deconvert(nansum(flux_nu_per_dS(nu=nu_grid, B=B_grid, R=R_selection, filling_factor=filling_factor)*dS, axis=-1) / (xrange*yrange))
+                    tf_deconvert(nansum(
+                        flux_nu_per_dS(
+                            nu=nu_grid, 
+                            B=B_grid, 
+                            beta=data_vtk['vel1'], 
+                            R=R_selection, 
+                            filling_factor=filling_factor
+                        )*dS, axis=-1) / (xrange*yrange))
                 ]
             else:
                 new_bcc_dict['spectrum'] = [[],[]]
@@ -1768,7 +1829,9 @@ if processing_type == 'expLongFsyn':
                     new_bcc_dict['spectrum'][1].append(tf_deconvert(
                         nansum(
                             flux_nu_per_dS(
-                                nu=nu, B=Bcc_fluid_tot,
+                                nu=nu,
+                                B=Bcc_fluid_tot,
+                                beta=data_vtk['vel1'],
                                 R=R_selection,
                                 filling_factor=filling_factor
                             )
