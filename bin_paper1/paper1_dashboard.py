@@ -477,7 +477,7 @@ def syn_emission_rate_per_dS (flux_total_per_dS, beta, filling_factor=1.0):
     Unit: erg / (cm^2 s)'''
     flux_total_per_dS, beta = tf_convert(flux_total_per_dS, beta)
     beta, gamma, df = combined_doppler_factor(beta)
-    return (8*np.pi*dist**2 / filling_factor) * npmean(df * flux_total_per_dS / gamma)
+    return (8*np.pi*dist**2 / filling_factor) * npmean(flux_total_per_dS / df**3)
 
 
 # In[7]:
@@ -957,7 +957,7 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
         history['internal_energy'].append(np.sum(data_vtk['internal_energy_vsZ']*dl)/xrange)
         history['flux_density'].append(get_cgs_value(np.sum(data_vtk['flux_density_vsZ']*dl))/xrange)
         history['syn_emission_rate_per_dS'].append(get_cgs_value(tf_deconvert(
-            syn_emission_rate_per_dS(data_vtk['flux_tot'], beta=data_vtk['vel1'])
+            syn_emission_rate_per_dS(data_vtk['flux_density'], beta=data_vtk['vel1'])
         )))
         history['etot_observer'].append(get_cgs_value(np.sum(data_vtk['etot_observer_vsZ']*dl))/xrange)
         # move on
