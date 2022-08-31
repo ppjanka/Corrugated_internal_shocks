@@ -402,19 +402,19 @@ def intensity (nu_fl, B, R):
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def combined_beta (beta):
     '''Combines the fluid beta with the bulk jet motion (assumed parallel!)'''
-    beta = tf_convert(beta)
+    beta = tf_convert(beta)[0]
     return (beta + beta_jet) / (1.0 + beta*beta_jet)
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def combined_gamma (beta):
     '''Combines the fluid beta with the bulk jet motion (assumed parallel!)'''
-    beta = tf_convert(beta)
+    beta = tf_convert(beta)[0]
     beta = (beta + beta_jet) / (1.0 + beta*beta_jet)
     gamma = 1.0/sqrt(1.0-beta*beta)
     return beta, gamma
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def combined_doppler_factor (beta):
     '''Combines the fluid beta with the bulk jet motion (assumed parallel!) to get the total doppler factor.'''
-    beta = tf_convert(beta)
+    beta = tf_convert(beta)[0]
     beta = (beta + beta_jet) / (1.0 + beta*beta_jet)
     gamma = 1.0/sqrt(1.0-beta*beta)
     return beta, gamma, 1.0 / (gamma*(1.0-beta*np.cos(incl)))
