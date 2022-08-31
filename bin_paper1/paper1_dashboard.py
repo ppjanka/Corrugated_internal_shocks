@@ -407,13 +407,16 @@ def combined_beta (beta):
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def combined_gamma (beta):
     '''Combines the fluid beta with the bulk jet motion (assumed parallel!)'''
-    beta = combined_beta(beta)
+    beta = tf_convert(beta)
+    beta = (beta + beta_jet) / (1.0 + beta*beta_jet)
     gamma = 1.0/sqrt(1.0-beta*beta)
     return beta, gamma
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def combined_doppler_factor (beta):
     '''Combines the fluid beta with the bulk jet motion (assumed parallel!) to get the total doppler factor.'''
-    beta, gamma = combined_gamma(beta)
+    beta = tf_convert(beta)
+    beta = (beta + beta_jet) / (1.0 + beta*beta_jet)
+    gamma = 1.0/sqrt(1.0-beta*beta)
     return beta, gamma, 1.0 / (gamma*(1.0-beta*np.cos(incl)))
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def nu2nu_fl (nu, beta):
@@ -557,7 +560,7 @@ def etot_observer (beta, rho, enthalpy, press, Bflsqr):
      - cf. Beckwith & Stone (2011), eq. (20)'''
     beta, gamma = combined_gamma(beta)
     rho, enthalpy, press, Bflsqr = tf_convert(rho, enthalpy, press, Bflsqr)
-    return rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta**2) Bflsqr
+    return rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta**2) * Bflsqr
 
 
 # In[9]:
