@@ -347,7 +347,7 @@ nu_int_max = 3.0e15
 # system properties (see overleaf)
 gamma_jet = 2.0
 beta_jet = np.sqrt(1.0 - 1.0/gamma_jet**2) # old bug: 0.75
-incl = 60.0 * np.pi / 180.
+incl = 30.0 * np.pi / 180.
 theta_j = 2.3 * np.pi / 180.
 dist = 8. * kpc
 mbh = 10. * Msun
@@ -552,12 +552,12 @@ def internal_energy (rho, enthalpy, gamma, press, Bflsqr):
 
 # total available energy in the observer frame
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def etot_observer (beta, rho, enthalpy, press, Bflsqr):
-    '''Total energy per dS in observer frame.
+def ekin_observer (beta, rho):
+    '''Kinetic energy density in observer frame.
      - cf. Beckwith & Stone (2011), eq. (20)'''
     beta, gamma = combined_gamma(beta)
-    rho, enthalpy, press, Bflsqr = tf_convert(rho, enthalpy, press, Bflsqr)
-    return rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta**2) * Bflsqr
+    rho = tf_convert(rho)[0]
+    return gamma**2 * rho
 
 
 # In[9]:
@@ -715,12 +715,14 @@ sim2phys = {
     'enthalpy': simu_mass * (simu_len/simu_t)**2 / simu_mass, # erg/g
     'internal_energy': simu_mass * (simu_len/simu_t)**2 / simu_len**3, # erg / cm^3
     'internal_energy_vsZ': simu_mass * (simu_len/simu_t)**2 / simu_len**3, # erg / cm^3
+    'ekin_observer': simu_mass * (simu_len/simu_t)**2 / simu_len**3, # erg / cm^3
     'j_nu': 1.0, # erg / cm**3
     'j_nu_vsZ': 1.0, # erg / cm**3
     'j_over_alpha_nu': 1.0, # erg / cm**2
     'j_over_alpha_nu_vsZ': 1.0, # erg / cm**2
     'flux_density': 1.0, # erg/(cm**2*sec) / cm**2
     'flux_density_vsZ': 1.0, # erg/(cm**2*sec) / cm**2
+    'syn_emission_rate_per_dS': 1.0, # erg/(cm**2*sec)
     'spectrum': (1.0, 1.0), # (Hz, erg / (s cm**2 Hz) / cm**2)
     'ddt_internal_energy': simu_mass * (simu_len/simu_t)**2 / simu_len**3 / simu_t, # erg / cm^3 / s
     'ddt_internal_energy_vsZ': simu_mass * (simu_len/simu_t)**2 / simu_len**3 / simu_t, # erg / cm^3 / s
@@ -804,10 +806,10 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     data_vtk['enthalpy'] = tf_deconvert(enth)
     data_vtk['internal_energy'] = tf_deconvert(internal_energy(data_vtk['rho'], enth, gam, data_vtk['press'], Bcc_fluid_tot_sqr)) # warning!: includes rest mass
     do_vertical_avg(data_vtk, 'internal_energy')
-    data_vtk['etot_observer'] = tf_deconvert(
-        etot_observer (data_vtk['vel1'], data_vtk['rho'], enth, data_vtk['press'], Bcc_fluid_tot_sqr)
+    data_vtk['ekin_observer'] = tf_deconvert(
+        ekin_observer (data_vtk['vel1'], data_vtk['rho'])
     )
-    do_vertical_avg(data_vtk, 'etot_observer')
+    do_vertical_avg(data_vtk, 'ekin_observer')
     
     del Bcc_fluid_tot_sqr, enth
     
@@ -934,7 +936,7 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
 def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
     previous_data_vtk = None
     history = {}
-    quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'etot_observer']
+    quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'ekin_observer']
     for quantity in quantities:
         history[quantity] = []
     for vtk_filename in tqdm(vtk_filenames):
@@ -956,7 +958,7 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
         history['syn_emission_rate_per_dS'].append(get_cgs_value(tf_deconvert(
             syn_emission_rate_per_dS(data_vtk['flux_density'], beta=data_vtk['vel1'])
         )))
-        history['etot_observer'].append(get_cgs_value(np.sum(data_vtk['etot_observer_vsZ']*dl))/xrange)
+        history['ekin_observer'].append(get_cgs_value(np.sum(data_vtk['ekin_observer_vsZ']*dl))/xrange)
         # move on
         del previous_data_vtk
         previous_data_vtk = data_vtk
