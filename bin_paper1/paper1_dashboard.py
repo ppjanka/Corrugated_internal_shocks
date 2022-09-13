@@ -320,14 +320,10 @@ simu_B_8piCorr = np.sqrt(8.*np.pi*simu_press) # sqrt( erg / cm^3 )
 # In[5]:
 
 
+# PROBLEM PARAMETERS
 out_dt_vtk = 0.1
 adiab_idx = 1.33333333333
 
-
-# In[6]:
-
-
-# sychrotron emission treatment
 # general parameters, see Malzac (2014,2018)
 gmin = 1.0e1
 gmax = 1.0e6
@@ -351,6 +347,82 @@ incl = 30.0 * np.pi / 180.
 theta_j = 2.3 * np.pi / 180.
 dist = 8. * kpc
 mbh = 10. * Msun
+
+
+# In[ ]:
+
+
+# MATHS
+
+# vector operations
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def sqr_vec_l2 (x,y,z):
+    x,y,z = tf_convert(x,y,z)
+    return x**2 + y**2 + z**2
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def norm_vec_l2 (x,y,z):
+    x,y,z = tf_convert(x,y,z)
+    return sqrt(x**2 + y**2 + z**2)
+
+
+# In[ ]:
+
+
+# SPECIAL RELATIVITY
+
+# NOTE: in Athena 4.2 vel1, vel2, vel3 are 3-velocities. Instead Athena++ uses 4-velocities in the code (so they would need to be translated).
+
+# v <-> gamma convenience functions
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def v2gamma (v):
+    v, = tf_convert(v)
+    return 1.0/sqrt(1.0-v**2)
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def vsqr2gamma (vsqr):
+    vsqr, = tf_convert(vsqr)
+    return 1.0/sqrt(1.0-vsqr)
+
+# velocity composition
+@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def combined_beta_vec (beta_vec):
+    '''Combines the fluid beta with the bulk jet motion (general case).'''
+    beta_obs = np.zeros(beta_vec.shape)
+    beta_obs[...,0] = (beta_vec[...,0] + beta_jet) / (1.0 + beta_vec[...,0]*beta_jet)
+    beta_obs[...,1:] = sqrt(1.0 - beta_jet**2) * beta_vec[...,1:] / (1.0 + beta_vec[...,0]*beta_jet)
+@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def combined_beta (beta_vec):
+    '''Combines the fluid beta with the bulk jet motion.'''
+    beta_vec = combined_beta_vec(beta_vec)
+    beta = sqrt(npsum(beta_vec**2, axis=-1))
+    return beta_vec, beta
+@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def combined_gamma (beta_vec):
+    '''Combines the fluid beta with the bulk jet motion.'''
+    beta_vec, beta = combined_beta(beta_vec)
+    gamma = v2gamma(beta)
+    return beta_vec, beta, gamma
+@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def combined_doppler_factor (beta_vec, n_vec):
+    '''Combines the fluid beta with the bulk jet motion to get the total doppler factor.'''
+    beta_vec, beta, gamma = combined_gamma(beta_vec)
+    df = 1.0 / (gamma*(1.0-npsum(beta_vec*n_vec, axis=-1)))
+    return beta_vec, beta, gamma, df
+
+# Bcc in the fluid frame
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def BccFl0 (gamma, v1,v2,v3, b1,b2,b3):
+    gamma, v1,v2,v3, b1,b2,b3 = tf_convert(gamma, v1,v2,v3, b1,b2,b3)
+    return gamma * (v1*b1 + v2*b2 + v3*b3)
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def BccFli (gamma, v,b, bFl0):
+    gamma, v,b, bFl0 = tf_convert(gamma, v,b, bFl0)
+    return b / gamma + bFl0 * v
+
+
+# In[6]:
+
+
+# SYNCHROTRON EMISSION
 
 # See Malzac (2014), appendix A
 
@@ -400,45 +472,31 @@ def intensity (nu_fl, B, R):
     
 # observables
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def combined_beta (beta):
-    '''Combines the fluid beta with the bulk jet motion (assumed parallel!)'''
-    beta = tf_convert(beta)[0]
-    return (beta + beta_jet) / (1.0 + beta*beta_jet)
+def nu2nu_fl (nu, doppler_factor):
+    return nu / doppler_factor
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def combined_gamma (beta):
-    '''Combines the fluid beta with the bulk jet motion (assumed parallel!)'''
-    beta = combined_beta(beta)
-    gamma = 1.0/sqrt(1.0-beta*beta)
-    return beta, gamma
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def combined_doppler_factor (beta):
-    '''Combines the fluid beta with the bulk jet motion (assumed parallel!) to get the total doppler factor.'''
-    beta, gamma = combined_gamma(beta)
-    return beta, gamma, 1.0 / (gamma*(1.0-beta*np.cos(incl)))
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def nu2nu_fl (nu, beta):
-    return nu/(combined_doppler_factor(beta)[-1])
-@jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def flux_nu_per_dS (nu, B, beta, R, filling_factor=1.0):
+def flux_nu_per_dS (nu, B, gamma, doppler_factor, R, filling_factor=1.0):
     '''Observer-frame synchrotron flux from the given simulation unit surface.
     Unit: erg / (s cm**2 Hz) / cm**2'''
-    nu, B, beta, R, filling_factor = tf_convert(nu, B, beta, R, filling_factor)
-    beta, gamma, df = combined_doppler_factor(beta)
-    return (df**2 * gamma / (2.*dist**2))              * filling_factor* intensity(nu/df,B,R)
+    nu, B, gamma, doppler_factor, R, filling_factor = tf_convert(nu, B, gamma, doppler_factor, R, filling_factor)
+    return (df**2 * gamma / (2.*dist**2))              * filling_factor* intensity(nu2nu_fl(nu,doppler_factor),B,R)
              #* (dS*simu_len**2) # perp. surface element, instead of (beta c dt R)
     
 if not low_memory:
     # total flux within the IR-opt range: 300GHz - 3PHz
     @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-    def _flux_total_integrate (nu_grid,B_grid,beta_grid,R,dlognu_grid, filling_factor=1.0):
-        nu_grid,B_grid,beta_grid,R,dlognu_grid, filling_factor = tf_convert(nu_grid,B_grid,beta_grid,R,dlognu_grid, filling_factor)
-        integrand = nu_grid*Hz * get_cgs(flux_nu_per_dS(nu_grid,B_grid,beta_grid,R,filling_factor))
+    def _flux_total_integrate (
+        nu_grid,B_grid, gamma_grid,df_grid,R,
+        dlognu_grid, filling_factor=1.0
+    ):
+        nu_grid,B_grid,gamma_grid,df_grid,R,dlognu_grid, filling_factor = tf_convert(nu_grid,B_grid,gamma_grid,df_grid,R,dlognu_grid, filling_factor)
+        integrand = nu_grid*Hz * get_cgs(flux_nu_per_dS(nu_grid,B_grid,gamma_grid,df_grid,R,filling_factor))
         return npsum(integrand*dlognu_grid, axis=-1)
     # Do NOT use numba for flux_total. It does not understand np.meshgrid, and alternative implementations cause the code to be extremely slow.
-    def flux_total_per_dS (B,beta,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
+    def flux_total_per_dS (B,gamma,df,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
         '''Total observer-frame flux from dS within the IR-opt range: 300GHz - 3PHz.
         Unit: erg/(cm**4*sec)'''
-        B,beta,R, nu_min,nu_max = tf_convert(B,beta,R, nu_min,nu_max)
+        B,gamma,df,R, nu_min,nu_max = tf_convert(B,beta,R, nu_min,nu_max)
         Bshape = B.shape
         # log-integrate the flux
         lognu = linspace(log(nu_min), log(nu_max), resolution)
@@ -446,15 +504,16 @@ if not low_memory:
         lognu = 0.5 * (lognu[1:] + lognu[:-1])
         nu = exp(lognu)
         B_grid, nu_grid = meshgrid(B, nu, indexing='ij')
-        beta_grid, dlognu_grid = meshgrid(beta, dlognu, indexing='ij')
-        return get_cgs(reshape(_flux_total_integrate(nu_grid,B_grid,beta_grid,R, dlognu_grid, filling_factor), Bshape))
+        gamma_grid, dlognu_grid = meshgrid(gamma, dlognu, indexing='ij')
+        df_grid, dlognu_grid = meshgrid(df, dlognu, indexing='ij')
+        return get_cgs(reshape(_flux_total_integrate(nu_grid,B_grid,gamma_grid,df_grid,R, dlognu_grid, filling_factor), Bshape))
     
 else: # low-memory
     @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-    def flux_total_per_dS (B,beta,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
+    def flux_total_per_dS (B,gamma,df,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
         '''Total observer-frame flux from dS within the IR-opt range: 300GHz - 3PHz.
         Unit: erg/(cm**4*sec)'''
-        B,beta,R, nu_min,nu_max = tf_convert(B,beta,R, nu_min,nu_max)
+        B,gamma,df,R, nu_min,nu_max = tf_convert(B,gamma,df,R, nu_min,nu_max)
         Bshape = B.shape
         # log-integrate the flux
         lognu = linspace(log(nu_min), log(nu_max), resolution)
@@ -465,16 +524,15 @@ else: # low-memory
         for idx in range(len(nu)):
             nu_here = nu[idx]
             dlognu_here = dlognu[idx]
-            result += nu_here*Hz * get_cgs(flux_nu_per_dS(nu_here, B, beta, R, filling_factor)) * dlognu_here
+            result += nu_here*Hz * get_cgs(flux_nu_per_dS(nu_here, B, gamma, df, R, filling_factor)) * dlognu_here
         return get_cgs(result)
     
 @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def syn_emission_rate_per_dS (flux_total_per_dS, beta, filling_factor=1.0):
+def syn_emission_rate_per_dS (flux_total_per_dS, doppler_factor, filling_factor=1.0):
     '''Total synchrotron emision rate, averaged over the box surface, observer frame.
     Unit: erg / (cm^2 s)'''
-    flux_total_per_dS, beta = tf_convert(flux_total_per_dS, beta)
-    beta, gamma, df = combined_doppler_factor(beta)
-    return (8*np.pi*dist**2 / filling_factor) * npmean(flux_total_per_dS / df**3)
+    flux_total_per_dS, doppler_factor = tf_convert(flux_total_per_dS, doppler_factor)
+    return (8*np.pi*dist**2 / filling_factor) * npmean(flux_total_per_dS / doppler_factor**3)
 
 
 # In[7]:
@@ -494,40 +552,8 @@ if unit_check:
 # In[8]:
 
 
-# other frequently used functions, moved here to enable numba optimization
+# PLASMA PARAMETERS
 
-# vector operations
-@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def sqr_vec_l2 (x,y,z):
-    x,y,z = tf_convert(x,y,z)
-    return x**2 + y**2 + z**2
-@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def norm_vec_l2 (x,y,z):
-    x,y,z = tf_convert(x,y,z)
-    return sqrt(x**2 + y**2 + z**2)
-
-# SR operations
-# NOTE: in Athena 4.2 vel1, vel2, vel3 are 3-velocities. Instead Athena++ uses 4-velocities in the code (so they would need to be translated).
-@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def v2gamma (v):
-    v, = tf_convert(v)
-    return 1.0/sqrt(1.0-v**2)
-@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def vsqr2gamma (vsqr):
-    vsqr, = tf_convert(vsqr)
-    return 1.0/sqrt(1.0-vsqr)
-
-# Bcc in the fluid frame
-@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def BccFl0 (gamma, v1,v2,v3, b1,b2,b3):
-    gamma, v1,v2,v3, b1,b2,b3 = tf_convert(gamma, v1,v2,v3, b1,b2,b3)
-    return gamma * (v1*b1 + v2*b2 + v3*b3)
-@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def BccFli (gamma, v,b, bFl0):
-    gamma, v,b, bFl0 = tf_convert(gamma, v,b, bFl0)
-    return b / gamma + bFl0 * v
-
-# plasma parameters
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def plasma_beta (press, Bflsqr):
     press, Bflsqr = tf_convert(press, Bflsqr)
@@ -552,21 +578,17 @@ def internal_energy (rho, enthalpy, gamma, press, Bflsqr):
 
 # total available kinetic energy in the observer frame
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def ekin_observer (beta, rho):
+def ekin_observer (gamma, rho):
     '''Kinetic energy density in observer frame.
      - cf. Beckwith & Stone (2011), eq. (20)'''
-    beta, gamma = combined_gamma(beta)
-    rho = tf_convert(rho)[0]
     return gamma**2 * rho
 
-
-# total available energy in the observer frame\n",
+# total available energy in the observer frame
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def etot_observer (beta, rho, enthalpy, press, Bflsqr):
+def etot_observer (beta, gamma, rho, enthalpy, press, Bflsqr):
     '''Total energy per dS in observer frame.
      - cf. Beckwith & Stone (2011), eq. (20)'''
-    beta, gamma = combined_gamma(beta)
-    rho, enthalpy, press, Bflsqr = tf_convert(rho, enthalpy, press, Bflsqr)
+    beta, gamma, rho, enthalpy, press, Bflsqr = tf_convert(beta, gamma, rho, enthalpy, press, Bflsqr)
     return rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta**2) * Bflsqr
 
 
@@ -577,27 +599,86 @@ def etot_observer (beta, rho, enthalpy, press, Bflsqr):
 # - ref. Lyutikov et al. (2005)
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def sin_local_incl (beta_vec, beta, n_vec):
+    return sqrt(1-npsum((beta_vec/beta) * n_vec, axis=-1)**2)
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def stokes_kappa (nu):
     nu = tf_convert(nu)[0]
     return 0.25*sqrt(3) * gamma((3*p-1)/12) * gamma((3*p+7)/12) * (e**3 / (me*c**2)) * (3*e / (2*np.pi*me**3*c**5))**(0.5*(p-1)) * nu**(-0.5*(p-1))
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def stokes_I (nu, beta, Bfluid, sin_xiprime):
+def stokes_I (sin_local_incl, doppler_factor, Bfluid, sin_xiprime):
     '''Stokes I parameter, before integrating over dS
      - see Lyutikov et al. (2005), eq. (2).
      - z=0 assumed,
-     - as we only use ratios here, Ke is omitted.'''
-    beta, gamma, df = combined_doppler_factor(beta)
-    nu, Bfluid, sin_xiprime = tf_convert(nu, Bfluid, sin_xiprime)
-    return ((p+7/3)/(p+1)) * (stokes_kappa(nu) / (sin(incl)*dist**2)) * df**(2+0.5*(p-1)) * npabs(Bfluid*sin_xiprime)**(0.5*(p+1))
+     - as we only use ratios here, part of normalization identical between I, Q, and U is omitted.'''
+    sin_local_incl, doppler_factor, Bfluid, sin_xiprime = tf_convert(sin_local_incl, doppler_factor, Bfluid, sin_xiprime)
+    return ((p+7/3)/(p+1)) * (1 / sin_local_incl) * doppler_factor**(2+0.5*(p-1)) * npabs(Bfluid*sin_xiprime)**(0.5*(p+1))
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_Q (sin_local_incl, doppler_factor, Bfluid, sin_xiprime, cos_xitilde):
+    '''Stokes Q parameter, before integrating over dS
+     - see Lyutikov et al. (2005), eq. (2).
+     - z=0 assumed,
+     - as we only use ratios here, part of normalization identical between I, Q, and U is omitted.'''
+    sin_local_incl, doppler_factor, Bfluid, sin_xiprime, cos_xitilde = tf_convert(sin_local_incl, doppler_factor, Bfluid, sin_xiprime, cos_xitilde)
+    return (1 / sin_local_incl) * doppler_factor**(2+0.5*(p-1)) * npabs(Bfluid*sin_xiprime)**(0.5*(p+1)) * (2*cos_xitilde**2 - 1.0)
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_U (sin_local_incl, doppler_factor, Bfluid, sin_xiprime, sin_xitilde, cos_xitilde):
+    '''Stokes U parameter, before integrating over dS
+     - see Lyutikov et al. (2005), eq. (2).
+     - z=0 assumed,
+     - as we only use ratios here, part of normalization identical between I, Q, and U is omitted.'''
+    sin_local_incl, doppler_factor, Bfluid, sin_xiprime, sin_xitilde, cos_xitilde = tf_convert(sin_local_incl, doppler_factor, Bfluid, sin_xiprime, sin_xitilde, cos_xitilde)
+    return (1 / sin_local_incl) * doppler_factor**(2+0.5*(p-1)) * npabs(Bfluid*sin_xiprime)**(0.5*(p+1)) * 2.*sin_xitilde*cos_xitilde
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_qprime (Bfluid_vec, beta_vec, n_vec):
+    '''Lyutikov et al. (2005), eq. (6).'''
+    gamma = 1.0 / np.sqrt(1.0 - np.sum(beta_vec**2, axis=-1))
+    return Bfluid_vec + np.cross(n_vec, np.cross(beta_vec, Bfluid_vec)) - (gamma/(1+gamma)) * np.cross(Bfluid_vec, beta_vec) * beta_vec
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_e (n_vec, qprime_vec):
+    '''Lyutikov et al. (2005), eq. (6).'''
+    ncrossq = np.cross(n_vec, qprime_vec)
+    return ncrossq / np.sqrt(
+        np.sum(qprime_vec**2, axis=-1) - np.sum(ncrossq**2, axis=-1)
+    )
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_cos_xitilde (e_vec, n_vec, l_vec):
+    '''Lyutikov et al. (2005), eq. (5).'''
+    return np.sqrt(np.sum(
+        np.cross(e_vec, np.cross(n_vec, l_vec))**2, axis=-1
+    ))
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_sin_xitilde (e_vec, l_vec):
+    '''Lyutikov et al. (2005), eq. (5).'''
+    return np.sqrt(np.sum(
+        np.cross(e_vec, l_vec)**2, axis=-1
+    ))
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_nprime (n_vec, gamma, beta_vec):
+    '''Lyutikov et al. (2005), eq. (6).'''
+    return (n_vec + gamma * beta_vec * ((gamma/(gamma+1))*np.cross(n_vec, beta_vec)-1)) / (gamma * (1 - np.cross(n_vec, beta_vec)))
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_sin_xiprime (nprime_vec, Bfluid_vec, Bfluid):
+    return sqrt(1 - np.sum(nprime_vec*Bfluid_vec/Bfluid, axis=-1)**2)
 
 
 # In[9]:
 
 
+# MAGNETIC FIELD CURVATURE
+
 # TODO: could probably optimize it better, also: NOT tested for tensorflow yet
 
-# magnetic field curvature treatment
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def _vector_orientation (vectors):
     '''Returns orientation phi (Arc tan(y/x)) of the vector field.'''
@@ -720,6 +801,8 @@ def bfield_curvature (data, verbose=False):
 # In[10]:
 
 
+# UNITS
+
 sim2phys = {
     'Time':simu_t, # sec
     'x1f':simu_len, # cm
@@ -790,13 +873,24 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     
     # SR quantities
     # NOTE: in Athena 4.2 vel1, vel2, vel3 are 3-velocities. Instead Athena++ uses 4-velocities in the code (so they would need to be translated).
+    
+    # fluid velocities in collision frame
     vel_tot_sqr = sqr_vec_l2(data_vtk['vel1'], data_vtk['vel2'], data_vtk['vel3'])
     data_vtk['vel_tot'] = tf_deconvert(sqrt(vel_tot_sqr))
     gam = vsqr2gamma(vel_tot_sqr)
     data_vtk['gamma'] = tf_deconvert(gam)
     del vel_tot_sqr
+    
+    # fluid velocities in observer frame (boosted by beta_jet)
+    beta_vec = np.swapaxes(np.array(data_vtk['vel1'], data_vtk['vel2'], data_vtk['vel3']), 0,-1)
+    n_vec = np.array([cos(incl), 0, -sin(incl)])
+    combined_beta_vec, combined_beta, combined_gamma, doppler_factor = combined_doppler_factor(beta_vec, n_vec)
+    data_vtk['combined_beta_vec'] = tf_deconvert(combined_beta_vec)
+    data_vtk['combined_beta'] = tf_deconvert(combined_beta)
+    data_vtk['combined_gamma'] = tf_deconvert(combined_gamma)
+    data_vtk['doppler_factor'] = tf_deconvert(df)
 
-    # total Bcc in observer frame
+    # total Bcc in collision frame
     data_vtk['Bcc_tot'] = tf_deconvert(norm_vec_l2(data_vtk['Bcc1'], data_vtk['Bcc2'], data_vtk['Bcc3']))
 
     # Bcc in the fluid frame
@@ -840,28 +934,28 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     data_vtk['internal_energy'] = tf_deconvert(internal_energy(data_vtk['rho'], enth, gam, data_vtk['press'], Bcc_fluid_tot_sqr)) # warning!: includes rest mass
     do_vertical_avg(data_vtk, 'internal_energy')
     data_vtk['ekin_observer'] = tf_deconvert(
-        ekin_observer (data_vtk['vel1'], data_vtk['rho'])
+        ekin_observer (combined_gamma, data_vtk['rho'])
     )
     do_vertical_avg(data_vtk, 'ekin_observer')
     data_vtk['etot_observer'] = tf_deconvert(
-        etot_observer(data_vtk['vel1'], data_vtk['rho'], enth, data_vtk['press'], Bcc_fluid_tot_sqr)
+        etot_observer(combined_beta, combined_gamma, data_vtk['rho'], enth, data_vtk['press'], Bcc_fluid_tot_sqr)
     )
     do_vertical_avg(data_vtk, 'etot_observer')
     
     del Bcc_fluid_tot_sqr, enth
     
     # synchrotron emission diagnostics
-    jnu = j_nu(nu2nu_fl(nu_selection,data_vtk['vel1']), Bcc_fluid_tot)
+    jnu = j_nu(nu2nu_fl(nu_selection,doppler_factor), Bcc_fluid_tot)
     data_vtk['j_nu'] = tf_deconvert(jnu)
     do_vertical_avg(data_vtk, 'j_nu')
-    alphanu = alpha_nu(nu2nu_fl(nu_selection,data_vtk['vel1']), Bcc_fluid_tot)
+    alphanu = alpha_nu(nu2nu_fl(nu_selection,doppler_factor), Bcc_fluid_tot)
     data_vtk['alpha_nu'] = tf_deconvert(alphanu)
     do_vertical_avg(data_vtk, 'alpha_nu')
-    janu = j_over_alpha_nu(nu2nu_fl(nu_selection,data_vtk['vel1']), Bcc_fluid_tot)
+    janu = j_over_alpha_nu(nu2nu_fl(nu_selection,doppler_factor), Bcc_fluid_tot)
     data_vtk['j_over_alpha_nu'] = tf_deconvert(janu)
     do_vertical_avg(data_vtk, 'j_over_alpha_nu')
     flux_tot = flux_total_per_dS(
-        B=Bcc_fluid_tot, beta=data_vtk['vel1'],
+        B=Bcc_fluid_tot, gamma=combined_gamma, df=doppler_factor,
         R=R_selection, 
         nu_min=nu_int_min, nu_max=nu_int_max
     )
@@ -874,13 +968,16 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
     if not low_memory:
         nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
-        nu_grid, beta_grid = meshgrid(freqs, data_vtk['vel1'], indexing='ij')
+#         nu_grid, gamma_grid = meshgrid(freqs, combined_gamma, indexing='ij')
+#         nu_grid, df_grid = meshgrid(freqs, doppler_factor, indexing='ij')
         data_vtk['spectrum'] = [
             tf_deconvert(freqs),
             tf_deconvert(nansum(
                 flux_nu_per_dS(
                     nu=nu_grid, 
-                    B=B_grid, beta=beta_grid,
+                    B=B_grid,
+                    gamma=combined_gamma,#gamma_grid,
+                    doppler_factor=doppler_factor,#df_grid,
                     R=R_selection, 
                     filling_factor=filling_factor
                 )*dS, axis=-1) / (xrange*yrange)
@@ -894,7 +991,8 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
                 nansum(
                     flux_nu_per_dS(
                         nu=nu, B=Bcc_fluid_tot,
-                        beta=data_vtk['vel1'],
+                        gamma=combined_gamma,
+                        doppler_factor=doppler_factor,
                         R=R_selection,
                         filling_factor=filling_factor
                     )
@@ -909,6 +1007,65 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
             
     # magnetic field curvature
     data_vtk['curvature'] = bfield_curvature(data_vtk)
+    
+    # Stokes parameters
+    Bfluid_vec = np.swapaxes([Bfl1,Bfl2,Bfl3],0,-1)
+    qprime_vec = stokes_qprime(
+        Bfluid_vec=Bfluid_vec, 
+        beta_vec=combined_beta_vec, 
+        n_vec=n_vec
+    )
+    e_vec = stokes_e (
+        n_vec=n_vec, 
+        qprime_vec=qprime_vec
+    )
+    l_vec = np.array([sin(incl),0,cos(incl)])
+    cos_xitilde = stokes_cos_xitilde(
+        e_vec=e_vec, 
+        n_vec=n_vec, 
+        l_vec=l_vec
+    )
+    sin_xitilde = stokes_sin_xitilde(
+        e_vec=e_vec,
+        l_vec=l_vec
+    )
+    sin_loc_incl = sin_local_incl(
+        beta_vec=combined_beta_vec,
+        beta=combined_beta,
+        n_vec=n_vec
+    )
+    nprime_vec = stokes_nprime(
+        n_vec=n_vec, 
+        gamma=combined_gamma, 
+        beta_vec=combined_beta_vec
+    )
+    sin_xiprime = stokes_sin_xiprime(
+        nprime_vec=nprime_vec,
+        Bfluid_vec=Bfluid_vec,
+        Bfluid=Bcc_fluid_tot
+    )
+    data_vtk['stokes_I'] = tf_deconvert(stokes_I(
+        sin_local_incl=sin_loc_incl, 
+        doppler_factor=doppler_factor, 
+        Bfluid=Bcc_fluid_tot, 
+        sin_xiprime=sin_xiprime
+    ))
+    data_vtk['stokes_Q'] = tf_deconvert(stokes_Q(
+        sin_local_incl=sin_loc_incl, 
+        doppler_factor=doppler_factor, 
+        Bfluid=Bcc_fluid_tot, 
+        sin_xiprime=sin_xiprime, 
+        cos_xitilde=cos_xitilde
+    ))
+    data_vtk['stokes_U'] = tf_deconvert(stokes_U(
+        sin_local_incl=sin_loc_incl, 
+        doppler_factor=doppler_factor, 
+        Bfluid=Bcc_fluid_tot, 
+        sin_xiprime=sin_xiprime, 
+        sin_xitilde=sin_xitilde, 
+        cos_xitilde=cos_xitilde
+    ))
+    del Bfluid_vec, qprime_vec, e_vec, l_vec, cos_xitilde, sin_xitilde, sin_loc_incl, nprime_vec, sin_xiprime, 
     
     return data_vtk
 
@@ -973,7 +1130,7 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
 def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
     previous_data_vtk = None
     history = {}
-    quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'ekin_observer', 'etot_observer']
+    quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'ekin_observer', 'etot_observer', 'polarization_degree', 'polarization_evpa']
     for quantity in quantities:
         history[quantity] = []
     for vtk_filename in tqdm(vtk_filenames):
@@ -993,10 +1150,17 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
         history['internal_energy'].append(np.sum(data_vtk['internal_energy_vsZ']*dl)/xrange)
         history['flux_density'].append(get_cgs_value(np.sum(data_vtk['flux_density_vsZ']*dl))/xrange)
         history['syn_emission_rate_per_dS'].append(get_cgs_value(tf_deconvert(
-            syn_emission_rate_per_dS(data_vtk['flux_density'], beta=data_vtk['vel1'])
+            syn_emission_rate_per_dS(data_vtk['flux_density'], beta=data_vtk['doppler_factor'])
         )))
         history['ekin_observer'].append(get_cgs_value(np.sum(data_vtk['ekin_observer_vsZ']*dl))/xrange)
         history['etot_observer'].append(get_cgs_value(np.sum(data_vtk['etot_observer_vsZ']*dl))/xrange)
+        # polarization from the Stokes parameters
+        Q_integral = tf_deconvert(nansum(data_vtk['stokes_Q']))
+        U_integral = tf_deconvert(nansum(data_vtk['stokes_U']))
+        I_integral = tf_deconvert(nansum(data_vtk['stokes_I']))
+        history['polarization_degree'] = sqrt(Q_integral**2 + U_integral**2) / I_integral
+        history['polarization_evpa'] = 0.5 * np.arccos(Q_integral / sqrt(Q_integral**2 + U_integral))
+        del Q_integral, U_integral, I_integral
         # move on
         del previous_data_vtk
         previous_data_vtk = data_vtk
@@ -1831,13 +1995,13 @@ if processing_type == 'expLongFsyn':
         del Bcc_fluid_tot_sqr, enth
 
         # synchrotron emission diagnostics
-        jnu = j_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
+        jnu = j_nu(nu2nu_fl(nu_selection,doppler_factor), Bcc_fluid_tot)
         new_bcc_dict['j_nu'] = tf_deconvert(jnu)
         do_vertical_avg(new_bcc_dict, 'j_nu')
-        alphanu = alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
+        alphanu = alpha_nu(nu2nu_fl(nu_selection,doppler_factor), Bcc_fluid_tot)
         new_bcc_dict['alpha_nu'] = tf_deconvert(alphanu)
         do_vertical_avg(new_bcc_dict, 'alpha_nu')
-        janu = j_over_alpha_nu(nu2nu_fl(nu_selection), Bcc_fluid_tot)
+        janu = j_over_alpha_nu(nu2nu_fl(nu_selection,doppler_factor), Bcc_fluid_tot)
         new_bcc_dict['j_over_alpha_nu'] = tf_deconvert(janu)
         do_vertical_avg(new_bcc_dict, 'j_over_alpha_nu')
         flux_tot = flux_total_per_dS(B=Bcc_fluid_tot, R=R_selection, nu_min=nu_int_min, nu_max=nu_int_max)
@@ -1857,7 +2021,8 @@ if processing_type == 'expLongFsyn':
                         flux_nu_per_dS(
                             nu=nu_grid, 
                             B=B_grid, 
-                            beta=data_vtk['vel1'], 
+                            gamma=combined_gamma,
+                            doppler_factor=doppler_factor,
                             R=R_selection, 
                             filling_factor=filling_factor
                         )*dS, axis=-1) / (xrange*yrange))
@@ -1871,7 +2036,8 @@ if processing_type == 'expLongFsyn':
                             flux_nu_per_dS(
                                 nu=nu,
                                 B=Bcc_fluid_tot,
-                                beta=data_vtk['vel1'],
+                                gamma=combined_gamma,
+                                doppler_factor=doppler_factor,
                                 R=R_selection,
                                 filling_factor=filling_factor
                             )
