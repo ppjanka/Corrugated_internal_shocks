@@ -550,7 +550,7 @@ def internal_energy (rho, enthalpy, gamma, press, Bflsqr):
     rho, enthalpy, gamma, press, Bflsqr = tf_convert(rho, enthalpy, gamma, press, Bflsqr)
     return rho * enthalpy * gamma**2 - press + 0.5 * Bflsqr # warning!: includes rest mass
 
-# total available energy in the observer frame
+# total available kinetic energy in the observer frame
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def ekin_observer (beta, rho):
     '''Kinetic energy density in observer frame.
@@ -558,6 +558,38 @@ def ekin_observer (beta, rho):
     beta, gamma = combined_gamma(beta)
     rho = tf_convert(rho)[0]
     return gamma**2 * rho
+
+
+# total available energy in the observer frame\n",
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def etot_observer (beta, rho, enthalpy, press, Bflsqr):
+    '''Total energy per dS in observer frame.
+     - cf. Beckwith & Stone (2011), eq. (20)'''
+    beta, gamma = combined_gamma(beta)
+    rho, enthalpy, press, Bflsqr = tf_convert(rho, enthalpy, press, Bflsqr)
+    return rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta**2) * Bflsqr
+
+
+# In[ ]:
+
+
+# Stokes parameters
+# - ref. Lyutikov et al. (2005)
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_kappa (nu):
+    nu = tf_convert(nu)[0]
+    return 0.25*sqrt(3) * gamma((3*p-1)/12) * gamma((3*p+7)/12) * (e**3 / (me*c**2)) * (3*e / (2*np.pi*me**3*c**5))**(0.5*(p-1)) * nu**(-0.5*(p-1))
+
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def stokes_I (nu, beta, Bfluid, sin_xiprime):
+    '''Stokes I parameter, before integrating over dS
+     - see Lyutikov et al. (2005), eq. (2).
+     - z=0 assumed,
+     - as we only use ratios here, Ke is omitted.'''
+    beta, gamma, df = combined_doppler_factor(beta)
+    nu, Bfluid, sin_xiprime = tf_convert(nu, Bfluid, sin_xiprime)
+    return ((p+7/3)/(p+1)) * (stokes_kappa(nu) / (sin(incl)*dist**2)) * df**(2+0.5*(p-1)) * npabs(Bfluid*sin_xiprime)**(0.5*(p+1))
 
 
 # In[9]:
@@ -716,6 +748,7 @@ sim2phys = {
     'internal_energy': simu_mass * (simu_len/simu_t)**2 / simu_len**3, # erg / cm^3
     'internal_energy_vsZ': simu_mass * (simu_len/simu_t)**2 / simu_len**3, # erg / cm^3
     'ekin_observer': simu_mass * (simu_len/simu_t)**2 / simu_len**3, # erg / cm^3
+    'etot_observer': simu_mass * (simu_len/simu_t)**2 / simu_len**3, # erg / cm^3
     'j_nu': 1.0, # erg / cm**3
     'j_nu_vsZ': 1.0, # erg / cm**3
     'j_over_alpha_nu': 1.0, # erg / cm**2
@@ -810,6 +843,10 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
         ekin_observer (data_vtk['vel1'], data_vtk['rho'])
     )
     do_vertical_avg(data_vtk, 'ekin_observer')
+    data_vtk['etot_observer'] = tf_deconvert(
+        etot_observer(data_vtk['vel1'], data_vtk['rho'], enth, data_vtk['press'], Bcc_fluid_tot_sqr)
+    )
+    do_vertical_avg(data_vtk, 'etot_observer')
     
     del Bcc_fluid_tot_sqr, enth
     
@@ -936,7 +973,7 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
 def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
     previous_data_vtk = None
     history = {}
-    quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'ekin_observer']
+    quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'ekin_observer', 'etot_observer']
     for quantity in quantities:
         history[quantity] = []
     for vtk_filename in tqdm(vtk_filenames):
@@ -959,6 +996,7 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
             syn_emission_rate_per_dS(data_vtk['flux_density'], beta=data_vtk['vel1'])
         )))
         history['ekin_observer'].append(get_cgs_value(np.sum(data_vtk['ekin_observer_vsZ']*dl))/xrange)
+        history['etot_observer'].append(get_cgs_value(np.sum(data_vtk['etot_observer_vsZ']*dl))/xrange)
         # move on
         del previous_data_vtk
         previous_data_vtk = data_vtk
