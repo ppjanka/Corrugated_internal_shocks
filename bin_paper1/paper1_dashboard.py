@@ -135,9 +135,12 @@ force_recalc = get_arg('force_recalc', default=False, val_type=boolean) # force 
 import multiprocessing
 cpu_avail = multiprocessing.cpu_count()
 nproc = get_arg('nproc', default=int(0.5*cpu_avail), val_type=int)
+nproc_history = get_arg('nproc_history', default=1, val_type=int)
 if nproc < 0:
     nproc = cpu_avail
-print('Using nproc = %i' % nproc, flush=True)
+if nproc_history < 0:
+    nproc_history = cpu_avail
+print(f'Using nproc = {nproc}, nproc_history = {nproc_history}', flush=True)
 
 #---------------------------------------------------------------
 
@@ -1146,22 +1149,23 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
 # In[13]:
 
 
-def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
+history_quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'ekin_observer', 'etot_observer', 'polarization_degree', 'polarization_evpa']
+
+def _precalc_history_batch (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
     previous_data_vtk = None
     history = {}
-    quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'ekin_observer', 'etot_observer', 'polarization_degree', 'polarization_evpa']
-    for quantity in quantities:
+    for quantity in history_quantities:
         history[quantity] = []
-    for vtk_filename in tqdm(vtk_filenames):
+    for vtk_filename in vtk_filenames:
         fileno = int(vtk_filename.split('/')[-1].split('.')[1])
         # read and augment the data
-#         try:
-        data_vtk = read_vtk_file(vtk_filename, previous_data_vtk, out_dt=out_dt, augment_kwargs=augment_kwargs, tarpath=tarpath)
-#         except Exception as e:
-#             print('[precalc_history] Could not read vtk file %s, error occured:' % vtk_filename)
-#             print(e)
-#             print(' - the file will be ignored.')
-#             continue
+        try:
+            data_vtk = read_vtk_file(vtk_filename, previous_data_vtk, out_dt=out_dt, augment_kwargs=augment_kwargs, tarpath=tarpath)
+        except Exception as e:
+            print('[precalc_history] Could not read vtk file %s, error occured:' % vtk_filename)
+            print(e)
+            print(' - the file will be ignored.')
+            continue
         # calculate history variables
         history['times'].append(fileno*out_dt)
         # energy components
@@ -1185,16 +1189,51 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
         Q_integral = tf_deconvert(nansum(data_vtk['stokes_Q']))
         U_integral = tf_deconvert(nansum(data_vtk['stokes_U']))
         I_integral = tf_deconvert(nansum(data_vtk['stokes_I']))
-        history['polarization_degree'] = sqrt(Q_integral**2 + U_integral**2) / I_integral
-        history['polarization_evpa'] = 0.5 * np.arccos(Q_integral / sqrt(Q_integral**2 + U_integral**2))
+        history['polarization_degree'].append(tf_deconvert(
+            sqrt(Q_integral**2 + U_integral**2) / I_integral
+        ))
+        history['polarization_evpa'].append(tf_deconvert(
+            0.5 * np.arccos(Q_integral / sqrt(Q_integral**2 + U_integral**2))
+        ))
         del Q_integral, U_integral, I_integral
         # move on
         del previous_data_vtk
         previous_data_vtk = data_vtk
-    for quantity in quantities:
+    for quantity in history_quantities:
         history[quantity] = np.array(history[quantity])
     history['ddt_internal_energy'] = (history['internal_energy'][1:] - history['internal_energy'][:-1]) / (history['times'][1:] - history['times'][:-1])
     history['ddt_internal_energy'] = np.insert(history['ddt_internal_energy'], 0, np.nan)
+    return history
+
+def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
+    print('Calculating history..')
+    if nproc_history == 1:
+        history = _precalc_history_batch(vtk_filenames, out_dt=out_dt, augment_kwargs=augment_kwargs, tarpath=tarpath)
+    else:
+        from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
+        history = {}
+        # prepare batches for parallel processing
+        batches = np.array_split(vtk_filenames, nproc_history)
+        for i in range(nproc_history-1):
+            batches[i+1] = np.insert(batches[i+1], 0, batches[i][-1])
+        # process batch histories
+        with ProcessPool(nproc_history) as pool:
+            batch_histories = pool.map(
+                lambda x : _precalc_history_batch(
+                    x, out_dt=out_dt, augment_kwargs=augment_kwargs, tarpath=tarpath
+                ), 
+                batches
+            )
+        # combine batch histories
+        for batch_history in batch_histories:
+            for quantity in batch_history.keys():
+                if quantity not in history.keys():
+                    history[quantity] = batch_history[quantity]
+                else:
+                    history[quantity] = np.append(history[quantity], batch_history[quantity][1:])
+        del batch_histories
+    print(' - history calculation done.')
+    
     return history
 
 
