@@ -18,7 +18,7 @@ CORR_TYPE=1
 PROD_TYPE=1
 CORR_AMPL=1
 
-nproc=-1 #32 # use all cores available
+nproc=32 # use all cores available
 nproc_history=2
 
 # module setup

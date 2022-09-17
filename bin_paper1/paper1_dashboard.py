@@ -541,6 +541,53 @@ def syn_emission_rate_per_dS (flux_total_per_dS, doppler_factor, filling_factor=
     flux_total_per_dS, doppler_factor = tf_convert(flux_total_per_dS, doppler_factor)
     return (8*np.pi*dist**2 / filling_factor) * npmean(flux_total_per_dS / doppler_factor**3)
 
+@jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+def synEm_per_dnudSdt (nu, B, R, gamma, doppler_factor):
+    nu, B, R, gamma, doppler_factor = tf_convert(nu, B, R, gamma, doppler_factor)
+    return 4*np.pi * (gamma / doppler_factor) * intensity(nu2nu_fl(nu,doppler_factor), B, R)
+
+if not low_memory:
+    @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+    def _synEm_integrateNu (nu_grid, dlognu_grid, B_grid, R, gamma_grid, df_grid):
+        nu_grid, dlognu_grid, B_grid, R, gamma_grid, df_grid = tf_convert(nu_grid, dlognu_grid, B_grid, R, gamma_grid, df_grid)
+        integrand = nu_grid*Hz * get_cgs(synEm_per_dnudSdt(nu_grid,B_grid,R,gamma_grid,df_grid))
+        return npsum(integrand*dlognu_grid, axis=-1)
+    # Do NOT use numba. It does not understand np.meshgrid, and alternative implementations cause the code to be extremely slow.
+    def synEm_per_dSdt (B,gamma,df,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128):
+        B,gamma,df,R, nu_min,nu_max = tf_convert(B,gamma,df,R, nu_min,nu_max)
+        Bshape = B.shape
+        # log-integrate the flux
+        lognu = linspace(log(nu_min), log(nu_max), resolution)
+        dlognu = lognu[1:] - lognu[:-1]
+        lognu = 0.5 * (lognu[1:] + lognu[:-1])
+        nu = exp(lognu)
+        B_grid, nu_grid = meshgrid(B, nu, indexing='ij')
+        gamma_grid, dlognu_grid = meshgrid(gamma, dlognu, indexing='ij')
+        df_grid, dlognu_grid = meshgrid(df, dlognu, indexing='ij')
+        return get_cgs(reshape(
+            _synEm_integrateNu (nu_grid, dlognu_grid, B_grid, R, gamma_grid, df_grid),
+            Bshape
+        ))
+    
+else: # low-memory
+    @jit(nopython=opt_numba, parallel=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
+    def synEm_per_dSdt (B,gamma,df,R, nu_min=nu_int_min, nu_max=nu_int_max, resolution=128, filling_factor=1.0):
+        B,gamma,df,R, nu_min,nu_max = tf_convert(B,gamma,df,R, nu_min,nu_max)
+        Bshape = B.shape
+        # log-integrate the flux
+        lognu = linspace(log(nu_min), log(nu_max), resolution)
+        dlognu = lognu[1:] - lognu[:-1]
+        lognu = 0.5 * (lognu[1:] + lognu[:-1])
+        nu = exp(lognu)
+        result = np.zeros(Bshape)
+        for idx in range(len(nu)):
+            nu_here = nu[idx]
+            dlognu_here = dlognu[idx]
+            result += nu_here*Hz * get_cgs(
+                synEm_per_dnudSdt (nu_here, B, R, gamma, doppler_factor)
+            ) * dlognu_here
+        return get_cgs(result)
+
 
 # In[7]:
 
@@ -983,6 +1030,16 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     data_vtk['flux_density'] = tf_deconvert(flux_tot)
     do_vertical_avg(data_vtk, 'flux_density')
     
+    data_vtk['synEm_per_dSdt'] = tf_deconvert(
+        synEm_per_dSdt (
+            B=Bcc_fluid_tot,
+            gamma=combined_gamma,
+            df=doppler_factor,
+            R=R_selection, 
+            nu_min=nu_int_min, nu_max=nu_int_max
+    ))
+    do_vertical_avg(data_vtk, 'synEm_per_dSdt')
+    
     nu_min, nu_max = tf_convert(nu_min, nu_max)
     freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
     
@@ -1149,7 +1206,7 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
 # In[13]:
 
 
-history_quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'ekin_observer', 'etot_observer', 'polarization_degree', 'polarization_evpa']
+history_quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'synEm_per_dSdt_mean', 'ekin_observer', 'etot_observer', 'polarization_degree', 'polarization_evpa', 'Q_integral', 'U_integral', 'I_integral']
 
 def _precalc_history_batch (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
     previous_data_vtk = None
@@ -1185,10 +1242,16 @@ def _precalc_history_batch (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=def
         history['syn_emission_rate_per_dS'].append(get_cgs_value(tf_deconvert(
             syn_emission_rate_per_dS(data_vtk['flux_density'], doppler_factor=data_vtk['doppler_factor'])
         )))
+        history['synEm_per_dSdt_mean'].append(get_cgs_value(tf_deconvert(
+            npmean(data_vtk['synEm_per_dSdt'])
+        )))
         # polarization from the Stokes parameters
         Q_integral = tf_deconvert(nansum(data_vtk['stokes_Q']))
         U_integral = tf_deconvert(nansum(data_vtk['stokes_U']))
         I_integral = tf_deconvert(nansum(data_vtk['stokes_I']))
+        history['Q_integral'].append(Q_integral)
+        history['U_integral'].append(U_integral)
+        history['I_integral'].append(I_integral)
         history['polarization_degree'].append(tf_deconvert(
             sqrt(Q_integral**2 + U_integral**2) / I_integral
         ))
