@@ -319,6 +319,12 @@ simu_B = np.sqrt(2.*simu_press) # sqrt( erg / cm^3 )
 simu_B_8piCorr = np.sqrt(8.*np.pi*simu_press) # sqrt( erg / cm^3 )
 
 
+# In[161]:
+
+
+erg
+
+
 # --------------------
 # **PHYSICS**
 
@@ -644,7 +650,7 @@ def etot_observer (beta_vec, beta_sqr, gamma, rho, enthalpy, press, Bfluid_vec, 
     '''Total energy per dS in observer frame.
      - cf. Beckwith & Stone (2011), eq. (20)'''
     beta_vec, beta_sqr, gamma, rho, enthalpy, press, Bfluid_vec, Bfluid_sqr = tf_convert(beta_vec, beta_sqr, gamma, rho, enthalpy, press, Bfluid_vec, Bfluid_sqr)
-    return rho * enthalpy * gamma**2 - press + 0.5 * beta_sqr * Bfluid_sqr - 0.5 * npsum(beta_vec * Bfluid_vec, axis=-1)**2
+    return rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta_sqr) * Bfluid_sqr - 0.5 * npsum(beta_vec * Bfluid_vec, axis=-1)**2
 
 
 # In[133]:
