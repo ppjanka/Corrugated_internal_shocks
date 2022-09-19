@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # coding: utf-8
 
 # ------------------------
@@ -354,7 +354,7 @@ dist = 8. * kpc
 mbh = 10. * Msun
 
 
-# In[ ]:
+# In[6]:
 
 
 # MATHS
@@ -370,7 +370,7 @@ def norm_vec_l2 (x,y,z):
     return sqrt(x**2 + y**2 + z**2)
 
 
-# In[ ]:
+# In[7]:
 
 
 # SPECIAL RELATIVITY
@@ -426,7 +426,7 @@ def BccFli (gamma, v,b, bFl0):
     return b / gamma + bFl0 * v
 
 
-# In[6]:
+# In[8]:
 
 
 # SYNCHROTRON EMISSION
@@ -589,7 +589,7 @@ else: # low-memory
         return get_cgs(result)
 
 
-# In[7]:
+# In[9]:
 
 
 if unit_check:
@@ -603,7 +603,7 @@ if unit_check:
           get_cgs(flux_total(np.array([12.,]),12.,0.5)) / get_cgs(erg/(cm**2*sec)))
 
 
-# In[8]:
+# In[10]:
 
 
 # PLASMA PARAMETERS
@@ -647,11 +647,12 @@ def etot_observer (beta_vec, beta_sqr, gamma, rho, enthalpy, press, Bfluid_vec, 
     return rho * enthalpy * gamma**2 - press + 0.5 * beta_sqr * Bfluid_sqr - 0.5 * npsum(beta_vec * Bfluid_vec, axis=-1)**2
 
 
-# In[ ]:
+# In[133]:
 
 
 # Stokes parameters
-# - ref. Lyutikov et al. (2005)
+# - ref. Lyutikov et al. (2003, 2005)
+# WARNING: Typesetting mistakes with vector products in Lyutikov et al. (2005)! Please compare with Lyutikov et al. (2003).
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def sin_local_incl (beta_vec, beta, n_vec):
@@ -663,72 +664,72 @@ def stokes_kappa (nu):
     return 0.25*sqrt(3) * gamma((3*p-1)/12) * gamma((3*p+7)/12) * (e**3 / (me*c**2)) * (3*e / (2*np.pi*me**3*c**5))**(0.5*(p-1)) * nu**(-0.5*(p-1))
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def stokes_I (sin_local_incl, doppler_factor, Bfluid, sin_xiprime):
+def stokes_I (sin_local_incl, doppler_factor, Bfluid, cos_xiprime):
     '''Stokes I parameter, before integrating over dS
      - see Lyutikov et al. (2005), eq. (2).
+     - see Lyutikov et al. (2003), eq. (B7).
      - z=0 assumed,
      - as we only use ratios here, part of normalization identical between I, Q, and U is omitted.'''
-    sin_local_incl, doppler_factor, Bfluid, sin_xiprime = tf_convert(sin_local_incl, doppler_factor, Bfluid, sin_xiprime)
-    return ((p+7/3)/(p+1)) * (1 / sin_local_incl) * doppler_factor**(2+0.5*(p-1)) * npabs(Bfluid*sin_xiprime)**(0.5*(p+1))
+    sin_local_incl, doppler_factor, Bfluid, cos_xiprime = tf_convert(sin_local_incl, doppler_factor, Bfluid, cos_xiprime)
+    abs_sin_xiprime = sqrt(1.0 - cos_xiprime**2)
+    return ((p+7/3)/(p+1)) * (1 / sin_local_incl) * doppler_factor**(2+0.5*(p-1)) * npabs(Bfluid*abs_sin_xiprime)**(0.5*(p+1))
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def stokes_Q (sin_local_incl, doppler_factor, Bfluid, sin_xiprime, cos_xitilde):
+def stokes_Q (sin_local_incl, doppler_factor, Bfluid, cos_xiprime, cos_xitilde):
     '''Stokes Q parameter, before integrating over dS
      - see Lyutikov et al. (2005), eq. (2).
+     - see Lyutikov et al. (2003), eq. (B7).
      - z=0 assumed,
      - as we only use ratios here, part of normalization identical between I, Q, and U is omitted.'''
-    sin_local_incl, doppler_factor, Bfluid, sin_xiprime, cos_xitilde = tf_convert(sin_local_incl, doppler_factor, Bfluid, sin_xiprime, cos_xitilde)
-    return (1 / sin_local_incl) * doppler_factor**(2+0.5*(p-1)) * npabs(Bfluid*sin_xiprime)**(0.5*(p+1)) * (2*cos_xitilde**2 - 1.0)
+    sin_local_incl, doppler_factor, Bfluid, cos_xiprime, cos_xitilde = tf_convert(sin_local_incl, doppler_factor, Bfluid, cos_xiprime, cos_xitilde)
+    abs_sin_xiprime = sqrt(1.0 - cos_xiprime**2)
+    return (1 / sin_local_incl) * doppler_factor**(2+0.5*(p-1)) * npabs(Bfluid*abs_sin_xiprime)**(0.5*(p+1)) * (2*cos_xitilde**2 - 1.0)
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def stokes_U (sin_local_incl, doppler_factor, Bfluid, sin_xiprime, sin_xitilde, cos_xitilde):
+def stokes_U (sin_local_incl, doppler_factor, Bfluid, cos_xiprime, sin_xitilde, cos_xitilde):
     '''Stokes U parameter, before integrating over dS
      - see Lyutikov et al. (2005), eq. (2).
+     - see Lyutikov et al. (2003), eq. (B7).
      - z=0 assumed,
      - as we only use ratios here, part of normalization identical between I, Q, and U is omitted.'''
-    sin_local_incl, doppler_factor, Bfluid, sin_xiprime, sin_xitilde, cos_xitilde = tf_convert(sin_local_incl, doppler_factor, Bfluid, sin_xiprime, sin_xitilde, cos_xitilde)
-    return (1 / sin_local_incl) * doppler_factor**(2+0.5*(p-1)) * npabs(Bfluid*sin_xiprime)**(0.5*(p+1)) * 2.*sin_xitilde*cos_xitilde
+    sin_local_incl, doppler_factor, Bfluid, cos_xiprime, sin_xitilde, cos_xitilde = tf_convert(sin_local_incl, doppler_factor, Bfluid, cos_xiprime, sin_xitilde, cos_xitilde)
+    abs_sin_xiprime = sqrt(1.0 - cos_xiprime**2)
+    return (1 / sin_local_incl) * doppler_factor**(2+0.5*(p-1)) * npabs(Bfluid*abs_sin_xiprime)**(0.5*(p+1)) * 2.*sin_xitilde*cos_xitilde
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def stokes_qprime (Bfluid_vec, beta_vec, gamma, n_vec):
-    '''Lyutikov et al. (2005), eq. (6).'''
-    gamma_vec = gamma.repeat(3).reshape(beta_vec.shape)
-    return Bfluid_vec + np.cross(n_vec, np.cross(beta_vec, Bfluid_vec)) - (gamma_vec/(1+gamma_vec)) * np.cross(Bfluid_vec, beta_vec) * beta_vec
+    '''Lyutikov et al. (2003), eq. (C3).'''
+    return Bfluid_vec + np.cross(n_vec, np.cross(beta_vec, Bfluid_vec)) - ((gamma/(1+gamma)) * npsum(Bfluid_vec * beta_vec, axis=-1)).repeat(3).reshape(beta_vec.shape) * beta_vec
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def stokes_e (n_vec, qprime_vec):
-    '''Lyutikov et al. (2005), eq. (6).'''
-    ncrossq = np.cross(n_vec, qprime_vec)
-    return ncrossq / sqrt(
-        npsum(qprime_vec**2, axis=-1) - npsum(ncrossq**2, axis=-1)
-    ).repeat(3).reshape(ncrossq.shape)
+    '''Lyutikov et al. (2003), eq. (C3).'''
+    return np.cross(n_vec, qprime_vec) / sqrt(
+        npsum(qprime_vec**2, axis=-1) - npsum(n_vec * qprime_vec, axis=-1)**2
+    ).repeat(3).reshape(qprime_vec.shape)
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def stokes_cos_xitilde (e_vec, n_vec, l_vec):
-    '''Lyutikov et al. (2005), eq. (5).'''
-    return np.sqrt(np.sum(
-        np.cross(e_vec, np.cross(n_vec, l_vec))**2, axis=-1
-    ))
+    '''Lyutikov et al. (2003), eq. (C8).'''
+    return npsum(e_vec * np.cross(n_vec, l_vec), axis=-1)
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def stokes_sin_xitilde (e_vec, l_vec):
-    '''Lyutikov et al. (2005), eq. (5).'''
-    return np.sqrt(np.sum(
-        np.cross(e_vec, l_vec)**2, axis=-1
-    ))
+    '''Lyutikov et al. (2003), eq. (C8).'''
+    return npsum(e_vec * l_vec, axis=-1)
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
 def stokes_nprime (n_vec, gamma, beta_vec):
-    '''Lyutikov et al. (2005), eq. (6).'''
-    gamma_vec = gamma.repeat(3).reshape(beta_vec.shape)
-    return (n_vec + gamma_vec * beta_vec * ((gamma_vec/(gamma_vec+1))*np.cross(n_vec, beta_vec)-1)) / (gamma_vec * (1 - np.cross(n_vec, beta_vec)))
+    '''Lyutikov et al. (2003), eq. (4).'''
+    return (n_vec + (gamma * ((gamma/(gamma+1))*npsum(n_vec*beta_vec, axis=-1)-1)).repeat(3).reshape(beta_vec.shape) * beta_vec) / (gamma * (1 - npsum(n_vec*beta_vec, axis=-1))).repeat(3).reshape(beta_vec.shape)
 
 @jit(nopython=opt_numba, fastmath=opt_fastmath, forceobj=(not opt_numba))
-def stokes_sin_xiprime (nprime_vec, Bfluid_vec, Bfluid):
-    return sqrt(1 - npsum(nprime_vec*Bfluid_vec / Bfluid.repeat(3).reshape(Bfluid_vec.shape), axis=-1)**2)
+def stokes_cos_xiprime (Bfluid_vec, nprime_vec):
+    '''Lyutikov et al. (2003), eq. (5).'''
+    return npsum(Bfluid_vec * nprime_vec, axis=-1)
 
 
-# In[9]:
+# In[ ]:
 
 
 # MAGNETIC FIELD CURVATURE
@@ -854,7 +855,7 @@ def bfield_curvature (data, verbose=False):
     return curvature
 
 
-# In[10]:
+# In[ ]:
 
 
 # UNITS
@@ -901,7 +902,7 @@ sim2phys = {
 }
 
 
-# In[11]:
+# In[ ]:
 
 
 def do_vertical_avg (data_vtk, quantity):
@@ -1118,38 +1119,37 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
         gamma=combined_gamma, 
         beta_vec=combined_beta_vec
     )
-    sin_xiprime = stokes_sin_xiprime(
-        nprime_vec=nprime_vec,
+    cos_xiprime = stokes_cos_xiprime(
         Bfluid_vec=Bfluid_vec,
-        Bfluid=Bcc_fluid_tot
+        nprime_vec=nprime_vec
     )
     data_vtk['stokes_I'] = tf_deconvert(stokes_I(
         sin_local_incl=sin_loc_incl, 
         doppler_factor=doppler_factor, 
         Bfluid=Bcc_fluid_tot, 
-        sin_xiprime=sin_xiprime
+        cos_xiprime=cos_xiprime
     ))
     data_vtk['stokes_Q'] = tf_deconvert(stokes_Q(
         sin_local_incl=sin_loc_incl, 
         doppler_factor=doppler_factor, 
         Bfluid=Bcc_fluid_tot, 
-        sin_xiprime=sin_xiprime, 
+        cos_xiprime=cos_xiprime, 
         cos_xitilde=cos_xitilde
     ))
     data_vtk['stokes_U'] = tf_deconvert(stokes_U(
         sin_local_incl=sin_loc_incl, 
         doppler_factor=doppler_factor, 
         Bfluid=Bcc_fluid_tot, 
-        sin_xiprime=sin_xiprime, 
+        cos_xiprime=cos_xiprime, 
         sin_xitilde=sin_xitilde, 
         cos_xitilde=cos_xitilde
     ))
-    del Bfluid_vec, qprime_vec, e_vec, l_vec, cos_xitilde, sin_xitilde, sin_loc_incl, nprime_vec, sin_xiprime, 
+    del Bfluid_vec, qprime_vec, e_vec, l_vec, cos_xitilde, sin_xitilde, sin_loc_incl, nprime_vec, cos_xiprime, 
     
     return data_vtk
 
 
-# In[12]:
+# In[ ]:
 
 
 def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
@@ -1203,7 +1203,7 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
     return data_vtk
 
 
-# In[13]:
+# In[ ]:
 
 
 history_quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'synEm_per_dSdt_mean', 'ekin_observer', 'etot_observer', 'polarization_degree', 'polarization_evpa', 'Q_integral', 'U_integral', 'I_integral']
@@ -1303,7 +1303,7 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
 # --------------
 # # Single-dataset dashboard
 
-# In[14]:
+# In[ ]:
 
 
 
@@ -1533,7 +1533,7 @@ if processing_type == 'dashboard':
         print(' - frame done.', flush=True)
 
 
-# In[15]:
+# In[ ]:
 
 
 if processing_type == 'dashboard':
@@ -1578,7 +1578,7 @@ if processing_type == 'dashboard':
             datapath = datapath
 
 
-# In[16]:
+# In[ ]:
 
 
 if processing_type == 'dashboard':
@@ -1631,7 +1631,7 @@ if processing_type == 'dashboard':
             print('done.')
 
 
-# In[17]:
+# In[ ]:
 
 
 if processing_type == 'dashboard':
@@ -1649,7 +1649,7 @@ if processing_type == 'dashboard':
         print('Error while rendering movie:\n%s\n -- please try to manually convert the .png files generated in %s.' % (e, outpath), flush=True)
 
 
-# In[18]:
+# In[ ]:
 
 
 if False and processing_type == 'dashboard' and not in_script:
