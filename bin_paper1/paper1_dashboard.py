@@ -315,14 +315,8 @@ simu_len = get_cgs(c*simu_t)
 simu_mass = get_cgs(simu_rho * simu_len**3)
 simu_en = simu_mass * get_cgs(c)**2 # erg
 simu_press = simu_en / simu_len**3 # erg / cm^3
-simu_B = np.sqrt(2.*simu_press) # sqrt( erg / cm^3 )
-simu_B_8piCorr = np.sqrt(8.*np.pi*simu_press) # sqrt( erg / cm^3 )
-
-
-# In[161]:
-
-
-erg
+simu_B = np.sqrt(simu_press) # sqrt( erg / cm^3 )
+simu_B_8piCorr = np.sqrt(4.*np.pi*simu_press) # sqrt( erg / cm^3 )
 
 
 # --------------------
@@ -651,6 +645,172 @@ def etot_observer (beta_vec, beta_sqr, gamma, rho, enthalpy, press, Bfluid_vec, 
      - cf. Beckwith & Stone (2011), eq. (20)'''
     beta_vec, beta_sqr, gamma, rho, enthalpy, press, Bfluid_vec, Bfluid_sqr = tf_convert(beta_vec, beta_sqr, gamma, rho, enthalpy, press, Bfluid_vec, Bfluid_sqr)
     return rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta_sqr) * Bfluid_sqr - 0.5 * npsum(beta_vec * Bfluid_vec, axis=-1)**2
+
+
+# In[217]:
+
+
+if not in_script:
+    with open('/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT1_dens/prod1_corr_ampl/results_incl30/results_corr0ampl1/joined_vtk/IntSh2-p1.0200.vtk.pkl', 'rb') as f:
+        data = pkl.load(f)[0]
+    with open(f'/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT1_dens/prod1_corr_ampl/results_incl30/history_corr0ampl1.pkl', 'rb') as f:
+        data_history = pkl.load(f)
+    print(data.keys())
+    print()
+    print(data_history.keys())
+
+
+# In[218]:
+
+
+if not in_script:
+
+    plt.plot(data_history['times'], data_history['etot_observer'])
+
+    total = []
+    rho_enth_g2 = []
+    pressures = []
+    b2 = []
+    bcrossbeta = []
+    test = []
+    for i in range(21):
+        with open(f'/DATA/Dropbox/LOOTRPV/astro_projects/2020_IntSh2/athena4p2/bin_paper1/corrT1_dens/prod1_corr_ampl/results_incl30/results_corr0ampl1/joined_vtk/IntSh2-p1.0{i:02d}0.vtk.pkl', 'rb') as f:
+            data = pkl.load(f)[0]
+    #     beta_vec = data['combined_beta_vec']
+    #     beta_sqr = data['combined_beta']**2
+    #     gamma = data['combined_gamma']
+
+        beta_vec = np.moveaxis([data['vel1'], data['vel2'], data['vel3']], 0,-1)
+        beta_sqr = np.sqrt(data['vel1']**2 + data['vel2']**2 + data['vel3']**2)
+        gamma = 1 / sqrt(1 - beta_sqr)
+
+        rho = data['rho']
+        press = data['press']
+    #     enthalpy = data['enthalpy']
+        enthalpy = 1.0 +( adiab_idx / (adiab_idx - 1)) * press / rho
+        Bfluid_vec = np.moveaxis([data['Bcc_fluid_1'], data['Bcc_fluid_2'], data['Bcc_fluid_3']], 0,-1)
+        Bfluid_sqr = data['Bcc_fluid_tot']**2
+
+        Bcc_vec = np.moveaxis([data['Bcc1'], data['Bcc2'], data['Bcc3']], 0,-1)
+        Bcc_sqr = npsum(Bcc_vec**2, axis=-1)
+
+    #     etot = tf_deconvert(npmean(
+    #         etot_observer (beta_vec, beta_sqr, gamma, rho, enthalpy, press, Bfluid_vec, Bfluid_sqr)
+    #     ))
+        etot = tf_deconvert(npmean(
+            rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta_sqr) * Bfluid_sqr - 0.5 * npsum(beta_vec * Bfluid_vec, axis=-1)**2
+        ))
+
+        total.append(etot)
+        rho_enth_g2.append(tf_deconvert(npmean(rho * enthalpy * gamma**2)))
+        pressures.append(tf_deconvert(npmean(press)))
+        b2.append(tf_deconvert(npmean(0.5 * (1.0+beta_sqr) * Bfluid_sqr)))
+        bcrossbeta.append(tf_deconvert(npmean(0.5 * npsum(beta_vec * Bfluid_vec, axis=-1)**2)))
+
+        # the Bfield in eq. (20) is Bcc (sim frame), NOT Bfluid...
+        # - need to calculate Bobs, similar to Bfluid calculation
+        # Bcc in the fluid frame
+        data_vtk = data
+        Bobs0 = BccFl0(
+            gamma_jet,
+            -beta_jet,0,0,
+            data_vtk['Bcc1'],data_vtk['Bcc2'],data_vtk['Bcc3'],
+        )
+        Bobs1 = BccFli(
+            gamma_jet, 
+            -beta_jet, data_vtk['Bcc1'],
+            Bobs0
+        )
+        Bobs2 = BccFli(
+            gamma_jet, 
+            0, data_vtk['Bcc2'],
+            Bobs0
+        )
+        Bobs3 = BccFli(
+            gamma_jet, 
+            0, data_vtk['Bcc3'],
+            Bobs0
+        )
+        Bobs_vec = np.moveaxis([Bobs1, Bobs2, Bobs3], 0,-1)
+        Bobs_sqr = npsum(Bobs_vec**2, axis=-1)
+        test.append(tf_deconvert(npmean(
+            rho * enthalpy * gamma**2 - press + 0.5 * (1.0+beta_jet**2) * Bobs_sqr - 0.5 * npsum(beta_vec * Bobs_vec * 4*np.pi, axis=-1)**2
+        )))
+
+    total = np.array(total)
+    plt.scatter(data_history['times'][::10], total, color='k')
+
+    plt.plot(data_history['times'][::10], rho_enth_g2, label='rho_enth_g2')
+    # plt.plot(data_history['times'][::10], pressures, label='pressures')
+    # plt.plot(data_history['times'][::10], b2, label='b2')
+    # plt.plot(data_history['times'][::10], bcrossbeta, label='bcrossbeta')
+
+    plt.plot(data_history['times'][::10], test, label='test')
+
+    plt.gca().set_yscale('log')
+    plt.legend()
+
+    plt.show(); plt.close()
+
+
+# In[176]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
 
 
 # In[133]:
