@@ -1037,15 +1037,15 @@ def augment_vtk_data (data_vtk, previous_data_vtk=None,
     data_vtk['flux_density'] = tf_deconvert(flux_tot)
     do_vertical_avg(data_vtk, 'flux_density')
     
-    data_vtk['synEm_per_dSdt'] = tf_deconvert(
-        synEm_per_dSdt (
-            B=Bcc_fluid_tot,
-            gamma=combined_gamma,
-            df=doppler_factor,
-            R=R_selection, 
-            nu_min=nu_int_min, nu_max=nu_int_max
-    ))
-    do_vertical_avg(data_vtk, 'synEm_per_dSdt')
+#     data_vtk['synEm_per_dSdt'] = tf_deconvert(
+#         synEm_per_dSdt (
+#             B=Bcc_fluid_tot,
+#             gamma=combined_gamma,
+#             df=doppler_factor,
+#             R=R_selection, 
+#             nu_min=nu_int_min, nu_max=nu_int_max
+#     ))
+#     do_vertical_avg(data_vtk, 'synEm_per_dSdt')
     
     nu_min, nu_max = tf_convert(nu_min, nu_max)
     freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
@@ -1212,7 +1212,8 @@ def read_vtk_file (vtk_filename, previous_data_vtk=None, out_dt=out_dt_vtk, augm
 # In[ ]:
 
 
-history_quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'synEm_per_dSdt_mean', 'ekin_observer', 'etot_observer', 'polarization_degree', 'polarization_evpa', 'Q_integral', 'U_integral', 'I_integral']
+history_quantities = ['times', 'internal_energy', 'flux_density', 'syn_emission_rate_per_dS', 'ekin_observer', 'etot_observer', 'polarization_degree', 'polarization_evpa', 'Q_integral', 'U_integral', 'I_integral']
+# 'synEm_per_dSdt_mean', 
 
 def _precalc_history_batch (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_augment_kwargs, tarpath=None):
     previous_data_vtk = None
@@ -1248,9 +1249,9 @@ def _precalc_history_batch (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=def
         history['syn_emission_rate_per_dS'].append(get_cgs_value(tf_deconvert(
             syn_emission_rate_per_dS(data_vtk['flux_density'], doppler_factor=data_vtk['doppler_factor'])
         )))
-        history['synEm_per_dSdt_mean'].append(get_cgs_value(tf_deconvert(
-            npmean(data_vtk['synEm_per_dSdt'])
-        )))
+#         history['synEm_per_dSdt_mean'].append(get_cgs_value(tf_deconvert(
+#             npmean(data_vtk['synEm_per_dSdt'])
+#         )))
         # polarization from the Stokes parameters
         Q_integral = tf_deconvert(nansum(data_vtk['stokes_Q']))
         U_integral = tf_deconvert(nansum(data_vtk['stokes_U']))
