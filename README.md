@@ -27,3 +27,19 @@ The following additions were made to the original Athena 4.2 file tree, to imple
        - FsynExp.slurm (only in corrT2) -- a slurm script to run post-processing with 1d and 2d profiles of magnetic fields combined in different ways, in order to investigate the increase in synchrotron emission in 2d runs (see paper for details).
 
 ## Typical workflow
+
+1. Compile Athena:
+ - adjust the configure*.slurm script to match your computing environment,
+ - submit to compile,
+ - move / copy the athena binary from /bin to the desired processing folder (e.g., /corrT1_dens/prod1_corr_ampl/).
+2. Run the simulations and initial post-processing. In your desired configuration within the corrT*/prod* tree (new or existing):
+ - edit the athinput.* file to match your desired simulation parameters,
+ - edit a single run*.slurm, post-process*.slurm pair to reflect the details of your run common to all simulations within the given directory,
+ - edit generate_scripts.sh to describe what should change in the run*.slurm, post-process*.slurm scripts between different runs in the given directory (e.g., for prod1_corr_ampl, it is the corrugation amplitude),
+ - run generate_scripts.sh to generate all the remaining slurm scripts (*generate.sh <edited run*.slurm> <edited post-process*.slurm>*)
+ - use the generated submit_all.sh to submit the slurm scripts on the cluster with appropriate dependencies.
+ - if needed, edit one of the post-process*.slurm files to run a different type of analysis, then re-run from generate_scripts.sh onwards.
+4. Extract final diagnostics:
+ - submit FsynExp.slurm to run the magnetic field amplification tests (see paper),
+ - submit resolution_study.slurm to extract the shock geometry properties,
+ - once ready, run paper1_paperPlots.ipynb to extract the final plots, as they appear in the paper.
