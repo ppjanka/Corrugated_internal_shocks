@@ -16,7 +16,8 @@ The following additions were made to the original Athena 4.2 file tree, to imple
    - intsh2*.yml -- Anaconda environment definition files for all the Python scripts in the repository,
    - read_vtk.py -- a script from the original Athena repo with slight adjustments, used to read vtk files into Python,
    - athinput.IntSh2_paper1 -- generic input file for the problem (to be copied over to the relevant processing directory and adjusted as needed), 
-   - paper1_dashboard.ipynb, .py -- the main diagnostics script of the problem (.py version should be created directly from Jupyter, and is only here for completeness), processes vtk files to calculate the relevant snapshot-level and time-dependent quantities summarized as binary files and / or movies,
+   - **paper1_dashboard.ipynb**, .py -- the main diagnostics script of the problem (.py version should be created directly from Jupyter, and is only here for completeness), processes vtk files to calculate the relevant snapshot-level and time-dependent quantities summarized as binary files and / or movies,
+     - *Note*: This is the main data analysis script of this project. I highly recommend carefully reading and understanding this script if you are interested in reproducing / extending / repurposing this study.
    - resolution_study.ipynb, .py, .slurm -- script setup used to measure shock aspect ratio of the corrugated shocks (see paper for more details), .py script is created directly from Jupyter, and .slurm is used to run it on a cluster (adjust as needed),
    - paper1_paperPlots.ipynb -- uses the results of paper1_dashboard (and other scripts) to produce the final plots, as seen in the paper,
    - corrT* -- setup and data products for runs with different ways of shell corrugation (only density and pressure corrugation, i.e., T1 and T2, are eventually used in the paper),
