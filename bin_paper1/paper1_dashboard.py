@@ -2222,12 +2222,14 @@ if processing_type == 'comparison' and not in_script:
 
 if processing_type == 'expLongFsyn':
     
-    def calc_alternative_augmentations (default_dict, new_bcc_dict, 
-                      nu_res=128, nu_min=1., nu_max=1.1*nu_int_max,
-                      nu_int_min=nu_int_min, nu_int_max=nu_int_max,
-                      R_selection=R_choice, nu_selection=nu_choice,
-                      filling_factor=1.0,
-                    calc_spectrum=False):
+    def calc_alternative_augmentations (
+        default_dict, new_bcc_dict, 
+        nu_res=128, nu_min=1., nu_max=1.1*nu_int_max,
+        nu_int_min=nu_int_min, nu_int_max=nu_int_max,
+        R_selection=R_choice, nu_selection=nu_choice,
+        filling_factor=1.0,
+        calc_spectrum=False
+    ):
         '''Uses the default-augmented file and appends Bfield and Fsyn data for alternative scenarios:
          - with Bfield from a separate non-corrugated (1D) run
          - with Bfield from the corrugated (2D) run but vertically-averaged into a 1D structure
@@ -2235,18 +2237,27 @@ if processing_type == 'expLongFsyn':
          - with Bfield from the corrugated (2D) run scaled down so that the average matches the 1D case, leaving only the 2D structure (but not the overall bfield enhancement)'''
         
         data_vtk = default_dict
-    
-        # box dimensions
+        
+        for q in ('x1v', 'x2v'):
+            new_bcc_dict[q] = data_vtk[q]
         xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
         yrange = (data_vtk['x2v'][1] - data_vtk['x2v'][0]) * len(data_vtk['x2v'])
-        for f in [1,2]:
-            new_bcc_dict[f'x{f}v'] = data_vtk[f'x{f}v']
 
         # SR quantities
         gam = data_vtk['gamma']
 
-        # total Bcc in observer frame
-        new_bcc_dict['Bcc_tot'] = tf_deconvert(norm_vec_l2(new_bcc_dict['Bcc1'], new_bcc_dict['Bcc2'], new_bcc_dict['Bcc3']))
+        # fluid velocities in observer frame (boosted by beta_jet)
+        beta_vec = moveaxis(np.array([data_vtk['vel1'], data_vtk['vel2'], data_vtk['vel3']]), 0,-1)
+        n_vec = np.array([cos(incl), 0, -sin(incl)])
+        combined_beta_vec = data_vtk['combined_beta_vec']
+        combined_beta = data_vtk['combined_beta']
+        combined_gamma = data_vtk['combined_gamma']
+        doppler_factor = data_vtk['doppler_factor']
+
+        # total Bcc in collision frame
+        new_bcc_dict['Bcc_tot'] = tf_deconvert(norm_vec_l2(
+            new_bcc_dict['Bcc1'], new_bcc_dict['Bcc2'], new_bcc_dict['Bcc3']
+        ))
 
         # Bcc in the fluid frame
         Bfl0 = BccFl0(
@@ -2271,6 +2282,7 @@ if processing_type == 'expLongFsyn':
         )
         Bcc_fluid_tot_sqr = sqr_vec_l2(Bfl1, Bfl2, Bfl3)
         Bcc_fluid_tot = sqrt(Bcc_fluid_tot_sqr)
+        Bcc_fluid_vec = moveaxis(np.array([Bfl1,Bfl2,Bfl3]),0,-1)
         new_bcc_dict['Bcc_fluid_0'] = tf_deconvert(Bfl0)
         new_bcc_dict['Bcc_fluid_1'] = tf_deconvert(Bfl1)
         new_bcc_dict['Bcc_fluid_2'] = tf_deconvert(Bfl2)
@@ -2285,8 +2297,23 @@ if processing_type == 'expLongFsyn':
         # internal energy in the fluid frame
         # see Beckwith & Stone (2011), https://github.com/PrincetonUniversity/athena/wiki/Special-Relativity
         enth = data_vtk['enthalpy']
-        new_bcc_dict['internal_energy'] = tf_deconvert(internal_energy(data_vtk['rho'], enth, gam, data_vtk['press'], Bcc_fluid_tot_sqr)) # warning!: includes rest mass
+        new_bcc_dict['internal_energy'] = tf_deconvert(
+            internal_energy(data_vtk['rho'], enth, gam, data_vtk['press'], Bcc_fluid_tot_sqr)
+        ) # warning!: includes rest mass
         do_vertical_avg(new_bcc_dict, 'internal_energy')
+        new_bcc_dict['etot_observer'] = tf_deconvert(
+            etot_observer(
+                beta_vec=combined_beta_vec, 
+                beta_sqr=(combined_beta**2), 
+                gamma=combined_gamma, 
+                rho=data_vtk['rho'], 
+                enthalpy=enth, 
+                press=data_vtk['press'], 
+                Bfluid_vec=Bcc_fluid_vec, 
+                Bfluid_sqr=Bcc_fluid_tot_sqr
+            )
+        )
+        do_vertical_avg(new_bcc_dict, 'etot_observer')
 
         del Bcc_fluid_tot_sqr, enth
 
@@ -2300,28 +2327,45 @@ if processing_type == 'expLongFsyn':
         janu = j_over_alpha_nu(nu2nu_fl(nu_selection,doppler_factor), Bcc_fluid_tot)
         new_bcc_dict['j_over_alpha_nu'] = tf_deconvert(janu)
         do_vertical_avg(new_bcc_dict, 'j_over_alpha_nu')
-        flux_tot = flux_total_per_dS(B=Bcc_fluid_tot, R=R_selection, nu_min=nu_int_min, nu_max=nu_int_max)
+        flux_tot = flux_total_per_dS(
+            B=Bcc_fluid_tot, gamma=combined_gamma, df=doppler_factor,
+            R=R_selection, 
+            nu_min=nu_int_min, nu_max=nu_int_max
+        )
         new_bcc_dict['flux_density'] = tf_deconvert(flux_tot)
         do_vertical_avg(new_bcc_dict, 'flux_density')
 
-        if calc_spectrum:
-            nu_min, nu_max = tf_convert(nu_min, nu_max)
-            freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
+    #     data_vtk['synEm_per_dSdt'] = tf_deconvert(
+    #         synEm_per_dSdt (
+    #             B=Bcc_fluid_tot,
+    #             gamma=combined_gamma,
+    #             df=doppler_factor,
+    #             R=R_selection, 
+    #             nu_min=nu_int_min, nu_max=nu_int_max
+    #     ))
+    #     do_vertical_avg(data_vtk, 'synEm_per_dSdt')
 
-            dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
+        nu_min, nu_max = tf_convert(nu_min, nu_max)
+        freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
+
+        dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
+        if calc_spectrum:
             if not low_memory:
                 nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
+                nu_grid, gamma_grid = meshgrid(freqs, combined_gamma, indexing='ij')
+                nu_grid, df_grid = meshgrid(freqs, doppler_factor, indexing='ij')
                 new_bcc_dict['spectrum'] = [
                     tf_deconvert(freqs),
                     tf_deconvert(nansum(
                         flux_nu_per_dS(
                             nu=nu_grid, 
-                            B=B_grid, 
-                            gamma=combined_gamma,
-                            doppler_factor=doppler_factor,
+                            B=B_grid,
+                            gamma=gamma_grid,
+                            doppler_factor=df_grid,
                             R=R_selection, 
                             filling_factor=filling_factor
-                        )*dS, axis=-1) / (xrange*yrange))
+                        )*dS, axis=-1) / (xrange*yrange)
+                    )
                 ]
             else:
                 new_bcc_dict['spectrum'] = [[],[]]
@@ -2330,8 +2374,7 @@ if processing_type == 'expLongFsyn':
                     new_bcc_dict['spectrum'][1].append(tf_deconvert(
                         nansum(
                             flux_nu_per_dS(
-                                nu=nu,
-                                B=Bcc_fluid_tot,
+                                nu=nu, B=Bcc_fluid_tot,
                                 gamma=combined_gamma,
                                 doppler_factor=doppler_factor,
                                 R=R_selection,
@@ -2340,6 +2383,68 @@ if processing_type == 'expLongFsyn':
                         ) * dS / (xrange*yrange)
                     ))
                 new_bcc_dict['spectrum'] = [np.array(new_bcc_dict['spectrum'][0]), np.array(new_bcc_dict['spectrum'][1])]
+
+        # magnetic field curvature
+        new_bcc_dict['curvature'] = bfield_curvature(new_bcc_dict)
+
+        # Stokes parameters
+        Bfluid_vec = moveaxis([Bfl1,Bfl2,Bfl3],0,-1)
+        qprime_vec = stokes_qprime(
+            Bfluid_vec=Bfluid_vec, 
+            beta_vec=combined_beta_vec, 
+            gamma=combined_gamma,
+            n_vec=n_vec
+        )
+        e_vec = stokes_e (
+            n_vec=n_vec, 
+            qprime_vec=qprime_vec
+        )
+        l_vec = np.array([sin(incl),0,cos(incl)])
+        cos_xitilde = stokes_cos_xitilde(
+            e_vec=e_vec, 
+            n_vec=n_vec, 
+            l_vec=l_vec
+        )
+        sin_xitilde = stokes_sin_xitilde(
+            e_vec=e_vec,
+            l_vec=l_vec
+        )
+        sin_loc_incl = sin_local_incl(
+            beta_vec=combined_beta_vec,
+            beta=combined_beta,
+            n_vec=n_vec
+        )
+        nprime_vec = stokes_nprime(
+            n_vec=n_vec, 
+            gamma=combined_gamma, 
+            beta_vec=combined_beta_vec
+        )
+        cos_xiprime = stokes_cos_xiprime(
+            Bfluid_vec=Bfluid_vec,
+            nprime_vec=nprime_vec
+        )
+        new_bcc_dict['stokes_I'] = tf_deconvert(stokes_I(
+            sin_local_incl=sin_loc_incl, 
+            doppler_factor=doppler_factor, 
+            Bfluid=Bcc_fluid_tot, 
+            cos_xiprime=cos_xiprime
+        ))
+        new_bcc_dict['stokes_Q'] = tf_deconvert(stokes_Q(
+            sin_local_incl=sin_loc_incl, 
+            doppler_factor=doppler_factor, 
+            Bfluid=Bcc_fluid_tot, 
+            cos_xiprime=cos_xiprime, 
+            cos_xitilde=cos_xitilde
+        ))
+        new_bcc_dict['stokes_U'] = tf_deconvert(stokes_U(
+            sin_local_incl=sin_loc_incl, 
+            doppler_factor=doppler_factor, 
+            Bfluid=Bcc_fluid_tot, 
+            cos_xiprime=cos_xiprime, 
+            sin_xitilde=sin_xitilde, 
+            cos_xitilde=cos_xitilde
+        ))
+        del Bfluid_vec, qprime_vec, e_vec, l_vec, cos_xitilde, sin_xitilde, sin_loc_incl, nprime_vec, cos_xiprime, 
 
 
 # In[ ]:
