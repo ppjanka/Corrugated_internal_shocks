@@ -1,5 +1,7 @@
 # An MHD view: corrugated internal shocks in relativistic jets
 
+![](readme_snapshots.png)
+
 We use MHD simulations to investigate how corrugation (or rippling) of internal shells affects the dynamical and radiative properties of their collisions, in the context of the internal shock models of relativistic jets.
 
 **Reference:** Pjanka et al. (2022), in prep.
