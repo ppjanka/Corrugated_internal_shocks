@@ -38,7 +38,7 @@ The following additions were made to the original Athena 4.2 file tree, to imple
  - edit generate_scripts.sh to describe what should change in the run*.slurm, post-process*.slurm scripts between different runs in the given directory (e.g., for prod1_corr_ampl, it is the corrugation amplitude),
  - run generate_scripts.sh to generate all the remaining slurm scripts (*generate.sh <edited run*.slurm> <edited post-process*.slurm>)
  - use the generated submit_all.sh to submit the slurm scripts on the cluster with appropriate dependencies,
- - if needed, edit one of the post-process*.slurm files to run a different type of analysis, then re-run from generate_scripts.sh onwards.
+ - if needed, edit one of the post-process*.slurm files to run a different type of analysis (i.e., with another configuration of the paper1_diagnostics script), then re-run from generate_scripts.sh onwards.
 4. Extract final diagnostics:
  - submit FsynExp.slurm to run the magnetic field amplification tests (see paper),
  - submit resolution_study.slurm to extract the shock geometry properties,
