@@ -36,7 +36,7 @@ The following additions were made to the original Athena 4.2 file tree, to imple
  - edit the athinput.* file to match your desired simulation parameters,
  - edit a single run*.slurm, post-process*.slurm pair to reflect the details of your run common to all simulations within the given directory,
  - edit generate_scripts.sh to describe what should change in the run*.slurm, post-process*.slurm scripts between different runs in the given directory (e.g., for prod1_corr_ampl, it is the corrugation amplitude),
- - run generate_scripts.sh to generate all the remaining slurm scripts (*generate.sh <edited run*.slurm> <edited post-process*.slurm>*)
+ - run generate_scripts.sh to generate all the remaining slurm scripts (*generate.sh <edited run*.slurm> <edited post-process*.slurm>)
  - use the generated submit_all.sh to submit the slurm scripts on the cluster with appropriate dependencies,
  - if needed, edit one of the post-process*.slurm files to run a different type of analysis, then re-run from generate_scripts.sh onwards.
 4. Extract final diagnostics:
