@@ -2228,7 +2228,9 @@ if processing_type == 'expLongFsyn':
         nu_int_min=nu_int_min, nu_int_max=nu_int_max,
         R_selection=R_choice, nu_selection=nu_choice,
         filling_factor=1.0,
-        calc_spectrum=False
+        calc_spectrum=False, 
+        calc_curvature=False, 
+        calc_stokes=False
     ):
         '''Uses the default-augmented file and appends Bfield and Fsyn data for alternative scenarios:
          - with Bfield from a separate non-corrugated (1D) run
@@ -2345,11 +2347,13 @@ if processing_type == 'expLongFsyn':
     #     ))
     #     do_vertical_avg(data_vtk, 'synEm_per_dSdt')
 
-        nu_min, nu_max = tf_convert(nu_min, nu_max)
-        freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
-
-        dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
         if calc_spectrum:
+            
+            nu_min, nu_max = tf_convert(nu_min, nu_max)
+            freqs = logspace(log10(nu_min), log10(nu_max), nu_res)
+
+            dS = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * (data_vtk['x2v'][1] - data_vtk['x2v'][0])
+            
             if not low_memory:
                 nu_grid, B_grid = meshgrid(freqs, Bcc_fluid_tot, indexing='ij')
                 nu_grid, gamma_grid = meshgrid(freqs, combined_gamma, indexing='ij')
@@ -2384,67 +2388,71 @@ if processing_type == 'expLongFsyn':
                     ))
                 new_bcc_dict['spectrum'] = [np.array(new_bcc_dict['spectrum'][0]), np.array(new_bcc_dict['spectrum'][1])]
 
-        # magnetic field curvature
-        new_bcc_dict['curvature'] = bfield_curvature(new_bcc_dict)
+        if calc_curvature:
+                
+            # magnetic field curvature
+            new_bcc_dict['curvature'] = bfield_curvature(new_bcc_dict)
 
-        # Stokes parameters
-        Bfluid_vec = moveaxis([Bfl1,Bfl2,Bfl3],0,-1)
-        qprime_vec = stokes_qprime(
-            Bfluid_vec=Bfluid_vec, 
-            beta_vec=combined_beta_vec, 
-            gamma=combined_gamma,
-            n_vec=n_vec
-        )
-        e_vec = stokes_e (
-            n_vec=n_vec, 
-            qprime_vec=qprime_vec
-        )
-        l_vec = np.array([sin(incl),0,cos(incl)])
-        cos_xitilde = stokes_cos_xitilde(
-            e_vec=e_vec, 
-            n_vec=n_vec, 
-            l_vec=l_vec
-        )
-        sin_xitilde = stokes_sin_xitilde(
-            e_vec=e_vec,
-            l_vec=l_vec
-        )
-        sin_loc_incl = sin_local_incl(
-            beta_vec=combined_beta_vec,
-            beta=combined_beta,
-            n_vec=n_vec
-        )
-        nprime_vec = stokes_nprime(
-            n_vec=n_vec, 
-            gamma=combined_gamma, 
-            beta_vec=combined_beta_vec
-        )
-        cos_xiprime = stokes_cos_xiprime(
-            Bfluid_vec=Bfluid_vec,
-            nprime_vec=nprime_vec
-        )
-        new_bcc_dict['stokes_I'] = tf_deconvert(stokes_I(
-            sin_local_incl=sin_loc_incl, 
-            doppler_factor=doppler_factor, 
-            Bfluid=Bcc_fluid_tot, 
-            cos_xiprime=cos_xiprime
-        ))
-        new_bcc_dict['stokes_Q'] = tf_deconvert(stokes_Q(
-            sin_local_incl=sin_loc_incl, 
-            doppler_factor=doppler_factor, 
-            Bfluid=Bcc_fluid_tot, 
-            cos_xiprime=cos_xiprime, 
-            cos_xitilde=cos_xitilde
-        ))
-        new_bcc_dict['stokes_U'] = tf_deconvert(stokes_U(
-            sin_local_incl=sin_loc_incl, 
-            doppler_factor=doppler_factor, 
-            Bfluid=Bcc_fluid_tot, 
-            cos_xiprime=cos_xiprime, 
-            sin_xitilde=sin_xitilde, 
-            cos_xitilde=cos_xitilde
-        ))
-        del Bfluid_vec, qprime_vec, e_vec, l_vec, cos_xitilde, sin_xitilde, sin_loc_incl, nprime_vec, cos_xiprime, 
+        if calc_stokes:
+        
+            # Stokes parameters
+            Bfluid_vec = moveaxis([Bfl1,Bfl2,Bfl3],0,-1)
+            qprime_vec = stokes_qprime(
+                Bfluid_vec=Bfluid_vec, 
+                beta_vec=combined_beta_vec, 
+                gamma=combined_gamma,
+                n_vec=n_vec
+            )
+            e_vec = stokes_e (
+                n_vec=n_vec, 
+                qprime_vec=qprime_vec
+            )
+            l_vec = np.array([sin(incl),0,cos(incl)])
+            cos_xitilde = stokes_cos_xitilde(
+                e_vec=e_vec, 
+                n_vec=n_vec, 
+                l_vec=l_vec
+            )
+            sin_xitilde = stokes_sin_xitilde(
+                e_vec=e_vec,
+                l_vec=l_vec
+            )
+            sin_loc_incl = sin_local_incl(
+                beta_vec=combined_beta_vec,
+                beta=combined_beta,
+                n_vec=n_vec
+            )
+            nprime_vec = stokes_nprime(
+                n_vec=n_vec, 
+                gamma=combined_gamma, 
+                beta_vec=combined_beta_vec
+            )
+            cos_xiprime = stokes_cos_xiprime(
+                Bfluid_vec=Bfluid_vec,
+                nprime_vec=nprime_vec
+            )
+            new_bcc_dict['stokes_I'] = tf_deconvert(stokes_I(
+                sin_local_incl=sin_loc_incl, 
+                doppler_factor=doppler_factor, 
+                Bfluid=Bcc_fluid_tot, 
+                cos_xiprime=cos_xiprime
+            ))
+            new_bcc_dict['stokes_Q'] = tf_deconvert(stokes_Q(
+                sin_local_incl=sin_loc_incl, 
+                doppler_factor=doppler_factor, 
+                Bfluid=Bcc_fluid_tot, 
+                cos_xiprime=cos_xiprime, 
+                cos_xitilde=cos_xitilde
+            ))
+            new_bcc_dict['stokes_U'] = tf_deconvert(stokes_U(
+                sin_local_incl=sin_loc_incl, 
+                doppler_factor=doppler_factor, 
+                Bfluid=Bcc_fluid_tot, 
+                cos_xiprime=cos_xiprime, 
+                sin_xitilde=sin_xitilde, 
+                cos_xitilde=cos_xitilde
+            ))
+            del Bfluid_vec, qprime_vec, e_vec, l_vec, cos_xitilde, sin_xitilde, sin_loc_incl, nprime_vec, cos_xiprime, 
 
 
 # In[ ]:
