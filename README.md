@@ -29,6 +29,8 @@ The following additions were made to the original Athena 4.2 file tree, to imple
        - generate_scripts.sh -- given a pair of run and post-process scripts for one amplitude, this Bash script generates pairs of such scripts for all the remaining amplitudes (thus, any adjustment only needs to be done once, and then propagated using generate_scripts), it also creates a convenient run_all.sh script, that will submit the slurm scripts with appropriate dependencies (so that run*.slurm needs to finish before post-process*.slurm starts),
        - FsynExp.slurm (only in corrT2) -- a slurm script to run post-processing with 1d and 2d profiles of magnetic fields combined in different ways, in order to investigate the increase in synchrotron emission in 2d runs (see paper for details).
 
+**Note:** There is a number of smaller scripts in the repository beside the ones mentioned above. Some of them contain exploratory analysis and may include additional calculations to those in the main workflow. However, they are typically initial (scratchbook) calculations, so they should be treated with caution and double-checked / tested before any further use.
+
 ## Typical workflow
 
 1. Compile Athena:
