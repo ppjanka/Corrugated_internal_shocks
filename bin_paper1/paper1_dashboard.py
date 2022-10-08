@@ -169,6 +169,7 @@ import numpy as np
 import pickle as pkl
 from collections.abc import Iterable
 from numba import jit, prange
+from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
 
 # vtk file loading if available
 try:
@@ -1440,7 +1441,6 @@ def precalc_history (vtk_filenames, out_dt=out_dt_vtk, augment_kwargs=default_au
     if nproc_history == 1:
         history = _precalc_history_batch(vtk_filenames, out_dt=out_dt, augment_kwargs=augment_kwargs, tarpath=tarpath)
     else:
-        from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
         history = {}
         # prepare batches for parallel processing
         batches = np.array_split(vtk_filenames, nproc_history)
@@ -1773,7 +1773,6 @@ if processing_type == 'dashboard':
         else: # keep reading from the compressed tarfile
             tarpath = datapath
     # now, parallelize the frame generation
-    from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
     chunks = np.array_split(range(len(vtk_filenames)), nproc)
     def worker (ichunk):
         indices = chunks[ichunk]
@@ -2157,7 +2156,6 @@ if processing_type == 'comparison':
     print(' --- ')
     
     # now, parallelize the frame generation
-    from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
     chunks = np.array_split(range(len(vtk_filenames_comp[0])), nproc)
     def worker (ichunk):
         indices = chunks[ichunk]
@@ -2543,38 +2541,53 @@ if processing_type == 'expLongFsyn':
 
 if processing_type == 'expLongFsyn':
     
+    quantities = ('internal_energy', 'flux_density')
+    alternatives = ('B1d_sep', 'B1d_avg', 'B1d_avgScaled', 'B2d_scaled', 'identity')
+    
+    def _precalc_pair (pair):
+        pkl_1d, pkl_2d = pair
+        # augment the files
+        try:
+            data_2d = augment_Bfield_alternatives (pkl_2d, pkl_1d, append=True)
+        except Exception as e:
+            print(f'[precalc_alternate_history] Could not read vtk.pkl files:\n  {pkl_1d, pkl_2d}\n  error msg: {e}\n - the file will be ignored.')
+            return {a:{k:np.nan for k in quantities} for a in alternatives}
+        # calculate history variables
+        data_vtk = data_2d
+        xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
+        dl = (data_vtk['x1v'][1] - data_vtk['x1v'][0])
+        history_entries = {a:{} for a in alternatives}
+        for alternative in alternatives:
+            history_branch = history_entries[alternative]
+            data_branch = data_2d['alternatives'][alternative]
+            history_branch['internal_energy'] = (
+                get_cgs_value(np.sum(data_branch['internal_energy_vsZ']*dl))/xrange
+            )
+            history_branch['flux_density'] = (
+                get_cgs_value(np.sum(data_branch['flux_density_vsZ']*dl))/xrange
+            )
+        return history_entries
+    
     def precalc_alternate_history (history_pkl, vtk_pkl_filenames_1d2d_pairs, append=True):
         '''Note: requires the archive containing *.vtk.pkl files to be untarred (to be able to append the pkl files), extract first if needed.'''
         # load the original history
         with open(history_pkl, 'rb') as f:
             history = pkl.load(f)
         # prepare to append
-        quantities = ('internal_energy', 'flux_density')
-        alternatives = ('B1d_sep', 'B1d_avg', 'B1d_avgScaled', 'B2d_scaled', 'identity')
         history['alternatives'] = {a:{q:[] for q in quantities} for a in alternatives}
         # processing file-by-file
-        for pkl_1d, pkl_2d in tqdm(vtk_pkl_filenames_1d2d_pairs):
-            # augment the files
-            try:
-                data_2d = augment_Bfield_alternatives (pkl_2d, pkl_1d, append=True)
-            except Exception as e:
-                print(f'[precalc_alternate_history] Could not read vtk.pkl files:\n  {pkl_1d, pkl_2d}\n  error msg: {e}')
-                print(' - the file will be ignored.')
-                continue
-            # calculate history variables
-            data_vtk = data_2d
-            xrange = (data_vtk['x1v'][1] - data_vtk['x1v'][0]) * len(data_vtk['x1v'])
-            dl = (data_vtk['x1v'][1] - data_vtk['x1v'][0])
-            for alternative in alternatives:
-                history_branch = history['alternatives'][alternative]
-                data_branch = data_2d['alternatives'][alternative]
-                history_branch['internal_energy'].append(
-                    get_cgs_value(np.sum(data_branch['internal_energy_vsZ']*dl))/xrange
-                )
-                history_branch['flux_density'].append(
-                    get_cgs_value(np.sum(data_branch['flux_density_vsZ']*dl))/xrange
-                )
-        for alternative in alternatives:
+        print('Processing files..')
+        with ProcessPool(nproc_history) as pool:
+            history_entries = pool.map(_precalc_pair, vtk_pkl_filenames_1d2d_pairs)
+        print('done.')
+        print('Collecting history entries..')
+        for history_entry in tqdm(history_entries):
+            for alternative, entry in history_entry.items():
+                for k,v in entry.items():
+                    history['alternatives'][alternative][k].append(v)
+        # history post-processing
+        print('Post-processing history..')
+        for alternative in tqdm(alternatives):
             history_branch = history['alternatives'][alternative]
             # convert to numpy
             for quantity in quantities:
@@ -2582,10 +2595,13 @@ if processing_type == 'expLongFsyn':
             # calculate derivatives
             history_branch['ddt_internal_energy'] = (history_branch['internal_energy'][1:] - history_branch['internal_energy'][:-1]) / (history['times'][1:] - history['times'][:-1])
             history_branch['ddt_internal_energy'] = np.insert(history_branch['ddt_internal_energy'], 0, np.nan)
+        print('done.')
         # Save the alternative-appended result to the 2d file
         if append:
+            print('Saving to history file..', end='')
             with open(history_pkl, 'wb') as f:
                 pkl.dump(history, f)
+            print('done.')
         else:
             return history
 
@@ -2833,7 +2849,6 @@ if processing_type == 'curvature' and in_script:
     if '.tgz' in datapath:
         tarpath = datapath
     # now, parallelize the frame generation
-    from pathos.pools import ProcessPool # an alternative to Python's multiprocessing
     chunks = np.array_split(range(len(vtk_filenames)), nproc)
     def worker (ichunk):
         indices = chunks[ichunk]

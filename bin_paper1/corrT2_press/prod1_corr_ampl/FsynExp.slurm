@@ -14,6 +14,7 @@
 #SBATCH --mail-user=patryk.pjanka@su.se
 
 nproc=-1 # use all cores available
+nproc_history=2
 
 # module setup
 module load PDC
@@ -32,6 +33,5 @@ CORR_AMPL=50
 # launch job
 cd $RUNDIR
 
-
 # process diagnostics
-srun python paper1_dashboard.py -expLongFsyn $RUNDIR/results_corr0ampl${CORR_AMPL} $RUNDIR/results_corr1ampl${CORR_AMPL} -nproc $nproc -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 0 -force_recalc 1 # -low_memory 1
+srun python paper1_dashboard.py -expLongFsyn $RUNDIR/results_corr0ampl${CORR_AMPL} $RUNDIR/results_corr1ampl${CORR_AMPL} -nproc $nproc -nproc_history $nproc_history -opt_tf 0 -opt_numba 1 -convert_vtk 1 -tar_when_done 0 -force_recalc 1 # -low_memory 1
