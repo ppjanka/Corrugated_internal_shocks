@@ -18,7 +18,7 @@ CORR_TYPE=2
 PROD_TYPE=1
 CORR_AMPL=50
 
-nproc=32
+nproc=24
 nproc_history=2
 
 # module setup
