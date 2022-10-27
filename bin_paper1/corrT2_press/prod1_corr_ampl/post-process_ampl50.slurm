@@ -7,7 +7,7 @@
 
 #SBATCH --nodes=1             # number of nodes
 #SBATCH -p main               # partition
-# SBATCH --mem=512G            # memory requested
+#SBATCH --mem=512G            # memory requested
 
 #SBATCH --mail-type=begin
 #SBATCH --mail-type=end
@@ -18,7 +18,7 @@ CORR_TYPE=2
 PROD_TYPE=1
 CORR_AMPL=50
 
-nproc=24
+nproc=32
 nproc_history=2
 
 # module setup
