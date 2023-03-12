@@ -4,7 +4,7 @@
 
 We use MHD simulations to investigate how corrugation (or rippling) of internal shells affects the dynamical and radiative properties of their collisions, in the context of the internal shock models of relativistic jets.
 
-**Reference:** Pjanka et al. (2022), in prep.
+**Reference:** Pjanka, Demidem, and Veledina (2023), in press
 
 **Note:** This is a fork of the publicly available Athena-Cversion MHD code (hereafter, Athena 4.2, please see relevant references in https://princetonuniversity.github.io/Athena-Cversion/AthenaDocsMP), augmented to handle relativistic test particles (see the [Athena4.2_CRtransport repository](https://github.com/ppjanka/Athena4.2_CRtransport)). For full documentation of the original code please go to https://princetonuniversity.github.io/Athena-Cversion/.
 
